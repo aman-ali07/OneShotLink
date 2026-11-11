@@ -72,7 +72,7 @@ order; each reads the previous output. See AGENTS.md for the clean-room rules.
 | R-06 | test | IN PROGRESS | Lifecycle/v1/v3/race/expiry covered by 12 integration specs; browser E2E is M2/M4 | F01/F02 happy paths + reveal race, wrong passphrase, expiry covered |
 | R-07 | diff | IN PROGRESS | `replica/parity.md`: baseline 5.8, M1 54.8 (9/11), M2 60.6 (10/11), R-08 63.0 (11/11); re-score after M3 | Baseline recorded at 5.8/100 with 0/11 must-haves; re-run after each milestone |
 | R-08 | entrepreneur | DONE | `replica/fixes.md`, `replica/reviews.csv`, `replica/feedback.md`, `replica/themes-secrets.json` | 20 real linked records from 3 reachable sources (HN 17, Security SE 2, SO 1); Reddit 403 and no mobile app stated as unreachable; every theme flagged thin where <3 reviews or 1 source |
-| R-09 | brand | TODO | `replica/brand.md`, `replica/brand.json` | New name/palette; `sweep.py` exits 0 before any launch work |
+| R-09 | brand | DONE | `replica/brand.md`, `replica/brand.json`, rename across code/docs | Name **OneShotLink**; palette re-measured (12 pairs, 0 AA failures); sweep exits 0. Domains/registries/GitHub checked; trademark, store and social-handle checks are listed as **to run** in brand.md §2 and are not claimed done |
 | R-10 | launch | TODO | `replica/launch/` | No fake proof; original's name absent from listing |
 | R-11 | deploy | TODO | `replica/deploy.md` | Preflight green, user approval recorded, no live keys committed |
 

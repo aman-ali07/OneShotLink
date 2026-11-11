@@ -1,6 +1,7 @@
 # AGENTS.md — project instructions
 
-Onetime Secret clone: a self-hostable, single-use secret sharing service.
+OneShotLink: a self-hostable, single-use secret sharing service. Clean-room clone of the
+original one-time secret service.
 **Stack:** Ruby 3.3 + Roda on Rack 3 + Puma, Redis, Vue 3 + TypeScript + Vite + Tailwind.
 **Status:** production-packaged core with optional simple-mode accounts. The Vue SPA and
 APIs support create → link → reveal once → gone, including the passphrase path; account
@@ -42,7 +43,7 @@ files are needed until a subtree genuinely needs different rules.
 
 ## Replica clone workflow (mandatory)
 
-This project is a clean-room clone of Onetime Secret's core features. The
+This project is a clean-room clone of the original service's core features. The
 `replica-*` skill pack is installed globally under `~/.agents/skills/replica-*`
 (source: https://github.com/Jakeschincariol/replica-skill, MIT). Use it for every
 clone-related task, in this order:
@@ -62,9 +63,9 @@ Rules:
   network calls, private APIs, logos, illustrations, copy, or fonts. Public pages, public
   docs, and the user's own account are the only evidence sources.
 - **Rebrand before launch.** `/replica-brand` (with `sweep.py`) must pass before any
-  deploy. The repository name and "onetimesecret" references are working titles, not
-  shippable branding; do not add the original's name or domain to UI copy, links, or
-  metadata.
+  deploy. The brand is **OneShotLink** (`replica/brand.md`, `replica/brand.json`);
+  references to the original are working titles only, not shippable branding. Do not add
+  the original's name or domain to UI copy, links, or metadata.
 - **No invented parity.** If a feature is deferred, it stays `no`/`skip` in the matrix
   and in PRD.md; never mark it `yes` to improve the score.
 - **Screenshots are references only.** They belong in `replica/screens/`, are git-ignored,
@@ -74,7 +75,7 @@ Useful commands (tools are stdlib Python; run them from the repo root):
 
 ```bash
 python3 ~/.agents/skills/replica-diff/parity.py replica/features.csv
-python3 ~/.agents/skills/replica-brand/sweep.py . --avoid "Onetime Secret" --domains onetimesecret.com
+python3 ~/.agents/skills/replica-brand/sweep.py . --config replica/brand.json
 python3 ~/.agents/skills/replica-design/contrast.py replica/design/tokens.json   # once tokens exist
 ```
 

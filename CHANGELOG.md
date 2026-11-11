@@ -9,6 +9,21 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Changed (R-09 rebrand, 2026-11-11) — verified (sweep, build, specs)
+
+- **The product is now OneShotLink.** The original working title is gone from the UI, page
+  title, OpenAPI document, README/PRD headings, package names, the Compose project, the CI
+  image tag and the preflight default network name. Reason and screening evidence:
+  `replica/brand.md`. The rebrand sweep exits `0` (baseline was 19 hits).
+- **Rebranded copy** on the create/reveal/404 surfaces: "Share a secret once", "Create the
+  link", "Your link, ready to send", "It can be opened once. Opening it deletes it." The
+  passphrase is still described as an access check, never as zero-knowledge (D-012).
+- **Operational consequence:** the Compose project is renamed, so volumes and networks are
+  prefixed `oneshotlink_`. An existing instance keeps its data only if addressed by the old
+  project name; nothing is migrated automatically. See DEPLOYMENT.md §3.
+- **Accessible-name change:** the header brand link and `<title>` no longer say "One-time
+  secret". Anything scraping the old title will notice.
+
 ### Added (go-live gate, 2026-11-11) — verified
 
 - **`script/preflight_selftest.sh`** proves the gate cannot rot: it stands the app up
@@ -285,4 +300,4 @@ OpenAPI document, LICENSE. See [TASKS.md](TASKS.md) and [KNOWN_ISSUES.md](KNOWN_
 
 Initial scaffold checkpoint. No runtime behavior is verified; do not deploy.
 
-[Unreleased]: https://example.invalid/onetime-secret/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/aman-ali07/OneShotLink/compare/v0.1.0...HEAD

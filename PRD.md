@@ -1,4 +1,7 @@
-# PRD — Onetime Secret clone
+# PRD — OneShotLink
+
+The brand is OneShotLink (R-09, `replica/brand.md`); this document still describes the
+clean-room clone of the original one-time secret service and keeps that provenance.
 
 Status: **M2 + production packaging implemented.** The secret lifecycle, browser
 vertical slice, hardened image, and Compose stack are live; the "Impl." column below is

@@ -1,0 +1,166 @@
+# Brand — R-09
+
+Status: **name chosen, palette verified, voice written, codebase swept clean of the
+original's name.** Trademark and app-store screening are **not** done — see §2. Nothing
+here claims legal clearance, zero-knowledge encryption (D-012), or production readiness.
+
+Angle this brand has to carry (from `replica/fixes.md`): **self-host first, honest crypto
+copy.** The original's loudest complaint is distrust of a third-party host, so the name and
+copy stay concrete about what the server can and cannot do.
+
+## 1. The name
+
+**OneShotLink** — descriptive-compound. It says the mechanism (one shot, one link) and the
+verb the product exists for (share a link, not "manage secrets"). It is the name the
+GitHub repository already carries, so no rename churn on the remote.
+
+Candidates considered (20 generated, cut to 5 by the skill's filters: not confusingly
+similar to the original in sound/look/meaning, short and spellable after hearing it once,
+no awkward meaning in a big language, and not fighting the self-host angle):
+
+| Candidate | Style | Why it was cut / kept |
+| --- | --- | --- |
+| **OneShotLink** | descriptive compound | **Kept.** Says the mechanism; no shared sound or letterform trick with the original; already the repo name. |
+| Burnnote | metaphor | Cut: "burn after reading" implies the sender keeps no record, which is stronger than what the product does. |
+| Sable | invented/metaphor | Cut: no meaning transfer; collides with existing products in unrelated categories. |
+| Sliponce | invented compound | Cut: reads as a typo of "slip once"; poor spell-after-hearing. |
+| Veilcast | metaphor | Cut: implies end-to-end secrecy we do not implement (D-012), i.e. it would lie about the crypto. |
+
+Rejected deliberately: any pun on "onetime", any `-ly` twin of a competitor, and every
+metaphor (veil, vault, cloak, zero) that implies the server cannot read the secret. That
+last rule is the D-012 constraint expressed as naming policy.
+
+## 2. The checks — run vs. to run
+
+Run on **2026-11-11** from this machine:
+
+| Check | Method | Result |
+| --- | --- | --- |
+| `oneshotlink.com` | RDAP (rdap.org → Verisign) | `404` — consistent with unregistered; confirm at a registrar before paying |
+| `oneshotlink.net` | RDAP (Verisign) | `404` — consistent with unregistered |
+| `oneshotlink.app` | RDAP (Google registry) | `404` — consistent with unregistered; `.app` is HSTS-preloaded, which suits this product |
+| `oneshotlink.dev` | RDAP (Google registry) | `404` — consistent with unregistered |
+| `oneshotlink.io` | RDAP | **Inconclusive** — the `.io` registry publishes no RDAP service (`errorCode 404`, "No RDAP service is available"); needs a registrar or whois lookup. `whois` is not installed on this machine. |
+| npm package | `registry.npmjs.org/oneshotlink` | `404` — unregistered |
+| PyPI package | `pypi.org/pypi/oneshotlink/json` | `404` — unregistered |
+| RubyGems | `rubygems.org/api/v1/gems/oneshotlink.json` | `404` — unregistered |
+| GitHub handle | `github.com/oneshotlink`, `github.com/OneShotLink` | `404` — no user or org holds it |
+
+**To run — no result is claimed for any of these:**
+
+- US trademark, USPTO TESS/TMsearch, classes **9** (software) and **42** (SaaS).
+- EU trademark, EUIPO eSearch, or TMview to cover several offices at once.
+- Canada, ISED trademark database.
+- WIPO Global Brand Database.
+- App Store and Google Play exact-name search (needs a device or store web session).
+- Handles on X, Instagram, TikTok (the GitHub handle is checked above; the others are not).
+- Open web search for `OneShotLink` plus the category. The web-search tool failed twice in
+  this session, so this row is genuinely unrun.
+
+These are screening checks, not clearance. Before spending money on the name, a trademark
+lawyer should run a proper search. **The `scripts/preflight` go-live gate does not check
+this**, so it is an operator decision recorded here, not an automated one.
+
+## 3. Palette
+
+Roles unchanged from `replica/design/tokens.json` (replica-design owns the role names).
+The accent is **deep teal `#0f766e`** — a different hue family from the original's
+blue-violet public identity, so no confusion in a screenshot comparison and no borrowed
+colour pair. Neutrals stay warm stone, which reads calmer than the usual cool grey for a
+page whose job is "paste the thing you do not want to leak".
+
+The original's brand hexes are deliberately absent from `brand.json`: we never sampled
+them, because reading their CSS or bundles is prohibited by the clean-room rule. The
+palette was authored from the token roles and then measured:
+
+```bash
+python3 ~/.agents/skills/replica-design/contrast.py replica/design/tokens.json
+# 12 pairs, 0 failing AA  (accent on bg 5.24:1, on-accent on accent 5.47:1, text 16.74:1)
+```
+
+Zero AA failures is the gate; it passes as of 2026-11-11.
+
+## 4. Logo brief
+
+For whoever draws it — the user, a designer, or an image model.
+
+- **Idea in one line:** a link (chain) that is whole while it is unread and breaks cleanly
+  the moment it is used — one open stroke entering, one leaving, the break at the seam.
+- **Mark type:** symbol plus wordmark. Wordmark set in the existing UI sans at semibold,
+  tight tracking, `#1c1917` on light; the symbol is the single-stroke chain break in
+  `#0f766e`.
+- **Monogram fallback:** `1SL` is too dense at 16px — use the symbol alone for the favicon
+  rather than a letter trio.
+- **Must work at** 16px (favicon, one mark, no fine detail) and 1024px (app icon).
+- **Deliverables:** SVG (single path per colour), app icon 1024×1024 with **no
+  transparency** for iOS, favicon set (16/32/180/512), social image 1200×630 with the
+  tagline "Share a secret once."
+- **Must not resemble the original's mark:** no shared shape, no shared colour pair, no
+  letterform trick. If a draft could be mistaken for the original's logo at 32px, redo it.
+
+## 5. Voice
+
+Three words: **plain, careful, unhurried.**
+
+- *Plain*, not blunt — no jargon, no "military-grade", and no softening a real limit.
+- *Careful*, not anxious — state the risk once, then let the user act; no red banners.
+- *Unhurried*, not slow — short sentences, no urgency theatre, no countdown pressure.
+
+| Do | Don't |
+| --- | --- |
+| Say exactly what is stored and for how long. | Say "military-grade", "zero-knowledge", or "unbreakable". |
+| Name the thing: link, passphrase, expiry. | Call it a vault, a package, a drop, a capsule. |
+| Tell the user what to do next. | Tell the user how to feel ("don't worry!"). |
+| Keep the passphrase warning factual: sent separately. | Imply the passphrase makes the secret unreadable to the server (D-012). |
+| Own the empty state ("already viewed, expired, or never existed"). | Explain the security logic at length in the UI. |
+
+### The ten most-seen strings, rewritten
+
+All fresh; none reuses the original's phrasing. Files are the ones changed in the sweep
+commit.
+
+| # | Where | String |
+| --- | --- | --- |
+| 1 | `AppHeader.vue` | **OneShotLink** |
+| 2 | `index.html` `<title>` | **OneShotLink — share a secret once** |
+| 3 | `ConcealView.vue` hero h1 | **Share a secret once** |
+| 4 | `ConcealView.vue` hero sub | The recipient opens the link once. After that the secret is gone from the server. |
+| 5 | `ConcealView.vue` primary button | **Create the link** (was "Create one-time link") |
+| 6 | `ConcealView.vue` result h1 | **Your link, ready to send** |
+| 7 | `ConcealView.vue` success alert | Stored encrypted. Deleted after one view, or automatically after {ttl}. |
+| 8 | `RevealView.vue` intro sub | It can be opened once. Opening it deletes it. |
+| 9 | `RevealView.vue` gone sub | It was already opened, it expired, or it never existed. The server does not say which. |
+| 10 | `AppFooter.vue` | Encrypted at rest. Deleted after one view or on expiry. |
+
+Unchanged on purpose: form labels (`Secret`, `Expires after`, `Passphrase`), the passphrase
+helper "Share it separately from the link.", and the account screens' headings. Those are
+functional microcopy with no brand voice to gain, and churning them would be noise.
+
+## 6. Sweep
+
+```bash
+python3 ~/.agents/skills/replica-brand/sweep.py . --config replica/brand.json
+```
+
+Clean as of the R-09 commit (verified: `sweep.py --config replica/brand.json` printed
+"Clean. Nothing of the original's name, domain or colours found." and exited `0`; the
+baseline before the pass was 19 hits — 18 name, 1 domain): the original's name and domain
+are gone from the codebase, package names, compose project, CI image tag, preflight
+defaults and the user-visible copy.
+`replica/` is skipped by the tool because that is where the original's name belongs — the
+recon record must keep saying who was cloned.
+
+Two references survive on purpose and neither is a hit:
+
+- The Ruby module namespace stays `Onetime` and Redis keys keep the `ots:` prefix. They are
+  internal identifiers, not shipped brand, and the sweep matches only the full name.
+- `lib/onetime/crypto.rb` derives keys with `info: "ots-secret"` and a per-record random
+  salt, so the brand does not appear in any stored record. K-23 previously claimed a
+  `"onetimesecret/v1"` HKDF salt was still in the code; that is stale and was corrected in
+  `KNOWN_ISSUES.md` during this task.
+
+Not done, and not claimed: a logo has not been produced (brief only), the GitHub repository
+description/topics and the remote name are unchanged, and no domain has been registered.
+
+Next: `/replica-launch` (R-10). Landing copy must not imply zero-knowledge (D-012) or
+"production ready" while the host gates are open.

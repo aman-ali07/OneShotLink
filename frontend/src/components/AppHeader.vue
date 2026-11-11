@@ -2,7 +2,7 @@
   <header class="border-b border-border bg-bg">
     <div class="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:px-6">
       <RouterLink to="/" class="text-base font-semibold tracking-tight text-text">
-        One-time secret
+        OneShotLink
       </RouterLink>
       <nav aria-label="Primary">
         <RouterLink

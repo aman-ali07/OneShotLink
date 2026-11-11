@@ -1,0 +1,26 @@
+{
+  "_about": "Brand source of truth for R-09. Consumed by replica-brand/sweep.py, replica-launch/listing.py and replica-deploy. Written 2026-11-11. 'colors' is empty on purpose: the original's brand hexes were never sampled (clean-room rule; reading their CSS/bundles is prohibited), so a colour sweep has nothing to compare against. Our palette was authored fresh and verified with replica-design/contrast.py.",
+  "name": "OneShotLink",
+  "tagline": "Share a secret once.",
+  "avoid": ["Onetime Secret", "OneTimeSecret", "onetimesecret"],
+  "domains": ["onetimesecret.com"],
+  "colors": [],
+  "palette": {
+    "primary": "#0f766e",
+    "primary_family": "deep teal",
+    "on_primary": "#ffffff",
+    "surface": "#ffffff",
+    "bg": "#fafaf9",
+    "text": "#1c1917"
+  },
+  "checks_run": "2026-11-11",
+  "checks_outstanding": [
+    "US trademark (USPTO, classes 9 and 42)",
+    "EU trademark (EUIPO eSearch / TMview)",
+    "Canada (ISED trademark database)",
+    "WIPO Global Brand Database",
+    "App Store and Google Play exact-name search",
+    "X, Instagram, TikTok handles",
+    "open web search for 'OneShotLink' plus category (search provider failed twice this session)"
+  ]
+}

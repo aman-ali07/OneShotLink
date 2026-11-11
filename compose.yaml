@@ -1,4 +1,4 @@
-name: onetime-secret
+name: oneshotlink
 
 services:
   redis:

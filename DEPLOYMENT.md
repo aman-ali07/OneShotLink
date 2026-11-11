@@ -110,6 +110,13 @@ docker compose down          # keeps the redis-data volume
 docker compose down -v       # deletes secrets and receipts — destructive
 ```
 
+The Compose project is named `oneshotlink`, so its volumes and networks are prefixed
+`oneshotlink_` (`oneshotlink_redis-data`, `oneshotlink_backend`, `oneshotlink_frontend`).
+The project was renamed from its pre-R-09 working title (see `git log -p compose.yaml`); an
+instance started before that rename keeps its data only if you address it by the old
+project name (`docker compose --project-name <old-name> ...`). No data has been migrated by
+the rename itself.
+
 ## 4. Reverse proxy and TLS
 
 - Terminate TLS at Caddy/nginx/Traefik and proxy to `web:3000`.
@@ -146,7 +153,7 @@ without the password), which is defence in depth, but the host should block the 
 
 ```bash
 # Find the backend subnet for this project
-SUBNET=$(docker network inspect onetime-secret_backend \
+SUBNET=$(docker network inspect oneshotlink_backend \
   --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}')
 
 # nftables: drop host -> backend:6379

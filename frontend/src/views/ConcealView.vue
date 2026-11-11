@@ -93,9 +93,9 @@ function reset() {
   <div class="space-y-8">
     <section v-if="!result" class="space-y-6">
       <div class="space-y-2">
-        <h1 class="text-3xl font-bold tracking-tight">Share a secret</h1>
+        <h1 class="text-3xl font-bold tracking-tight">Share a secret once</h1>
         <p class="text-muted">
-          The recipient can view it once. After that, it is deleted from the server.
+          The recipient opens the link once. After that the secret is gone from the server.
         </p>
       </div>
 
@@ -156,7 +156,7 @@ function reset() {
         <AppAlert v-if="error" tone="danger">{{ error }}</AppAlert>
 
         <AppButton type="submit" :loading="submitting">
-          {{ submitting ? "Creating link…" : "Create one-time link" }}
+          {{ submitting ? "Creating link…" : "Create the link" }}
         </AppButton>
       </form>
     </section>
@@ -164,7 +164,7 @@ function reset() {
     <section v-else class="space-y-6" aria-labelledby="result-heading">
       <div class="space-y-2">
         <h1 id="result-heading" ref="resultHeading" tabindex="-1" class="text-3xl font-bold tracking-tight">
-          Your one-time link
+          Your link, ready to send
         </h1>
         <p class="text-muted">
           Send this link to the recipient. It works once and then stops working.
@@ -181,7 +181,7 @@ function reset() {
       </AppAlert>
 
       <AppAlert tone="success">
-        Stored encrypted. It expires after {{ ttlLabel(result.receipt.secret_ttl) }}.
+        Stored encrypted. Deleted after one view, or automatically after {{ ttlLabel(result.receipt.secret_ttl) }}.
       </AppAlert>
 
       <AppButton variant="secondary" @click="reset">Create another secret</AppButton>

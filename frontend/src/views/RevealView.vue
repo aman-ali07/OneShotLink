@@ -80,7 +80,7 @@ function ttlLabel(seconds: number): string {
     <section v-if="phase === 'gone'" class="space-y-4" aria-labelledby="gone-heading">
       <h1 id="gone-heading" class="text-3xl font-bold tracking-tight">This secret is gone</h1>
       <p class="text-muted">
-        It was already viewed, has expired, or never existed. For safety, the server does not
+        It was already opened, it expired, or it never existed. The server does not
         say which.
       </p>
       <RouterLink to="/" class="inline-block text-sm font-semibold text-accent hover:underline">
@@ -117,7 +117,7 @@ function ttlLabel(seconds: number): string {
     <section v-else class="space-y-6" aria-labelledby="reveal-heading">
       <div class="space-y-2">
         <h1 id="reveal-heading" class="text-3xl font-bold tracking-tight">A secret was shared with you</h1>
-        <p class="text-muted">It can be viewed once. Reading it will destroy it immediately.</p>
+        <p class="text-muted">It can be opened once. Opening it deletes it.</p>
       </div>
 
       <AppAlert>

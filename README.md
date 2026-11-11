@@ -1,4 +1,4 @@
-# Onetime Secret clone
+# OneShotLink
 
 A self-hostable service for sharing passwords, API keys, and private notes through
 **single-use, self-destructing links**. The recipient can view a secret exactly once;

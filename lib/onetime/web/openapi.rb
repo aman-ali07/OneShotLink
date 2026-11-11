@@ -15,7 +15,7 @@ module Onetime
         {
           "openapi" => "3.1.0",
           "info" => {
-            "title" => "Onetime Secret API",
+            "title" => "OneShotLink API",
             "version" => VERSION,
             "description" => "Create a single-use secret, share the link, and let it be revealed exactly once."
           },

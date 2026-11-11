@@ -1,5 +1,5 @@
 {
-  "name": "onetime-secret-e2e",
+  "name": "oneshotlink-e2e",
   "private": true,
   "type": "module",
   "scripts": {

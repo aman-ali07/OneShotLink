@@ -17,7 +17,7 @@
 #   HOST                     Public base URL, including scheme (required).
 #   HTTP_URL                 Plain-HTTP URL for the redirect check. Defaults to
 #                            HOST with the scheme swapped to http.
-#   REDIS_NETWORK            Docker network to inspect. Default onetime-secret_backend.
+#   REDIS_NETWORK            Docker network to inspect. Default oneshotlink_backend.
 #   REDIS_PORT               Redis port. Default 6379.
 #   PREFLIGHT_ALLOW_SIGNUP   Set to 1 to create a throwaway account in order to
 #                            inspect the session cookie flags. Otherwise that
@@ -29,7 +29,7 @@ set -uo pipefail
 
 HOST="${HOST:-}"
 HTTP_URL="${HTTP_URL:-}"
-REDIS_NETWORK="${REDIS_NETWORK:-onetime-secret_backend}"
+REDIS_NETWORK="${REDIS_NETWORK:-oneshotlink_backend}"
 REDIS_PORT="${REDIS_PORT:-6379}"
 PREFLIGHT_ALLOW_SIGNUP="${PREFLIGHT_ALLOW_SIGNUP:-0}"
 CACERT=""
@@ -65,7 +65,7 @@ Options:
 Environment:
   HOST                   Public base URL, including scheme (required)
   HTTP_URL               Plain-HTTP URL for the redirect check (default: http://<host>)
-  REDIS_NETWORK          Docker network with Redis (default onetime-secret_backend)
+  REDIS_NETWORK          Docker network with Redis (default oneshotlink_backend)
   REDIS_PORT             Redis port (default 6379)
   PREFLIGHT_ALLOW_SIGNUP=1  Create a throwaway account to inspect cookie flags
 EOF

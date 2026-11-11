@@ -21,7 +21,7 @@ ROOT="$PWD"
 HTTPS_PORT="${PF_HTTPS_PORT:-9443}"
 HTTP_PORT="${PF_HTTP_PORT:-9080}"
 DOMAIN="preflight.selftest.invalid"
-NET="onetime-secret_frontend"
+NET="oneshotlink_frontend"
 CADDY="preflight-selftest-caddy"
 WORK="$(mktemp -d)"
 

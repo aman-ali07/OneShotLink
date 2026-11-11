@@ -83,7 +83,7 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: e2e/package-lock.json
-      - run: docker build -t onetime-secret-web .
+      - run: docker build -t oneshotlink-web .
       - name: Boot compose stack and run a lifecycle smoke test
         run: |
           docker compose up -d --no-build
