@@ -164,8 +164,17 @@ only the `web` container may open `redis:6379`.
 
 ### 4.1 Verify TLS on the live domain (T-70)
 
-Run these against the real hostname after the proxy is up. Each line must return the
-stated value; the app-side of all of them is already verified locally.
+Run the automated gate instead of the manual probes below:
+
+```bash
+HOST=https://secrets.example.com script/preflight.sh
+```
+
+It encodes every check in this section plus the Redis isolation checks, prints
+`PREFLIGHT PASSED` and exits `0` only when all pass, and exits non-zero otherwise
+(see `--help` for `--cacert`, `--resolve`, and `--skip-redis`). Set
+`PREFLIGHT_ALLOW_SIGNUP=1` to include the session-cookie check. The commands below
+are kept as reference for what it checks:
 
 ```bash
 H=https://secrets.example.com

@@ -64,6 +64,12 @@ These are the only two items left. Both are **infrastructure** that depends on t
 operator's host and certificates, so they cannot be closed from the repository. They
 block a public "production ready" claim, not local use.
 
+Both are checked by one command that exits non-zero on any failure:
+
+```bash
+HOST=https://your.domain script/preflight.sh   # see --help
+```
+
 | Item | Risk | Owner task |
 |---|---|---|
 | TLS termination + real hostname | The **app side is verified**: behind a TLS terminator with `SSL=true`/`HOST`/`TRUST_PROXY`, HSTS, `Secure`/`HttpOnly`/`SameSite` cookies, HTTPS links, and XFF spoofing protection were all confirmed at runtime (and the negative controls with `SSL=false`). What remains is the operator's real hostname and certificate at the proxy — run the §4.1 checklist on the live domain. | T-70 |

@@ -9,6 +9,18 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (go-live gate, 2026-11-11) — verified
+
+- **`script/preflight.sh`** turns the two remaining host gates into one command that
+  exits non-zero on failure: HTTPS `200` with a validating chain, HSTS (rejecting
+  `max-age=0`), the hardening headers, the session cookie's `Secure`/`HttpOnly`/`SameSite`
+  flags (opt-in, since it creates an account), a plain-HTTP→HTTPS redirect, the Redis
+  network being `internal`, and the host being **unable** to reach `redis:6379`. Supports
+  `--cacert` and `--resolve` for pre-DNS verification. Verified against a local
+  TLS-terminated stack: the pass path exits `0`, and untrusted certs, missing HSTS, a
+  plain-HTTP 200, an unreachable host, and a reachable Redis each exit `1` with a
+  specific message.
+
 ### Security (Redis network policy, 2026-11-11) — verified
 
 - **Redis can no longer reach the internet (T-71).** Compose now puts Redis on an
