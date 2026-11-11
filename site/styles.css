@@ -1,0 +1,203 @@
+/* OneShotLink marketing site. Values come from replica/design/tokens.json.
+   No webfont, no CDN, no analytics: system stack only, so the page loads with
+   zero third-party requests. Contrast verified with replica-design/contrast.py. */
+
+:root {
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --border: #e7e5e4;
+  --text: #1c1917;
+  --muted: #57534e;
+  --accent: #0f766e;
+  --on-accent: #ffffff;
+  --danger: #b91c1c;
+  --radius: 10px;
+  --content: 672px;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: var(--content);
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+header.site .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+}
+
+.brand {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+nav.site a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  margin-left: 16px;
+}
+
+nav.site a:hover { color: var(--text); text-decoration: underline; }
+
+main { padding: 48px 0 0; }
+
+section + section { margin-top: 56px; }
+
+h1 {
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 16px;
+  max-width: 22ch;
+}
+
+h2 {
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+}
+
+h3 { font-size: 20px; margin: 0 0 8px; }
+
+p { margin: 0 0 16px; color: var(--text); }
+
+.lede { font-size: 20px; color: var(--muted); max-width: 52ch; }
+
+.small { font-size: 14px; color: var(--muted); }
+
+.prealpha {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 32px;
+}
+
+.prealpha strong { color: var(--text); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 24px 0 8px; }
+
+.button {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: var(--radius);
+  min-height: 44px;
+}
+
+.button:hover { background: #0b5d56; }
+.button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+.button.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.button.secondary:hover { background: #f5f5f4; }
+
+ol.steps, ul.plain { padding-left: 20px; margin: 0 0 16px; }
+ol.steps li, ul.plain li { margin-bottom: 8px; }
+
+ol.steps li strong { display: block; }
+
+pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+
+caption { text-align: left; font-size: 14px; color: var(--muted); padding-bottom: 8px; }
+
+th, td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th { font-weight: 600; }
+
+.table-scroll { overflow-x: auto; }
+
+.note {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-size: 14px;
+}
+
+.note.warn { border-left: 3px solid var(--danger); }
+
+dl.faq { margin: 0; }
+
+dl.faq dt { font-weight: 600; margin-top: 20px; }
+dl.faq dd { margin: 6px 0 0; color: var(--muted); }
+
+footer.site {
+  margin-top: 72px;
+  border-top: 1px solid var(--border);
+  padding: 24px 0 48px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+footer.site a { color: var(--muted); }
+footer.site a:hover { color: var(--text); }
+
+footer.site .wrap { display: flex; flex-wrap: wrap; gap: 12px 20px; justify-content: space-between; }
+
+@media (max-width: 640px) {
+  h1 { font-size: 32px; }
+  h2 { font-size: 24px; }
+  .lede { font-size: 18px; }
+  main { padding-top: 32px; }
+  section + section { margin-top: 40px; }
+}

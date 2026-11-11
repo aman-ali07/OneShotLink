@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy — OneShotLink</title>
+    <meta name="description" content="What OneShotLink stores, for how long, and what it never collects." />
+    <meta name="theme-color" content="#0f766e" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="/">OneShotLink</a>
+        <nav class="site" aria-label="Primary">
+          <a href="/#pricing">Pricing</a>
+          <a href="/#faq">Questions</a>
+          <a href="https://github.com/aman-ali07/OneShotLink">Source</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section aria-labelledby="title">
+        <h1 id="title">Privacy</h1>
+        <p class="lede">
+          This page describes the software in this repository and the hosted instance we run.
+          If you self-host, the operator of your instance is the data controller; this page is
+          still an accurate description of what the software itself stores.
+        </p>
+        <p class="small">Last updated: 2026-11-11.</p>
+      </section>
+
+      <section aria-labelledby="what">
+        <h2 id="what">What is stored</h2>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                <th scope="col">Where</th>
+                <th scope="col">Why, and for how long</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">The secret itself</th>
+                <td>Redis, as ciphertext only</td>
+                <td>
+                  Encrypted with AES-256-GCM under a key derived from the instance secret.
+                  Deleted on the first successful reveal, or when the expiry you chose runs out.
+                  Plaintext is never written to disk or logged.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">A receipt (kind, timestamps, expiry, passphrase flag)</th>
+                <td>Redis, same expiry as the secret</td>
+                <td>
+                  So a signed-in sender can see what they created and when. Removed when the
+                  secret is revealed or expires.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Account email and password hash</th>
+                <td>Redis, only if you create an account</td>
+                <td>
+                  Email for sign-in and receipts; password stored as an Argon2id hash, never
+                  in plain text. Kept until the account is deleted.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Session token</th>
+                <td>Redis, keyed by a SHA-256 hash of the token</td>
+                <td>
+                  Keeps you signed in; expires on its own, and all other sessions are revoked
+                  when you change your password.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Request logs</th>
+                <td>The instance's stdout</td>
+                <td>
+                  One line per request: method, path with secret keys redacted, status,
+                  duration, request id. No request body, no query string, no cookies, no IP
+                  address.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="not">
+        <h2 id="not">What is not collected</h2>
+        <ul class="plain">
+          <li>No analytics, no tracking pixels, no third-party scripts on this page or in the app.</li>
+          <li>No advertising identifiers, no profiling, no data sold or shared with anyone.</li>
+          <li>No IP addresses or user agents in application logs.</li>
+          <li>No email address unless you sign up for an account or write to us first.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="cookies">
+        <h2 id="cookies">Cookies</h2>
+        <p>
+          One cookie, and only if you sign in: the session. It is
+          <code>HttpOnly</code>, <code>Secure</code> when the instance is served over HTTPS,
+          and <code>SameSite=Lax</code>. There are no marketing or analytics cookies, so there
+          is no consent banner — and no consent to collect, because nothing is tracked.
+        </p>
+      </section>
+
+      <section aria-labelledby="control">
+        <h2 id="control">Your control over it</h2>
+        <ul class="plain">
+          <li>
+            <strong>Expiry is yours.</strong> The TTL is set when you create a secret and
+            enforced by Redis, not by a cleanup job.
+          </li>
+          <li>
+            <strong>Passphrase.</strong> An extra access check in front of a secret. It does
+            not make the secret unreadable to the server.
+          </li>
+          <li>
+            <strong>Deleting an account.</strong> Ask the operator of your instance (or us, for
+            the hosted one) and the account record, its sessions and its receipts are removed.
+            There is no self-service delete button yet — that is a known gap, not a hidden
+            process.
+          </li>
+          <li>
+            <strong>Export.</strong> Not implemented. Receipts are metadata about secrets that
+            are designed to disappear; there is little to export.
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="hosted">
+        <h2 id="hosted">If we host it for you</h2>
+        <p>
+          The managed instance is not open yet. When it is: the instance runs on a host we
+          control, with TLS, authenticated Redis and daily backups, and the same retention
+          rules above apply. Backups contain ciphertext and account records, are kept for
+          seven days, and are deleted on rotation.
+        </p>
+        <p class="note warn">
+          <strong>Transport is not end-to-end encrypted.</strong> Secrets are encrypted at rest
+          and in transit to the server, and the server can read a revealed secret. If that is
+          not acceptable for a given secret, use an instance you control.
+        </p>
+      </section>
+
+      <section aria-labelledby="contact">
+        <h2 id="contact">Contact</h2>
+        <p>
+          Privacy questions and account deletion requests: open an issue at
+          <a href="https://github.com/aman-ali07/OneShotLink/issues">the source repository</a>,
+          or use the operator contact published by the instance you are using. This page
+          states what the software does; a lawyer has not reviewed it.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <span>OneShotLink — share a secret once.</span>
+        <span>
+          <a href="/">Home</a> · <a href="/terms.html">Terms</a> ·
+          <a href="https://github.com/aman-ali07/OneShotLink">Source</a>
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>

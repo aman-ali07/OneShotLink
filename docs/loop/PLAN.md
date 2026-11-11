@@ -14,15 +14,22 @@ Rules:
 
 ## Now
 
-- [ ] (empty — the first armed iteration writes this from the failing T* criterion)
+- [ ] **T-78 / T1: make `/landing` answer with the landing page.** Read
+      `replica/launch/landing.md` §1 (hero) first; the route, the view and
+      `spec/integration/landing_spec.rb` do not exist yet, so T1 is red because the
+      spec file is missing. Follow AGENTS.md §1 doc table: DESIGN_SYSTEM.md before
+      styling, API.md if server behaviour changes.
+- [ ] **T-78 / T2: the built SPA must carry the approved hero headline** — the exact
+      string from `replica/launch/landing.md` §1, including the em dash. Wiring the
+      route without the approved copy leaves T2 red.
 
 ## Blocked
 
-- [ ] **Human: arm a target.** `docs/loop/goal.criteria` has floor gates only, so
-      `script/loop_verify.sh` reports `GOAL: UNDEFINED` and `script/loop.sh` exits
-      without doing anything. Pick the next item (T-78 is the only `TODO` in
-      `TASKS.md` today), write it as T* behaviour criteria, confirm they are red,
-      then run the loop. `docs/loop/GOAL.md` has the procedure.
+- [ ] **Human: give the loop an agent.** `script/loop_doctor.sh` found no answering
+      agent on this machine (pi/claude need an interactive login, codex needs an
+      upgrade, gemini/opencode are unauthenticated). Until one answers,
+      `script/loop.sh` will stop at iteration 1 with "agent exited N". See the
+      fix list the doctor prints.
 
 ## Done
 

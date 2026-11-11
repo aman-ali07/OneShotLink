@@ -11,7 +11,9 @@
 #   script/loop.sh --dry-run       # render the self-prompt, run nothing
 #   script/loop.sh --no-commit     # never commit
 #
-# Env: LOOP_AGENT (default pi), LOOP_MAX_ITER, LOOP_MAX_ATTEMPT (6),
+# Env: LOOP_AGENT (pi|claude|codex|gemini|opencode, or a binary taking -p),
+#      LOOP_AGENT_CMD (escape hatch: command that takes the prompt as its last arg),
+#      LOOP_MAX_ITER, LOOP_MAX_ATTEMPT (6),
 #      LOOP_STALL_LIMIT (2), LOOP_COMMIT (1|0), LOOP_CRITERIA.
 #
 # Exit codes: 0 goal met / agent blocked / goal undefined; 1 rule violation or
@@ -160,7 +162,21 @@ while :; do
   echo
   echo "loop: iter $ITER/$MAX_ITER  attempt $((ATTEMPT + 1))/$MAX_ATTEMPT  progress $pass/$total"
 
-  "$AGENT" -p "$PROMPT" 2>&1 | tee "$transcript"
+  # Agent invocation: a preset for the common CLIs, or LOOP_AGENT_CMD for anything
+  # else (the prompt is passed as the final argument).
+  if [[ -n "${LOOP_AGENT_CMD:-}" ]]; then
+    # shellcheck disable=SC2086
+    $LOOP_AGENT_CMD "$PROMPT" 2>&1 | tee "$transcript"
+  else
+    case "$AGENT" in
+      pi)       pi -p "$PROMPT" 2>&1 | tee "$transcript" ;;
+      claude)   claude -p "$PROMPT" 2>&1 | tee "$transcript" ;;
+      codex)    codex exec --skip-git-repo-check "$PROMPT" 2>&1 | tee "$transcript" ;;
+      gemini)   gemini --skip-trust -p "$PROMPT" 2>&1 | tee "$transcript" ;;
+      opencode) opencode run "$PROMPT" 2>&1 | tee "$transcript" ;;
+      *)        "$AGENT" -p "$PROMPT" 2>&1 | tee "$transcript" ;;
+    esac
+  fi
   agent_status="${PIPESTATUS[0]}"
 
   if [[ "$(snapshot_human)" != "$HUMAN_NOW" ]]; then

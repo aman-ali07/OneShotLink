@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OneShotLink — share a secret once, on a server you run</title>
+    <meta
+      name="description"
+      content="One-time secret links you self-host: one compose command, your Redis, an atomic reveal, and copy that states exactly what the server can read."
+    />
+    <meta name="theme-color" content="#0f766e" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="OneShotLink — share a secret once" />
+    <meta
+      property="og:description"
+      content="A one-time secret service you run yourself. Encrypted at rest, deleted on first open, no account needed on either end."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="/">OneShotLink</a>
+        <nav class="site" aria-label="Primary">
+          <a href="#how">How it works</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">Questions</a>
+          <a href="https://github.com/aman-ali07/OneShotLink">Source</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <p class="prealpha">
+        <strong>Pre-alpha.</strong> The app is packaged and tested (104 specs, CI on every
+        push) and runs in a hardened container. TLS, Redis auth, backups and the host
+        firewall are operator actions, and the preflight gate has to pass on your host
+        before you trust it with anything real.
+      </p>
+
+      <section aria-labelledby="hero">
+        <h1 id="hero">Share a secret once — on a server you run.</h1>
+        <p class="lede">
+          One-time links for passwords and keys, with a one-command install, a reveal you can
+          read in the source, and a recipient who never needs an account.
+        </p>
+        <p class="actions">
+          <a class="button" href="#how">Install it</a>
+          <a class="button secondary" href="#faq">What the server can read</a>
+        </p>
+        <p class="small">
+          Two required environment variables. Your Redis. No account, no card, no telemetry.
+        </p>
+      </section>
+
+      <section aria-labelledby="problem">
+        <h2 id="problem">The problem is not the encryption</h2>
+        <p>
+          The tool everyone reaches for is somebody else's server, and the person sending the
+          password has no way to check what that server does with it. The usual answer is
+          "trust us": a network diagram and a promise.
+        </p>
+        <p>
+          There is a second trap that catches people later. Paste a one-time link into a chat
+          app and the preview may open it for you — and a one-time link that has been opened
+          once is gone before your colleague ever clicks.
+        </p>
+      </section>
+
+      <section aria-labelledby="how">
+        <h2 id="how">How it works</h2>
+        <ol class="steps">
+          <li>
+            <strong>Paste the secret.</strong>
+            Pick an expiry, and add a passphrase if you want an extra access check.
+          </li>
+          <li>
+            <strong>Send the link.</strong>
+            The recipient opens it and confirms. Nothing is consumed before that.
+          </li>
+          <li>
+            <strong>It is gone.</strong>
+            One view, or the expiry you chose — the record is deleted from Redis.
+          </li>
+        </ol>
+        <pre><code>export SECRET="$(openssl rand -hex 32)"
+export REDIS_PASSWORD="$(openssl rand -hex 24)"
+docker compose up -d --build
+curl -fsS http://localhost:3000/health</code></pre>
+        <p class="small">
+          Then put a TLS proxy in front of it and run <code>script/preflight.sh</code>. The
+          script refuses to call a deployment ready if the certificate, HSTS header, cookie
+          flags or Redis isolation are wrong.
+        </p>
+      </section>
+
+      <section aria-labelledby="features">
+        <h2 id="features">What it does differently</h2>
+        <div class="table-scroll">
+          <table>
+            <caption>Each row is a property of the code in this repository, not a roadmap item.</caption>
+            <thead>
+              <tr>
+                <th scope="col">Property</th>
+                <th scope="col">What it means here</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">A host you can prove</th>
+                <td>
+                  Two environment variables and one compose command. The crypto is about 60
+                  lines and named for what it is, so you can read it before you trust it.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">The share link does not spend the secret</th>
+                <td>
+                  Opening the link shows a button, not the secret. Nothing is consumed until
+                  the recipient confirms, so a link preview does not burn it.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Honest crypto, stated plainly</th>
+                <td>
+                  AES-256-GCM at rest under a key derived from the instance secret, verified
+                  with an authentication tag on decrypt. The server holds that key, so it can
+                  read a revealed secret; the passphrase is an access check, not a second key.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">No account on either end</th>
+                <td>
+                  Guests create and reveal. Accounts are optional, for receipts and a
+                  dashboard.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">A single answer for every miss</th>
+                <td>
+                  Expired, already opened, or never existed all return the same 404. The
+                  server does not leak which one it was.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">One reveal wins</th>
+                <td>
+                  The consume is an atomic compare-and-delete in Lua: eight concurrent reveals
+                  produce exactly one winner.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Nothing useful in the logs</th>
+                <td>
+                  One line per request with no body, no query string, no cookies, no IP, and
+                  the secret key redacted.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="pricing">
+        <h2 id="pricing">Pricing</h2>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">&nbsp;</th>
+                <th scope="col">Community</th>
+                <th scope="col">Managed</th>
+                <th scope="col">Deployment review</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Price</th>
+                <td>$0</td>
+                <td>$8/month or $80/year</td>
+                <td>$300 once</td>
+              </tr>
+              <tr>
+                <th scope="row">Where it runs</th>
+                <td>Your container, your Redis</td>
+                <td>An instance we operate</td>
+                <td>Your infrastructure</td>
+              </tr>
+              <tr>
+                <th scope="row">Secrets and accounts</th>
+                <td>Unlimited, no seat counting</td>
+                <td>Unlimited, no seat counting</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <th scope="row">TLS, backups, upgrades</th>
+                <td>You</td>
+                <td>Us</td>
+                <td>We review yours against the runbook</td>
+              </tr>
+              <tr>
+                <th scope="row">Branding, custom domains, SSO</th>
+                <td colspan="3">Not implemented. We are not selling them, and the app returns
+                  501 rather than pretending.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">
+          Managed hosting is <strong>not on sale yet</strong>. It opens after the preflight
+          gate passes on a real host with a real certificate and the restore drill is repeated
+          there. Flat per instance, one-click cancel, renewal email before every charge.
+        </p>
+      </section>
+
+      <section aria-labelledby="faq">
+        <h2 id="faq">Questions people actually ask</h2>
+        <dl class="faq">
+          <dt>Can the server read my secret?</dt>
+          <dd>
+            Yes, once it is revealed. The key is derived from the instance secret, which lives
+            on the server. The passphrase is an extra access check, not a second encryption
+            key, and we do not call this zero-knowledge because it is not. If the server must
+            not be able to read it, the answer is to run the server yourself — that is the
+            whole argument.
+          </dd>
+
+          <dt>Will a chat preview burn my link?</dt>
+          <dd>
+            Not the share link: it renders a confirmation button and consumes nothing until the
+            recipient presses it. A direct <code>GET /api/v3/guest/secret/:key</code> does
+            consume, so treat the API as a reveal and not as a status check.
+          </dd>
+
+          <dt>Do I need an account?</dt>
+          <dd>No, on either end. Accounts add receipts and a dashboard, and stay optional.</dd>
+
+          <dt>How long does a secret live?</dt>
+          <dd>
+            You choose from a fixed set of expiries when you create it, and Redis enforces the
+            TTL itself, so there is no cleanup job to fail silently.
+          </dd>
+
+          <dt>Can I import from my old tool?</dt>
+          <dd>
+            No. Secrets are ephemeral by design; a bulk import would be a plaintext store,
+            which is the thing this exists to avoid.
+          </dd>
+
+          <dt>Does it support SSO or teams?</dt>
+          <dd>
+            Not yet. The full auth mode answers 501 on purpose instead of falling back to
+            something weaker.
+          </dd>
+
+          <dt>Is it audited?</dt>
+          <dd>
+            No. There has been no third-party security audit. What exists is a threat model in
+            the repository, 104 specs including the at-rest ciphertext check and the
+            wrong-passphrase-does-not-consume case, and a load test that races eight reveals
+            per secret.
+          </dd>
+        </dl>
+      </section>
+
+      <section aria-labelledby="cta">
+        <h2 id="cta">One command, two environment variables, your own Redis.</h2>
+        <p class="actions">
+          <a class="button" href="https://github.com/aman-ali07/OneShotLink">Install it</a>
+        </p>
+        <p class="small">
+          If you would rather not run a container, the managed tier opens once the gate above
+          passes — tell us through the source repository and we will let you know.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <span>OneShotLink — share a secret once.</span>
+        <span>
+          <a href="/privacy.html">Privacy</a> ·
+          <a href="/terms.html">Terms</a> ·
+          <a href="https://github.com/aman-ali07/OneShotLink">Source</a>
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>

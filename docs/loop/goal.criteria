@@ -30,18 +30,14 @@ F3 | frontend unit tests pass | npm --prefix frontend test --silent | 0 | | 300
 F4 | frontend typecheck passes | npm --prefix frontend run typecheck | 0 | | 300
 F5 | frontend production build passes | npm --prefix frontend run build | 0 | | 300
 
-# --- target: uncomment to arm the loop --------------------------------------
-# Nothing is armed right now, so scripts/loop_verify.sh reports GOAL: UNDEFINED
-# and scripts/loop.sh refuses to start. That is deliberate: the floor is already
-# green, so the loop has no honest work to do until a human names one.
-#
-# The only TODO in TASKS.md today is T-78 (landing route from the approved copy
-# in replica/launch/landing.md). Uncomment the two lines below to arm it, and the
-# loop will build the route, the view, and their tests until both pass.
-#
-#T1 | /landing serves the approved landing page | docker run --rm --network=host -v "$PWD":/app -v ots-bundle:/bundle -e BUNDLE_PATH=/bundle -w /app ots-dev bundle exec rspec spec/integration/landing_spec.rb | 0 | 0 failures | 900
-#T2 | landing view renders the approved headline | npm --prefix frontend test --silent -- landing | 0 | | 300
-#
-# For any other target, take the TASKS.md / KNOWN_ISSUES.md ID you are closing and
-# write one criterion per observable behaviour it promises. One criterion that
-# cannot be satisfied by editing a mock is worth five that can.
+# --- target: armed for T-78 (landing route) --------------------------------
+# T-78 in TASKS.md: build the landing route from replica/launch/landing.md.
+# Both criteria assert approved COPY (written by a human in replica/launch), not
+# "a file exists", so a stub page or a self-written trivially-passing test cannot
+# satisfy them. Comment both lines out to park the loop again.
+
+T1 | landing spec passes: route serves the page | docker run --rm --network=host -v "$PWD":/app -v ots-bundle:/bundle -e BUNDLE_PATH=/bundle -w /app ots-dev bundle exec rspec spec/integration/landing_spec.rb | 0 | 0 failures | 900
+T2 | built SPA carries the approved hero headline | npm --prefix frontend run build --silent && grep -rqF 'on a server you run' public/app/assets | 0 | | 600
+
+# When T-78 is done, park these and arm the next target the same way: one
+# criterion per observable behaviour the task promises.

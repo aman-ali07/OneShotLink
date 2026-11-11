@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Terms — OneShotLink</title>
+    <meta name="description" content="Terms for using OneShotLink: MIT-licensed software, pre-alpha state, no warranty, no SLA." />
+    <meta name="theme-color" content="#0f766e" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="/">OneShotLink</a>
+        <nav class="site" aria-label="Primary">
+          <a href="/#pricing">Pricing</a>
+          <a href="/#faq">Questions</a>
+          <a href="https://github.com/aman-ali07/OneShotLink">Source</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section aria-labelledby="title">
+        <h1 id="title">Terms</h1>
+        <p class="lede">
+          Short version: the software is MIT-licensed and comes with no warranty; it is
+          pre-alpha; if you run it, you are responsible for your deployment; if we run it for
+          you, the limits below apply.
+        </p>
+        <p class="small">Last updated: 2026-11-11.</p>
+      </section>
+
+      <section aria-labelledby="software">
+        <h2 id="software">1. The software</h2>
+        <p>
+          OneShotLink is released under the MIT licence in the
+          <a href="https://github.com/aman-ali07/OneShotLink/blob/main/LICENSE">LICENSE</a>
+          file. You may run, modify and redistribute it under those terms. Nothing on this page
+          restricts the licence.
+        </p>
+      </section>
+
+      <section aria-labelledby="state">
+        <h2 id="state">2. State of the product</h2>
+        <p>
+          This is pre-alpha software. It has not been through a third-party security audit and
+          has no service-level agreement. Security controls that depend on the host — TLS
+          termination, Redis authentication, backups, the host firewall — are the operator's
+          job. The repository ships a preflight script so you can check them instead of
+          assuming.
+        </p>
+      </section>
+
+      <section aria-labelledby="warranty">
+        <h2 id="warranty">3. No warranty, and the limit of liability</h2>
+        <p>
+          The software is provided "as is", without warranty of any kind, as stated in the MIT
+          licence. To the maximum extent permitted by law, the maintainers are not liable for
+          lost data, lost secrets, missed deadlines or any indirect or consequential loss
+          arising from use of the software.
+        </p>
+        <p class="note warn">
+          <strong>Do not use it as the only copy of anything you cannot lose.</strong> A
+          one-time secret is deleted on first reveal by design; there is no undo, and a lost
+          link cannot be recovered.
+        </p>
+      </section>
+
+      <section aria-labelledby="acceptable">
+        <h2 id="acceptable">4. Acceptable use (hosted instances)</h2>
+        <p>If you use an instance someone operates for you, you agree not to use it to:</p>
+        <ul class="plain">
+          <li>store or transmit material that is illegal where the instance is hosted;</li>
+          <li>attack, probe or overload the service, or bypass its rate limits;</li>
+          <li>share credentials you are not authorised to share;</li>
+          <li>resell capacity on the instance without the operator's agreement.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="paid">
+        <h2 id="paid">5. Paid plans (not yet available)</h2>
+        <p>
+          No paid plan is on sale today. When the managed instance opens, a subscription will
+          mean: flat price per instance, no seat counting, one-click cancellation effective at
+          the end of the paid period, an email before every renewal, and a 14-day refund on
+          request. Putting payment details into this product before those terms are live is not
+          possible, because there is no payment code in it.
+        </p>
+      </section>
+
+      <section aria-labelledby="data">
+        <h2 id="data">6. Data</h2>
+        <p>
+          What is stored, for how long, and what is never collected is on the
+          <a href="/privacy.html">privacy page</a>. If you self-host, you are the controller of
+          your instance's data.
+        </p>
+      </section>
+
+      <section aria-labelledby="changes">
+        <h2 id="changes">7. Changes to these terms</h2>
+        <p>
+          Changes are made in the repository with the date at the top of this page updated; the
+          git history is the record. Continuing to use a hosted instance after a change means
+          you accept the new terms.
+        </p>
+        <p class="note">
+          The operating entity and jurisdiction for the hosted service must be filled in by
+          whoever operates it before launch. They are deliberately left out here rather than
+          invented.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <span>OneShotLink — share a secret once.</span>
+        <span>
+          <a href="/">Home</a> · <a href="/privacy.html">Privacy</a> ·
+          <a href="https://github.com/aman-ali07/OneShotLink">Source</a>
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>

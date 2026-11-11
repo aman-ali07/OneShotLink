@@ -12,6 +12,7 @@ script/loop_observe.sh    live repo state + verdict, rendered as text
 script/loop_prompt.sh     static instructions + that observation = the self-prompt
 script/loop.sh            the controller: observe -> act -> verify -> record -> repeat
 script/loop_selftest.sh   tests the controller itself with fake agents
+script/loop_doctor.sh     is this machine able to run the loop? probes each agent
 docs/loop/PLAN.md         plan memory the agent rewrites each iteration
 docs/loop/LOG.md          append-only evidence: did / proof / next
 ```
@@ -60,7 +61,17 @@ and accept the slower iteration: correctness beats a fast loop.
 ## Budgets and stops
 
 `LOOP_MAX_ITER` (default 1), `LOOP_MAX_ATTEMPT` (6), `LOOP_STALL_LIMIT` (2),
-`LOOP_AGENT` (default `pi`), `LOOP_COMMIT=0` to stop the per-iteration commit.
+`LOOP_COMMIT=0` to stop the per-iteration commit.
+
+`LOOP_AGENT` picks the executor (`pi`, `claude`, `codex`, `gemini`, `opencode`, or a
+bare binary that takes `-p "<prompt>"`); `LOOP_AGENT_CMD` is the escape hatch for
+anything else, and receives the prompt as its final argument. Check what is usable
+on this machine first:
+
+```bash
+script/loop_doctor.sh            # prerequisites, the verdict, one probe per agent
+script/loop_doctor.sh --slow     # 120s probes when a CLI is slow to start
+```
 Exit codes: `0` met / blocked / undefined, `1` rule violation or crash, `3`
 stalled, `4` attempts exhausted, `5` iteration budget exhausted.
 
