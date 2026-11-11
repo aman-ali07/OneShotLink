@@ -11,7 +11,7 @@ here has been executed against a live host, and nothing is claimed to be live.
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Backend specs | `bundle exec rspec` | **PASS** — 104 examples, 0 failures |
+| Backend specs | `bundle exec rspec` | **PASS** — 109 examples, 0 failures |
 | Browser journeys | `BASE_URL=… npm --prefix e2e test` + `run test:accounts` | **PASS in CI** (both journeys, container smoke job) — not re-run locally in this session |
 | Feature parity | `parity.py replica/features.csv` | **PASS** — 63.0, must-haves **11/11** |
 | Rebrand sweep | `sweep.py . --config replica/brand.json` | **PASS** — exit 0, clean |
@@ -26,7 +26,7 @@ here has been executed against a live host, and nothing is claimed to be live.
 
 | # | Item | State | Who |
 | --- | --- | --- | --- |
-| B1 | **Account deletion does not exist.** The privacy page promises "ask the operator and it is removed", which is a manual process. GDPR-style self-service delete is not implemented | `grep` for a delete route in `lib/onetime/web/app.rb` returns nothing | build (S) |
+| B1 | ~~Account deletion does not exist~~ — **fixed**: `DELETE /api/v3/account` with the password, plus a "Delete account" section in the dashboard | 5 specs (wrong password leaves the account intact, no session 401, email can be re-registered, live secrets survive, audit event recorded) | done |
 | B2 | **Privacy and terms are written but not served anywhere** — `site/privacy.html`, `site/terms.html` exist, the domain does not | no DNS | operator |
 | B3 | **Favicon is the brief's placeholder; no OG image** | `site/favicon.svg`, brief in `replica/brand.md` §4 | design |
 | B4 | **Trademark / store / handle screening not run** for the name | `replica/brand.md` §2 "to run" | human + lawyer |
@@ -135,8 +135,8 @@ exists only so the copy is linted if a wrapper is ever built.
 
 ## 7. Go/no-go
 
-**No go.** Blocking: B1 (account deletion), B2 (legal pages served), B3 (placeholder favicon,
-no OG image), B4 (trademark screening), B5 (preflight green on a real host), B6 (firewall).
+**No go.** Blocking: B2 (legal pages served), B3 (placeholder favicon, no OG image), B4
+(trademark screening), B5 (preflight green on a real host), B6 (firewall). B1 is done.
 
 When B5 and B6 are done, re-run §1 and paste the outputs here, then ask the user for the go.
 Nothing in this file should be quoted as "deployed" until a live URL is recorded at the top.

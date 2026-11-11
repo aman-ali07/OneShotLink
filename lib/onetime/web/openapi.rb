@@ -204,6 +204,19 @@ module Onetime
               }
             )
           },
+          "/api/v3/account" => {
+            "delete" => op(
+              "account",
+              "Delete the account, its sessions and its receipts; live secrets expire on their own TTL",
+              body: "PasswordConfirmRequest",
+              security: [{ cookie: [] }],
+              responses: {
+                "200" => json_ref("OkResponse"),
+                "401" => json_ref("Error"),
+                "403" => json_ref("Error")
+              }
+            )
+          },
           "/api/v1/share" => {
             "post" => op(
               "legacy",
@@ -381,6 +394,13 @@ module Onetime
               "properties" => {
                 "current_password" => { "type" => "string" },
                 "new_password" => { "type" => "string", "minLength" => 12, "maxLength" => 256 }
+              }
+            },
+            "PasswordConfirmRequest" => {
+              "type" => "object",
+              "required" => %w[password],
+              "properties" => {
+                "password" => { "type" => "string" }
               }
             },
             "AccountResponse" => {

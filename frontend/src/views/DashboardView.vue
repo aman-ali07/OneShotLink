@@ -6,6 +6,7 @@ import AppButton from "@/components/AppButton.vue";
 import {
   ApiError,
   changePassword,
+  deleteAccount,
   errorMessage,
   getAccount,
   listReceipts,
@@ -24,6 +25,8 @@ const actionNote = ref("");
 const currentPassword = ref("");
 const newPassword = ref("");
 const changing = ref(false);
+const deletePassword = ref("");
+const deleting = ref(false);
 const router = useRouter();
 
 function formatDate(seconds?: number): string {
@@ -86,6 +89,26 @@ async function updatePassword() {
     actionError.value = errorMessage(cause);
   } finally {
     changing.value = false;
+  }
+}
+
+async function removeAccount() {
+  actionError.value = "";
+  actionNote.value = "";
+  if (!deletePassword.value) {
+    actionError.value = "Enter your password to delete the account.";
+    return;
+  }
+
+  deleting.value = true;
+  try {
+    await deleteAccount({ password: deletePassword.value });
+    await router.push("/");
+  } catch (cause) {
+    actionError.value = errorMessage(cause);
+  } finally {
+    deleting.value = false;
+    deletePassword.value = "";
   }
 }
 
@@ -180,6 +203,30 @@ onMounted(load);
           <AppAlert v-if="actionNote" tone="success">{{ actionNote }}</AppAlert>
           <AppButton type="submit" :loading="changing">
             {{ changing ? "Updating…" : "Update password" }}
+          </AppButton>
+        </form>
+      </section>
+
+      <section class="max-w-md space-y-4" aria-labelledby="delete-heading">
+        <h2 id="delete-heading" class="text-xl font-semibold">Delete account</h2>
+        <p class="text-sm text-muted">
+          This removes your account, its sessions and your list of links. Secrets that have not
+          expired yet stay available to whoever holds the link until they expire.
+        </p>
+        <form class="space-y-3" @submit.prevent="removeAccount">
+          <div class="space-y-2">
+            <label for="delete-password" class="block text-sm font-semibold">Password</label>
+            <input
+              id="delete-password"
+              v-model="deletePassword"
+              type="password"
+              autocomplete="current-password"
+              required
+              class="w-full rounded-md border border-border-input bg-surface px-3 py-2 text-sm"
+            />
+          </div>
+          <AppButton type="submit" variant="danger" :loading="deleting">
+            {{ deleting ? "Deleting…" : "Delete my account" }}
           </AppButton>
         </form>
       </section>

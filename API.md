@@ -213,6 +213,7 @@ All return `403 forbidden` when `AUTH_MODE=disabled`, `501 not_configured` when 
 | `GET /api/v3/account/me` | — | `200 {"customer":{...}}` or `401 unauthorized` |
 | `GET /api/v3/account/receipts` | — | `200 {"receipts":[{identifier,secret_ttl,created_at,passphrase_required,kind,secret_url}]}` (newest 50, stale entries pruned) |
 | `POST /api/v3/account/password` | `{"current_password":"...","new_password":"..."}` | `200 {"ok":true}`; wrong current password is `401 invalid_credentials` |
+| `DELETE /api/v3/account` | `{"password":"..."}` | `200 {"ok":true}`, clears the cookie and removes the customer record, its email index, every session and every receipt. A wrong password is `401 invalid_credentials` and deletes nothing. Secrets still inside their TTL keep working for their recipients until they expire |
 
 Signup and sign-in share the `RATE_LIMIT_SIGNIN` limit (default 10 per window). Duplicate
 emails return `409 email_taken`. Email lookup is case-insensitive and normalized; raw

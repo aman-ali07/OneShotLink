@@ -18,6 +18,14 @@ RSpec.describe "Simple-mode accounts" do
     post path, JSON.generate(payload), ACCOUNT_JSON_HEADERS.merge(headers)
   end
 
+  def delete_json(path, payload, headers = ACCOUNT_JSON_HEADERS)
+    delete path, JSON.generate(payload), ACCOUNT_JSON_HEADERS.merge(headers)
+  end
+
+  def events
+    Onetime::Audit.recent(limit: 100).map { |e| e["event"] }
+  end
+
   def signup(email = "person@example.com", password = PASSWORD)
     post_json("/api/v3/signup", { email: email, password: password })
     JSON.parse(last_response.body)
@@ -211,11 +219,88 @@ RSpec.describe "Simple-mode accounts" do
     end
   end
 
-  describe "audit trail" do
-    def events
-      Onetime::Audit.recent(limit: 100).map { |e| e["event"] }
+  describe "account deletion" do
+    it "removes the account, its sessions and its receipts, and frees the email" do
+      simple do
+        signup("delete-me@example.com")
+        customer = Onetime::Models::Customer.find_by_email("delete-me@example.com")
+        post_json("/api/v3/secret/conceal", { secret: "owner secret", ttl: 1800 })
+        expect(last_response.status).to eq(201)
+
+        delete_json("/api/v3/account", { password: PASSWORD })
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("ok" => true)
+        expect(last_response.headers["Set-Cookie"]).to include("ots_session=")
+
+        get "/api/v3/account/me"
+        expect(last_response.status).to eq(401)
+
+        expect(Onetime::Store.redis.exists(Onetime::Models::Customer.key(customer[:id]))).to be(0)
+        expect(Onetime::Store.redis.exists(Onetime::Models::Customer.index_key("delete-me@example.com"))).to be(0)
+        expect(Onetime::Store.redis.exists(Onetime::Models::Secret.owner_index(customer[:id]))).to be(0)
+        expect(Onetime::Models::Session.revoke_all(customer[:id])).to be(0)
+
+        clear_cookies
+        signup("delete-me@example.com")
+        expect(last_response.status).to eq(201)
+      end
     end
 
+    it "leaves a live secret readable by its recipient until it expires" do
+      simple do
+        signup
+        post_json("/api/v3/secret/conceal", { secret: "already sent", ttl: 1800 })
+        key = JSON.parse(last_response.body)["secret_key"]
+
+        delete_json("/api/v3/account", { password: PASSWORD })
+        expect(last_response.status).to eq(200)
+        expect(Onetime::Store.redis.exists(Onetime::Models::Secret.receipt_key(key))).to be(0)
+
+        clear_cookies
+        get "/api/v3/guest/secret/#{key}"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["secret_value"]).to eq("already sent")
+      end
+    end
+
+    it "refuses without the password and deletes nothing" do
+      simple do
+        signup
+        delete_json("/api/v3/account", { password: "not the password" })
+
+        expect(last_response.status).to eq(401)
+        expect(JSON.parse(last_response.body).dig("error", "code")).to eq("invalid_credentials")
+
+        get "/api/v3/account/me"
+        expect(last_response.status).to eq(200)
+        expect(Onetime::Models::Customer.find_by_email("person@example.com")).not_to be_nil
+        expect(events).to include("customer.delete_failed")
+        expect(events).not_to include("customer.deleted")
+      end
+    end
+
+    it "requires a session" do
+      simple do
+        signup
+        clear_cookies
+
+        delete_json("/api/v3/account", { password: PASSWORD })
+        expect(last_response.status).to eq(401)
+        expect(Onetime::Models::Customer.find_by_email("person@example.com")).not_to be_nil
+      end
+    end
+
+    it "records the deletion" do
+      simple do
+        signup
+        delete_json("/api/v3/account", { password: PASSWORD })
+        expect(events).to include("customer.deleted")
+      end
+    end
+  end
+
+  describe "audit trail" do
     it "records signup, signin, and a failed signin" do
       simple do
         signup

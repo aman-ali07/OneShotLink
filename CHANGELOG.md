@@ -9,6 +9,23 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (account deletion, 2026-11-11) — verified
+
+- **`DELETE /api/v3/account`** deletes the signed-in account: it asks for the password again
+  rather than trusting the session, then removes the customer record, its email index, every
+  live session and every receipt, and clears the cookie. A wrong password is `401` and
+  deletes nothing (audited as `customer.delete_failed`).
+- **Dashboard:** a "Delete account" section with a password field and a danger button.
+- **Secrets that have not expired are left alone on purpose.** A link may already be in
+  someone's inbox; that handover is not the account's to cancel, and the secret still expires
+  on its own TTL.
+- `API.md`, the OpenAPI document and `site/privacy.html` updated; the privacy page no longer
+  says account deletion is missing.
+
+Verified: 109 specs (5 new) — wrong password leaves the account intact, no session is `401`,
+re-registering the freed email returns `201`, a live secret still reveals after deletion, and
+`customer.deleted` is recorded in the audit stream.
+
 ### Added (landing site + legal pages, 2026-11-11) — verified locally, not deployed
 
 - **`site/`** — a standalone static landing page plus `privacy.html` and `terms.html`, built

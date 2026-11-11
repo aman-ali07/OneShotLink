@@ -552,7 +552,9 @@ module Onetime
               # asks for the password again rather than trusting the session
               # alone. Secrets still inside their TTL are left to expire; only
               # the account, its sessions and its receipts are removed.
-              r.delete true do
+              # Roda only generates matchers for GET/POST; other verbs go through
+              # the method matcher.
+              r.is(method: "DELETE") do
                 require_accounts!
                 verify_csrf!
                 customer = require_session!

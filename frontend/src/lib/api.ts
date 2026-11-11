@@ -72,7 +72,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "DELETE";
   body?: unknown;
   signal?: AbortSignal;
 }
@@ -184,5 +184,12 @@ export function changePassword(input: {
   return request("/api/v3/account/password", OkSchema, {
     method: "POST",
     body: { current_password: input.currentPassword, new_password: input.newPassword },
+  });
+}
+
+export function deleteAccount(input: { password: string }): Promise<{ ok: boolean }> {
+  return request("/api/v3/account", OkSchema, {
+    method: "DELETE",
+    body: { password: input.password },
   });
 }
