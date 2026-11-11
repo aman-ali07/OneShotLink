@@ -11,10 +11,14 @@ services:
       - everysec
       - --maxmemory-policy
       - noeviction
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required (openssl rand -hex 24)}
     volumes:
       - redis-data:/data
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -31,6 +35,7 @@ services:
     environment:
       SECRET: ${SECRET:?SECRET is required (openssl rand -hex 32)}
       REDIS_URL: redis://redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       HOST: ${HOST:-localhost:3000}
       SSL: ${SSL:-false}
       AUTH_MODE: ${AUTH_MODE:-disabled}

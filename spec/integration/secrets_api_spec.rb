@@ -164,14 +164,48 @@ RSpec.describe "Secret lifecycle API" do
       end
     end
 
+    it "accepts exactly MAX_SECRET_BYTES and rejects one byte more" do
+      with_env("MAX_SECRET_BYTES" => "16") do
+        exact = "a" * 16
+        create_v3(secret: exact)
+        expect(last_response.status).to eq(201)
+
+        create_v3(secret: "a" * 17)
+        expect(last_response.status).to eq(413)
+      end
+    end
+
+    it "treats empty and one-character passphrases as absent or valid" do
+      # Empty string means "no passphrase": no passphrase required on reveal.
+      post "/api/v3/guest/conceal", JSON.generate(secret: "p0", ttl: 1800, passphrase: ""), JSON_HEADERS
+      expect(last_response.status).to eq(201)
+      key = JSON.parse(last_response.body)["secret_key"]
+      get "/api/v3/guest/secret/#{key}"
+      expect(last_response.status).to eq(200)
+
+      # A single character is a real passphrase and must be enforced.
+      post "/api/v3/guest/conceal", JSON.generate(secret: "p1", ttl: 1800, passphrase: "x"), JSON_HEADERS
+      expect(last_response.status).to eq(201)
+      key = JSON.parse(last_response.body)["secret_key"]
+      post "/api/v3/guest/secret/#{key}/reveal", JSON.generate(passphrase: "y"), JSON_HEADERS
+      expect(last_response.status).to eq(401)
+      post "/api/v3/guest/secret/#{key}/reveal", JSON.generate(passphrase: "x"), JSON_HEADERS
+      expect(last_response.status).to eq(200)
+    end
+
     it "rate limits conceal with Retry-After" do
       with_env("RATE_LIMIT_CONCEAL" => "1", "RATE_LIMIT_WINDOW" => "60") do
         create_v3(secret: "one")
         expect(last_response.status).to eq(201)
+        expect(last_response.headers["X-RateLimit-Limit"]).to eq("1")
+        expect(last_response.headers["X-RateLimit-Remaining"]).to eq("0")
 
         create_v3(secret: "two")
         expect(last_response.status).to eq(429)
         expect(last_response.headers["Retry-After"]).to eq("60")
+        expect(last_response.headers["X-RateLimit-Limit"]).to eq("1")
+        expect(last_response.headers["X-RateLimit-Remaining"]).to eq("0")
+        expect(last_response.headers["X-RateLimit-Reset"].to_i).to be_between(1, 60)
         expect(JSON.parse(last_response.body).dig("error", "code")).to eq("rate_limited")
       end
     end

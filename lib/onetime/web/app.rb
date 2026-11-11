@@ -140,13 +140,46 @@ module Onetime
         false
       end
 
+      # Never passes secret material: only identifiers, request id, and IP.
+      def audit(event, actor_id: nil, detail: nil)
+        Audit.record(event, actor_id: actor_id, request_id: request_id, ip: client_id, detail: detail)
+      end
+
       def enforce_rate_limit!(scope)
-        Limiter.check!(
+        result = Limiter.check!(
           client_id,
           scope: scope,
           limit: Config.rate_limit(scope),
           window: Config.rate_limit_window
         )
+        set_rate_limit_headers(result)
+      rescue Onetime::RateLimited => e
+        # Remember which scope tripped so the error handler can emit headers.
+        e.instance_variable_set(:@scope, scope)
+        raise
+      end
+
+      def set_rate_limit_headers(result)
+        return if result.nil? || result.limit.to_i <= 0
+
+        response["X-RateLimit-Limit"] = result.limit.to_s
+        response["X-RateLimit-Remaining"] = result.remaining.to_s
+        response["X-RateLimit-Reset"] = result.reset.to_s
+      end
+
+      # Recompute headers for the 429 path: enforce_rate_limit! raises before
+      # it can set them, so the error handler asks the limiter what is left.
+      def set_rate_limit_headers_for(scope)
+        set_rate_limit_headers(
+          Limiter.snapshot(
+            client_id,
+            scope: scope,
+            limit: Config.rate_limit(scope),
+            window: Config.rate_limit_window
+          )
+        )
+      rescue StandardError
+        nil
       end
 
       def parse_json_body
@@ -171,7 +204,12 @@ module Onetime
       end
 
       def reveal_payload(key, passphrase: nil)
-        json(Logic::RevealSecret.new(key: key, passphrase: passphrase).call)
+        result = Logic::RevealSecret.new(key: key, passphrase: passphrase).call
+        audit("secret.revealed", detail: result[:metadata][:kind])
+        json(result)
+      rescue InvalidPassphrase => e
+        audit("secret.passphrase_failed")
+        raise e
       end
 
       def cookies
@@ -397,6 +435,7 @@ module Onetime
               body = parse_json_body
               result = Logic::SignUp.new(email: body["email"], password: body["password"]).call
               set_session_cookie(result[:session_token])
+              audit("customer.signup", actor_id: result[:customer][:id])
               json({ customer: result[:customer] }, status: 201)
             end
 
@@ -406,14 +445,20 @@ module Onetime
               body = parse_json_body
               result = Logic::SignIn.new(email: body["email"], password: body["password"]).call
               set_session_cookie(result[:session_token])
+              audit("customer.signin", actor_id: result[:customer][:id])
               json({ customer: result[:customer] })
+            rescue InvalidCredentials => e
+              audit("customer.signin_failed")
+              raise e
             end
 
             r.post "signout" do
               require_accounts!
               verify_csrf!
+              actor = current_customer
               Models::Session.destroy(session_token)
               clear_session_cookie
+              audit("customer.signout", actor_id: actor && actor[:id])
               json({ ok: true })
             end
 
@@ -445,6 +490,11 @@ module Onetime
                 end
 
                 Models::Customer.update_password(customer[:id], replacement)
+                # A password change is a credential reset: every other live
+                # session must stop working. Keep the caller signed in.
+                revoked = Models::Session.revoke_all(customer[:id], except_token: session_token)
+                audit("customer.password_changed", actor_id: customer[:id])
+                audit("customer.sessions_revoked", actor_id: customer[:id], detail: revoked.to_s)
                 json({ ok: true })
               end
 
@@ -530,7 +580,11 @@ module Onetime
       error do |error|
         if api_version == "v1"
           response.status = error.respond_to?(:status) ? error.status : 500
-          response["Retry-After"] = Config.rate_limit_window.to_s if error.is_a?(Onetime::RateLimited)
+          if error.is_a?(Onetime::RateLimited)
+            response["Retry-After"] = Config.rate_limit_window.to_s
+            scope = error.instance_variable_get(:@scope)
+            set_rate_limit_headers_for(scope) if scope
+          end
           message = error.is_a?(Onetime::Error) ? error.message : "An internal error occurred."
           json({ message: message })
         else
@@ -538,6 +592,8 @@ module Onetime
           when Onetime::RateLimited
             response.status = 429
             response["Retry-After"] = Config.rate_limit_window.to_s
+            scope = error.instance_variable_get(:@scope)
+            set_rate_limit_headers_for(scope) if scope
             json(error_body(error.code, error.message))
           when Onetime::Error
             response.status = error.status

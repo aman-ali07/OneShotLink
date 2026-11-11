@@ -67,6 +67,7 @@ module Onetime
       raise Error, "AUTH_MODE must be disabled, simple, or full" unless %w[disabled simple full].include?(auth_mode)
       raise Error, "REDIS_TIMEOUT must be positive" if self["REDIS_TIMEOUT"].to_f <= 0
       raise Error, "REDIS_RECONNECT_ATTEMPTS must be >= 0" if redis_reconnect_attempts.negative?
+      validated_redis_url
 
       # Parse now so a typo fails at boot, not on the first proxied request.
       trusted_proxies
@@ -132,6 +133,33 @@ module Onetime
 
     def redis_url
       ENV["REDIS_URL"] || "redis://127.0.0.1:6379/0"
+    end
+
+    # Fail closed on a Redis URL that cannot carry auth/TLS correctly. rediss://
+    # enables TLS; a password goes in the userinfo (redis://:pw@host/db) or in
+    # REDIS_PASSWORD, which is folded into the URL and never logged.
+    def validated_redis_url
+      raw = redis_url.to_s
+      password = ENV["REDIS_PASSWORD"].to_s
+      uri = begin
+        URI.parse(raw)
+      rescue URI::InvalidURIError
+        raise Error, "REDIS_URL is not a valid URI"
+      end
+
+      unless %w[redis rediss unix].include?(uri.scheme)
+        raise Error, "REDIS_URL scheme must be redis://, rediss:// (TLS), or unix:"
+      end
+
+      if password.empty?
+        raw
+      else
+        # URI requires the user component before the password. Set it first,
+        # and never echo the password into logs or errors.
+        uri.user = "default" if uri.user.to_s.empty?
+        uri.password = password
+        uri.to_s
+      end
     end
 
     def log_level

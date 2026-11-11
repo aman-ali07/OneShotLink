@@ -20,16 +20,6 @@ module Onetime
 
     module_function
 
-    def data_key(secret = Config.secret!)
-      OpenSSL::KDF.hkdf(
-        secret,
-        salt: "onetimesecret/v1",
-        info: "secret-content-encryption",
-        length: KEY_BYTES,
-        hash: "SHA256"
-      )
-    end
-
     # Returns a hash safe to store as Redis hash fields.
     def encrypt(plaintext, secret: Config.secret!)
       raise ArgumentError, "plaintext must be a String" unless plaintext.is_a?(String)

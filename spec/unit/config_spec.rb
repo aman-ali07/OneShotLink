@@ -64,4 +64,23 @@ RSpec.describe Onetime::Config do
       expect(described_class.trust_proxy?).to be(false)
     end
   end
+
+  it "validates the Redis URL scheme and folds in REDIS_PASSWORD" do
+    with_env(VALID.merge("REDIS_URL" => "rediss://cache.internal:6380/0", "REDIS_PASSWORD" => "")) do
+      expect(described_class.validated_redis_url).to eq("rediss://cache.internal:6380/0")
+    end
+
+    with_env(VALID.merge("REDIS_URL" => "redis://redis:6379/0", "REDIS_PASSWORD" => "s3cret")) do
+      url = described_class.validated_redis_url
+      expect(url).to include("redis://")
+      expect(url).to include("s3cret")
+      expect(url).to include("redis:6379")
+    end
+  end
+
+  it "rejects a Redis URL with an unsupported scheme" do
+    with_env(VALID.merge("REDIS_URL" => "http://nope:6379/0", "REDIS_PASSWORD" => "")) do
+      expect { described_class.validated_redis_url }.to raise_error(described_class::Error, /scheme/)
+    end
+  end
 end

@@ -189,6 +189,63 @@ RSpec.describe "Simple-mode accounts" do
         expect(last_response.status).to eq(200)
       end
     end
+
+    it "revokes other sessions when the password changes" do
+      simple do
+        signup
+        first = rack_mock_session.cookie_jar["ots_session"]
+        first_digest = Onetime::Models::Session.digest(first)
+
+        # A second device signs in with the same credentials.
+        clear_cookies
+        signin
+        expect(last_response.status).to eq(200)
+
+        post_json("/api/v3/account/password", { current_password: PASSWORD, new_password: "a new long password" })
+        expect(last_response.status).to eq(200)
+
+        # The session that performed the change survives; the other one dies.
+        expect(Onetime::Store.redis.exists?("session:#{first_digest}")).to be(false)
+        expect(Onetime::Store.redis.exists?("session:#{Onetime::Models::Session.digest(rack_mock_session.cookie_jar['ots_session'])}")).to be(true)
+      end
+    end
+  end
+
+  describe "audit trail" do
+    def events
+      Onetime::Audit.recent(limit: 100).map { |e| e["event"] }
+    end
+
+    it "records signup, signin, and a failed signin" do
+      simple do
+        signup
+        clear_cookies
+        signin
+        clear_cookies
+        post_json("/api/v3/signin", { email: "person@example.com", password: "the wrong password" })
+        expect(last_response.status).to eq(401)
+
+        expect(events).to include("customer.signup", "customer.signin", "customer.signin_failed")
+      end
+    end
+
+    it "records a password change and the resulting revocation" do
+      simple do
+        signup
+        post_json("/api/v3/account/password", { current_password: PASSWORD, new_password: "a new long password" })
+        expect(last_response.status).to eq(200)
+        expect(events).to include("customer.password_changed", "customer.sessions_revoked")
+      end
+    end
+
+    it "never stores an email, password, or secret value in the audit log" do
+      simple do
+        signup("leaky@example.com")
+        raw = Onetime::Store.redis.xrange(Onetime::Audit::STREAM).to_s
+        expect(raw).not_to include("leaky@example.com")
+        expect(raw).not_to include(PASSWORD)
+      end
+    end
   end
 
   describe "mode gates" do

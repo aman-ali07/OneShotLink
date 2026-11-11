@@ -12,7 +12,7 @@ module Onetime
 
       def redis
         @redis ||= Redis.new(
-          url: Config.redis_url,
+          url: Config.validated_redis_url,
           timeout: Config.redis_timeout,
           connect_timeout: Config.redis_timeout,
           read_timeout: Config.redis_timeout,
