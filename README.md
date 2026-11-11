@@ -8,7 +8,7 @@ configurable TTL.
 > **Project status: production-packaged core with optional simple-mode accounts,
 > pre-alpha product.** The anonymous create → one-time reveal flow and optional accounts
 > run in a hardened non-root container with Redis persistence, CI, and redacted logs.
-> **68 backend specs pass**; the TypeScript/Vite build, a headless-Chrome secret journey,
+> **94 backend specs pass**; the TypeScript/Vite build, a headless-Chrome secret journey,
 > and a browser signup → receipt → signout → signin journey were verified. Operational
 > controls (TLS, Redis auth, backups, metrics, scanning, key rotation) are still open: see
 > [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md),
@@ -71,16 +71,22 @@ lib/onetime/
   password.rb            # Argon2id + bcrypt legacy verify
   store.rb               # Redis client + atomic consume
   web/app.rb             # Roda routes (health, config, v1, v3, static SPA)
+  web/openapi.rb         # OpenAPI 3.1 document (/api/v3/openapi.json)
   web/request_logger.rb  # redacted request logs
   web/head_requests.rb   # HEAD served like GET
+  audit.rb               # append-only audit stream (identifiers only)
+  backup.rb              # encrypted backup export/restore
+  logic/rotate_key.rb    # in-place SECRET rotation
 replica/                 # recon, feature matrix, architecture, design tokens, parity
-bin/ots                  # customer create / password reset CLI
-spec/                    # 68 unit + integration examples (Redis DB 15)
+bin/ots                  # CLI: customers, health, backup/restore, rotate-key
+script/loadtest.rb       # single-use invariant under concurrency
+spec/                    # 94 unit + integration examples (Redis DB 15)
 e2e/journey.mjs          # committed create → reveal → gone browser test
 e2e/accounts.mjs         # committed signup → receipt → signout → signin journey
 Dockerfile               # multi-stage UI build + non-root Ruby runtime
 compose.yaml             # web + persistent Redis
-.github/workflows/ci.yml # specs, frontend tests, container + browser smoke test
+.github/workflows/ci.yml # specs, scans, container + browser smoke test + load test
+RUNBOOK.md               # incident procedures (key compromise, Redis loss, rollback)
 ```
 
 Built by Vite into `public/app/` (git-ignored). Set `AUTH_MODE=simple` to expose account
@@ -90,6 +96,7 @@ routes and the dashboard; the default `disabled` keeps the anonymous flow only.
 
 ```bash
 export SECRET="$(openssl rand -hex 32)"
+export REDIS_PASSWORD="$(openssl rand -hex 24)"
 docker compose up -d --build
 curl -fsS localhost:3000/health
 ```
@@ -146,7 +153,7 @@ docker run --rm --network=host \
   ots-dev bundle exec rspec
 ```
 
-Expected: `68 examples, 0 failures`. The suite only touches Redis DB 15 and calls
+Expected: `94 examples, 0 failures`. The suite only touches Redis DB 15 and calls
 `FLUSHDB` there, never `FLUSHALL`.
 
 Frontend checks:
@@ -193,6 +200,7 @@ Read [AGENTS.md](AGENTS.md) before clone work.
 - [DATABASE.md](DATABASE.md) — Redis schema and invariants
 - [SECURITY.md](SECURITY.md) — controls, threat model, D-012
 - [TESTING.md](TESTING.md) / [DEPLOYMENT.md](DEPLOYMENT.md)
+- [RUNBOOK.md](RUNBOOK.md) — incident response (key compromise, Redis loss, rollback)
 - [TECH_STACK.md](TECH_STACK.md) / [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)
 - [docs/DECISIONS.md](docs/DECISIONS.md) / [KNOWN_ISSUES.md](KNOWN_ISSUES.md)
 - [CHANGELOG.md](CHANGELOG.md)

@@ -6,6 +6,7 @@ require "securerandom"
 
 require_relative "head_requests"
 require_relative "request_logger"
+require_relative "openapi"
 
 module Onetime
   module Web
@@ -427,6 +428,11 @@ module Onetime
 
             r.get "config" do
               json(public_config)
+            end
+
+            r.get "openapi.json" do
+              response["Content-Type"] = "application/json; charset=utf-8"
+              json(OpenApi.document)
             end
 
             r.post "signup" do

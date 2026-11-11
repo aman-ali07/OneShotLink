@@ -1,6 +1,6 @@
 # Testing
 
-> **Status: 68 backend examples, 0 failures (2026-11-11), plus two verified headless
+> **Status: 94 backend examples, 0 failures (2026-11-11), plus two verified headless
 > browser journeys and a Compose smoke test.** Ruby/Bundler are not installed on the
 > host, so backend tests run in the `ots-dev` Docker image against Redis DB 15. Lifecycle,
 > passphrase, TTL, at-rest encryption, concurrency, v1, rate limits, and simple-mode
@@ -68,17 +68,28 @@ never use `FLUSHALL`. The `ots-dev` image and `ots-bundle` volume are built once
 | `spec/unit/limiter_spec.rb` | 3 | ceiling, window reset, scope isolation |
 | `spec/unit/password_spec.rb` | 4 | Argon2id, malformed hashes, bcrypt legacy |
 | `spec/unit/store_spec.rb` | 4 | atomic win/lose, mismatch, empty expectation |
+| `spec/unit/session_spec.rb` | 6 | digest-only storage, TTL refresh, destroy, revoke-all with exception, full revocation, per-customer isolation |
 | `spec/integration/web_spec.rb` | 9 | health + Redis-down 503, config, CSP/HSTS, typed 404, SPA shell, HEAD |
-| `spec/unit/config_spec.rb` | 6 | boot validation, auth mode, proxy CIDRs |
 | `spec/unit/request_logger_spec.rb` | 3 | request fields, secret-key redaction, asset skip |
 | `frontend/src/lib/api.test.ts` | 9 | conceal/reveal payloads, typed errors, malformed responses, network failure |
 | `e2e/journey.mjs` | 1 journey | create → reveal → gone, wrong/correct passphrase, no console errors |
 | `e2e/accounts.mjs` | 1 journey | signup → owner receipt → reload → signout → signed-out prompt → signin; no plaintext on dashboard |
-| `spec/integration/accounts_spec.rb` | 13 | signup/cookie/at-rest, duplicate email, validation, signin/401, session TTL/deletion, signout, CSRF, owner isolation, password change, disabled/full gates |
-| `spec/integration/secrets_api_spec.rb` | 16 | v3 create/reveal/gone, at-rest, passphrase, race, expiry, v1 form+JSON, validation, 413, 429, proxy trust, auth-disabled fail-closed, full-mode 501 |
+| `spec/integration/accounts_spec.rb` | 17 | signup/cookie/at-rest, duplicate email, validation, signin/401, session TTL/deletion, signout, CSRF, owner isolation, password change, other-session revocation, audit trail, disabled/full gates |
+| `spec/integration/secrets_api_spec.rb` | 18 | v3 create/reveal/gone, at-rest, passphrase, race, expiry, v1 form+JSON, validation, 413, exact-size boundary, empty/1-char passphrase, 429, proxy trust, auth-disabled fail-closed, full-mode 501 |
+| `spec/unit/config_spec.rb` | 8 | boot validation, auth mode, proxy CIDRs, Redis URL scheme + password folding |
+| `spec/unit/ops_spec.rb` | 8 | audit events/redaction, key rotation (re-encrypt, old key fails, TTL preserved), backup export/restore, sessions excluded |
+| `spec/integration/openapi_spec.rb` | 4 | valid 3.1 doc, `$ref`s resolve, documented paths are mounted, cookie scheme on owner/account routes |
 
-Backend total: **68 examples, 0 failures**; frontend: **9 Vitest tests, 0 failures**.
-Not yet covered: tamper-through-HTTP (unit only) and the exact 1 MiB boundary.
+Backend total: **94 examples, 0 failures**; frontend: **9 Vitest tests, 0 failures**.
+Not yet covered: tamper-through-HTTP (unit only). The exact size boundary is now covered.
+
+Operational checks that run outside RSpec:
+
+```bash
+ruby script/loadtest.rb 400 40          # single-use invariant under load
+bundle exec bundler-audit check --update
+npm --prefix frontend audit --audit-level=high
+```
 
 ## 3.1 Frontend and browser evidence (M2)
 

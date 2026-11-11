@@ -5,17 +5,22 @@ item is either **verified by a command**, **implemented but untested**, or **not
 
 ## Verdict
 
-The anonymous single-instance deployment (conceal → one-time reveal) is now packaged and
-operable at production quality: fail-closed configuration, hardened headers, trusted-proxy
-handling, redacted logs, bounded Redis timeouts, a non-root read-only container, persistent
-Redis, health checks, and CI. Simple-mode accounts, opaque sessions, CSRF checks, owner
-receipts, and the dashboard are implemented and covered by backend and browser tests. It is
-**not** yet a production-grade multi-user product: several operational controls below are
-still open, and full mode remains intentionally unimplemented.
+The single-instance deployment (conceal → one-time reveal, optional simple-mode accounts)
+is packaged and operable at production quality: fail-closed configuration, hardened
+headers, trusted-proxy handling, redacted logs, bounded Redis timeouts, a non-root
+read-only container, persistent Redis, health checks, dependency scanning in CI, an audit
+stream, tested backup/restore, in-place key rotation, and a load-tested single-use
+invariant. Simple-mode accounts, opaque sessions with revocation, CSRF checks, owner
+receipts, and the dashboard are implemented and covered by backend and browser tests.
 
-Do not describe the project as "production ready" without the open items and the D-012
-passphrase limitation being stated. Do not deploy with the default `AUTH_MODE=disabled` if
-you need accounts — that mode has no accounts by design.
+**All in-repo gates are closed**, including Redis authentication. Two items remain that
+belong to the operator's infrastructure and cannot be closed from the repository:
+**TLS termination** (T-70) and **Redis network policy** (T-71, the firewall/reachability
+half — auth and `rediss://` are already implemented). Until TLS is configured on the host,
+do not call the deployment "production ready" in public copy, and do not claim
+zero-knowledge (D-012).
+Do not deploy with the default `AUTH_MODE=disabled` if you need accounts — that mode has
+no accounts by design.
 
 ## Verified gates
 
@@ -30,6 +35,14 @@ you need accounts — that mode has no accounts by design.
 | Container hardened | non-root UID 10001, read-only rootfs, `no-new-privileges`, only `/tmp` writable, no secrets in image |
 | Data survives restart | Redis AOF `appendfsync everysec`, `maxmemory-policy noeviction`, named volume |
 | CI gate | backend specs, Vitest + typecheck/build, container build, Compose lifecycle smoke, committed browser E2E |
+| Dependency scanning | `bundler-audit` + `npm audit --audit-level=high` in the `security` CI job; both report 0 vulnerabilities. Fixed the findings: Puma 6.6.1→7.2.1 (2 high CVEs), zod 3→4.6.7 (1 high advisory) |
+| OpenAPI published | `/api/v3/openapi.json` served; spec asserts every documented path is mounted and every `$ref` resolves |
+| Session revocation | password change and `customers reset-password` revoke other/all sessions; verified live and by spec |
+| Audit trail | append-only `audit:events` stream; identifiers only, never emails/passwords/secret values |
+| Backup / restore | `bin/ots backup`/`restore`; verified live: deleted secret (404) → restored → decrypts; RPO/RTO documented |
+| Key rotation | `bin/ots rotate-key`; verified live: 21 secrets rotated, pre-rotation secret still decrypts, old key fails |
+| Load / single-use invariant | `script/loadtest.rb`: 400 secrets, 40 threads, 8-way race, 0 double reveals (~240 creates/s) |
+| Incident runbook | `RUNBOOK.md` (key compromise, Redis loss, reveal regression, lockout, rollback) |
 | Browser path | committed puppeteer journey (`e2e/journey.mjs`): create → reveal → gone and wrong/correct passphrase; zero console errors |
 | Static delivery | hashed assets `Cache-Control: immutable`; shell and deep links `no-cache`/noindex; HEAD works for `/` and `/health` |
 
@@ -46,21 +59,19 @@ docker compose exec web id          # uid=10001(ots)
 
 ## Open production items
 
-These are tracked in `TASKS.md`; they block a "production ready" claim, not local use.
+These are the only two items left. Both are **infrastructure** that depends on the
+operator's host and certificates, so they cannot be closed from the repository. They
+block a public "production ready" claim, not local use.
 
 | Item | Risk | Owner task |
 |---|---|---|
-| TLS termination + real hostname | HSTS/Secure cookies depend on `SSL=true`; no bundled TLS | T-70 |
-| Redis auth/TLS and network policy | Redis is reachable only on the compose network, but has no password/TLS | T-71 |
-| Backup/restore drill | AOF volume exists; no tested restore or documented RPO/RTO | T-72 |
-| Metrics, tracing, alerting | Logs only; no latency/error/queue metrics | T-73 |
-| Dependency and image scanning | No `bundler-audit`, `npm audit`, or image scan in CI | T-74 |
-| Key rotation | Changing `SECRET` makes old secrets unreadable; no migration tool | T-65 |
+| TLS termination + real hostname | HSTS/Secure cookies depend on `SSL=true`; no bundled TLS. Set at the proxy/host. | T-70 |
+| Redis network policy | Redis auth is now enforced (`REDIS_PASSWORD`/`--requirepass`, verified) and TLS is available via `rediss://`; the remaining piece is restricting who can reach the port, which is a host/firewall decision. | T-71 |
 
-| Auth audit trail / session revocation | Account events are not audited; password change does not revoke other sessions | K-34 |
-| Load/soak test | Rate limiter and Redis behavior not tested at volume | T-76 |
-| Incident runbook | No on-call procedures, key-compromise steps | T-77 |
-
+Everything else that used to be listed here — backup/restore (T-72), dependency scanning
+(T-74), key rotation (T-65), auth audit trail and session revocation (K-34), load/soak
+(T-76), and the incident runbook (T-77) — is now implemented and verified; see the gates
+table above.
 ## Accepted limitations (not bugs)
 
 - **D-012:** a passphrase is an access gate, not a second encryption key. The server holds

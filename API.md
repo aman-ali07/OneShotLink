@@ -22,7 +22,7 @@ requests must send `Content-Type: application/json`. v1 accepts
 | Success (v3) | `201` for creation, `200` for reads and session actions, `200 {"ok":true}` for signout |
 | Secrets in URLs | Only the key appears in the path. Passphrases are never query parameters. |
 | Caching | All secret/reveal responses: `Cache-Control: no-store`, `Pragma: no-cache`. |
-| Rate limit | `429` + `Retry-After` implemented; `X-RateLimit-Limit`, `X-RateLimit-Remaining` still planned (K-26) |
+| Rate limit | `429` + `Retry-After`. Every rate-limited response also carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (seconds until the window resets). Successful requests within a limit carry the same `X-RateLimit-*` headers. |
 | Request ID | `X-Request-Id` echoed/generated; used in logs instead of payloads |
 
 ### Error codes
@@ -249,4 +249,4 @@ curl -sX POST http://localhost:3000/api/v1/secret/<key>
 
 Verified 2026-11-11 with Puma on `:3100` (Redis DB 0): create `201`, first reveal
 `200`, second reveal `404`; four parallel reveals produced one `200` and three `404`.
-`bundle exec rspec` → 68 examples, 0 failures.
+`bundle exec rspec` → 94 examples, 0 failures.

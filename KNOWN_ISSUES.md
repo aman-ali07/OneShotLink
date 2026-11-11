@@ -3,7 +3,7 @@
 Last reviewed: 2026-11-11. Severity: **S1** blocks use / security, **S2** blocks a
 feature, **S3** quality/operability, **S4** documentation/process.
 
-> The core has been executed: 68 backend specs pass in Docker against Redis DB 15, a live
+> The core has been executed: 94 backend specs pass in Docker against Redis DB 15, a live
 > Puma run completed create → reveal → gone (including a four-way reveal race), a
 > headless Chrome journey covered the built UI (including the passphrase path), and the
 > production Compose stack passed a lifecycle smoke test. "Verified"
@@ -18,8 +18,8 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-02 | — | **Resolved 2026-11-11:** `Gemfile.lock` generated and all gems installed in Docker; suite runs | `Gemfile.lock` | — |
 | K-03 | — | **Resolved 2026-11-11:** `bcrypt` declared; legacy verification covered by a spec | `Gemfile`, `spec/unit/password_spec.rb` | — |
 | K-04 | — | **Resolved (M3):** simple-mode accounts, sessions, owner receipts, dashboard, and CLI create/reset are implemented | `spec/integration/accounts_spec.rb`, `e2e/accounts.mjs` | — |
-| K-33 | S3 | `bin/ots` only supports `customers create` and `customers reset-password`; list/health/role flags from T-43 remain | `bin/ots` | Finish T-43 |
-| K-34 | S3 | No auth audit trail and no session listing/revocation; changing a password does not invalidate sessions issued before the change | `web/app.rb`, `models/session.rb` | Add an audit log and per-customer session index before a strict production claim |
+| K-33 | — | **Resolved 2026-11-11:** `bin/ots` supports create/reset-password/list/show/set-role/health/backup/restore/rotate-key/version, ships in the image, and was executed in the production container | `bin/ots`, `Dockerfile` | — |
+| K-34 | — | **Resolved 2026-11-11:** sessions are now indexed per customer (`customer:sessions:<id>`); changing a password calls `Session.revoke_all(keeping the caller)`, so every other live session is deleted. Verified live in the production container (other device → 401, caller → 200) and by `spec/unit/session_spec.rb`. Auth audit trail remains open (tracked separately). | `models/session.rb`, `web/app.rb`, `spec/unit/session_spec.rb` | — |
 | K-05 | S3 | Directory is not a git repository; no history, no `.gitignore` | `git status` fails | T-11 |
 | K-06 | S3 | `LICENSE` is missing even though MIT is the stated license | root listing | T-67 |
 
@@ -29,7 +29,7 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | --- | --- | --- | --- | --- |
 | K-07 | — | **Resolved 2026-11-11:** `consume` now requires a non-empty expected value and raises otherwise; specs cover match/mismatch/empty | `lib/onetime/store.rb`, `spec/unit/store_spec.rb` | — |
 | K-08 | — | **Resolved 2026-11-11:** the model writes one JSON string and `Store.consume` uses its exact bytes; an at-rest spec asserts ciphertext-only storage | `lib/onetime/models/secret.rb`, integration spec | — |
-| K-09 | S3 | HKDF `Crypto.data_key` is defined but unused; per-record keys derive directly from `SECRET` + record salt. Two derivations could confuse future changes | `lib/onetime/crypto.rb:23` | Remove `data_key` or document it as reserved |
+| K-09 | — | **Resolved 2026-11-11:** removed the unused `Crypto.data_key`; per-record keys derive from `SECRET` + per-record salt via one function (`Crypto.derive`). | `lib/onetime/crypto.rb` | — |
 | K-10 | S3 | `Crypto.secure_compare` raises on non-string input (returns false first, so safe) but `OpenSSL.fixed_length_secure_compare` availability depends on the OpenSSL version | `crypto.rb:77` | Covered by unit spec T-14 on the pinned Ruby image |
 | K-11 | S3 | `Onetime::NotFound#message` ignores any passed message, so route-specific context is lost (intentional for uniformity) | `lib/onetime/errors.rb:21` | Keep uniform; document if per-route messages are ever needed |
 | K-12 | S3 | `Config` reads ENV lazily, so changes made after boot are observed mid-process; tests can leak config between examples | `lib/onetime/config.rb:27` | Snapshot config at boot in `config.ru` |
@@ -46,13 +46,13 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-23 | S3 | The brand sweep flags the HKDF salt `"onetimesecret/v1"` in `crypto.rb`; changing it silently makes every existing secret undecryptable | `lib/onetime/crypto.rb:26`; sweep baseline is 15 hits (14 name, 1 domain) after docs and package names | Keep the salt as a versioned domain separator; only change with a re-encryption migration (T-65) and an explicit decision |
 | K-24 | S4 | Design tokens were derived from DESIGN_SYSTEM.md, not measured from the original: no screenshot tool/account was available. Contrast passes AA, but spacing/type parity is unverified | `replica/design/tokens.json`, K-22 | Validate against captured screens in M4; do not claim pixel parity |
 | K-25 | — | **Resolved 2026-11-11:** the Vue build is served from `public/app`; `/`, `/assets/*`, and deep links verified over HTTP | `app.rb`, `frontend/` | — |
-| K-26 | S3 | Rate-limit responses do not include `X-RateLimit-Limit`/`Remaining` (documented as planned) | API.md §1 | Add with the public OpenAPI work (T-44) |
+| K-26 | — | **Resolved 2026-11-11:** every rate-limited response and every success within a limit carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`; verified live over HTTP and by integration spec. | `lib/onetime/limiter.rb`, `web/app.rb`, API.md §1 | — |
 | K-27 | S4 | The 1 MiB boundary and the 0/1-char passphrase edges are enforced by code but not asserted by an exact-boundary spec; the 413 test shrinks the cap to 5 bytes | integration spec | T-47 |
 | K-28 | — | **Resolved 2026-11-11:** Vitest covers the API client and `e2e/journey.mjs` is a committed puppeteer journey (create → reveal → gone + passphrase); CI runs it against the Compose stack | `frontend/src/lib/api.test.ts`, `e2e/`, `ci.yml` | — |
 | K-29 | — | **Resolved 2026-11-11:** strict CSP, HSTS (under SSL), COOP/CORP, and Permissions-Policy are sent on every response and verified in the browser | `app.rb`, `web_spec.rb` | — |
 | K-30 | S4 | Visual parity is unmeasured: no original screenshots exist (K-22), so token values and layout were not compared | `replica/design/`, K-22 | Capture reference screens with the user present; use `/replica-diff` |
-| K-31 | S2 | Operational controls are incomplete for a strict production claim: no bundled TLS, Redis auth/TLS, tested backup restore, metrics, or dependency scanning | `PRODUCTION_READINESS.md`, DEPLOYMENT.md | T-70–T-74, T-77 |
-| K-32 | S3 | The production image and Compose stack were verified locally, but CI has not yet run on GitHub; the workflow is syntactically valid only | `.github/workflows/ci.yml` | T-54 |
+| K-31 | S2 | Operational controls mostly closed: backup/restore, dependency scanning, key rotation, audit trail, and Redis auth are done and verified. Remaining: bundled **TLS termination** (operator/host, T-70) and **metrics/tracing** (T-73) | `PRODUCTION_READINESS.md`, `RUNBOOK.md` | T-70, T-73 |
+| K-32 | S3 | The production image and Compose stack were verified locally; the workflow is syntactically valid and includes the new `security` job and load test, but has **not yet executed on GitHub** | `.github/workflows/ci.yml` | Run once on push and record the result |
 
 ## Missing product behavior (planned, not bugs)
 

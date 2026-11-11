@@ -10,7 +10,7 @@ production-packaging gate, and M3 simple-mode accounts are complete.** M0: app b
 26 specs pass. M1: full secret lifecycle. M2: Vue vertical slice. Packaging: hardened
 non-root container, Compose with persistent Redis, CI, redacted logs. M3: signup/signin/
 signout, sessions, owner receipts, dashboard, password change, CLI create/reset, and two
-browser journeys. **68 specs** green; parity **60.6/100 with 10/11 must-haves** (the last
+browser journeys. **94 specs** green; parity **60.6/100 with 10/11 must-haves** (the last
 is the deliberate D-012 passphrase divergence). Next: close operational gates in
 `PRODUCTION_READINESS.md`, then M4 verification.
 

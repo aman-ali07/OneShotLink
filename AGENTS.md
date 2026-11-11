@@ -4,7 +4,7 @@ Onetime Secret clone: a self-hostable, single-use secret sharing service.
 **Stack:** Ruby 3.3 + Roda on Rack 3 + Puma, Redis, Vue 3 + TypeScript + Vite + Tailwind.
 **Status:** production-packaged core with optional simple-mode accounts. The Vue SPA and
 APIs support create → link → reveal once → gone, including the passphrase path; account
-signup/signin, owner receipts, and the dashboard are implemented. **68 backend specs pass**,
+signup/signin, owner receipts, and the dashboard are implemented. **94 backend specs pass**,
 two headless browser journeys are verified, and the non-root Compose stack was smoke-tested.
 Operational gates (TLS, Redis auth, backups, metrics, scanning, key rotation) and full mode
 are still open; next milestone is M4 verification after those gates.

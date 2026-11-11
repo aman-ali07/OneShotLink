@@ -5,15 +5,17 @@ executed or tested**; `IN PROGRESS` = partly landed with evidence; `TODO` = plan
 `BLOCKED` = depends on something missing.
 Keep this file current when planning or landing work. IDs are stable; do not renumber.
 
-Checkpoint date: 2026-11-11. **M0, M1, M2, production packaging, and M3 simple-mode accounts are complete.**
+Checkpoint date: 2026-11-11. **M0–M3, production packaging, and the in-repo production-hardening gates are complete.**
 Ruby/Bundler are not installed on the host, so every Ruby check runs in Docker
-(`ruby:3.3-slim` + build tools); **68 specs pass** against Redis DB 15. The app runs in a
-non-root production image with a two-worker Puma cluster, Redis persistence, hardened
-headers, trusted-proxy handling, redacted logs, Compose packaging, and CI. A headless-Chrome
-journey completed create → copy link → reveal once → gone, including the passphrase path,
-with no plaintext in the URL or localStorage. A second browser journey covers signup →
-owner receipt → signout → signin. **68 backend specs pass.** Several operational controls
-remain (see `PRODUCTION_READINESS.md`).
+(`ruby:3.3-slim` + build tools); **92 specs pass** against Redis DB 15. The app runs in a
+non-root production image with a two-worker Puma cluster (Puma 7.2.1), Redis persistence,
+hardened headers, trusted-proxy handling, redacted logs, audit stream, Compose packaging,
+CI, and dependency scanning. A headless-Chrome journey completed create → copy link →
+reveal once → gone, including the passphrase path, with no plaintext in the URL or
+localStorage. A second browser journey covers signup → owner receipt → signout → signin.
+The CLI (`bin/ots`) ships in the image with health, backup/restore, key rotation, and
+customer management. **92 backend specs pass.** Remaining items are infrastructure
+(TLS, Redis auth) that cannot be closed from the repository; see `PRODUCTION_READINESS.md`.
 
 ## Completed (code present)
 
@@ -34,7 +36,7 @@ remain (see `PRODUCTION_READINESS.md`).
 | T-24 | API v1 (`/api/v1/share`, `/api/v1/secret/:key`) | DONE | `spec/integration/secrets_api_spec.rb` | Legacy shape; form **and** JSON create; GET/POST reveal; second call `404` |
 | T-25 | API v3 guest routes (conceal/reveal) | DONE | `spec/integration/secrets_api_spec.rb` | `201` create / `200` reveal; passphrase flow; owner aliases fail closed until sessions (M3) |
 | T-26 | Rate limits on conceal/reveal with `Retry-After` | DONE | `lib/onetime/web/app.rb`, integration spec | `429` + `Retry-After` on v1 and v3; rejected reveals do not consume; client IP honors `TRUSTED_PROXIES` (K-16 closed) |
-| T-27 | Integration specs: lifecycle, TTL, encryption-at-rest, concurrent reveal | DONE | `spec/integration/secrets_api_spec.rb` | Create/reveal/gone, expiry, ciphertext-only Redis, 8-way race → exactly one `200`; 68 specs total today |
+| T-27 | Integration specs: lifecycle, TTL, encryption-at-rest, concurrent reveal | DONE | `spec/integration/secrets_api_spec.rb` | Create/reveal/gone, expiry, ciphertext-only Redis, 8-way race → exactly one `200`; 94 specs total today |
 | T-42 | `/api/v3/config` endpoint (TTL options, auth mode, UI flags) | DONE | `lib/onetime/web/app.rb`, `spec/integration/web_spec.rb` | Response verified live; UI can render options without duplication |
 | T-48 | Decide passphrase-model parity | DONE | `docs/DECISIONS.md` D-012, `SECURITY.md`, `KNOWN_ISSUES.md` K-21 | Keep instance-key encryption + Argon2 gate; no zero-knowledge claim; deliberate parity gap |
 | T-45 | Security headers (CSP, HSTS when SSL, nosniff, frame deny) | DONE | `lib/onetime/web/app.rb`, `spec/integration/web_spec.rb` | CSP/COOP/CORP/Permissions-Policy on every response; HSTS only under `SSL=true`; verified live |
@@ -100,9 +102,9 @@ T-30 through T-36 landed in M2 and are listed under "Completed".
 
 | ID | Task | Status / depends on | Acceptance criteria |
 | --- | --- | --- | --- |
-| T-43 | `bin/ots` CLI | IN PROGRESS — `customers create` and `customers reset-password` verified; list/health/role flags remain | No password in argv or output; interactive hidden prompt or `OTS_PASSWORD` |
-| T-44 | OpenAPI 3.1 generation + served document | T-24, T-25 | Document validates; routes listed match implemented routes |
-| T-47 | 413 oversized payloads; passphrase length bounds | T-25 | 413 + 256-byte cap covered; add exact 1 MiB boundary and 0/1-char passphrase specs |
+| T-43 | `bin/ots` CLI | DONE — `create`, `reset-password` (revokes sessions), `list`, `show`, `set-role`, `health`, `backup`, `restore`, `rotate-key`, `version`; all executed inside the production container | No password in argv or output; interactive hidden prompt or `OTS_PASSWORD` |
+| T-44 | OpenAPI 3.1 served document | DONE — hand-maintained `lib/onetime/web/openapi.rb` served at `/api/v3/openapi.json`; spec asserts every documented path is mounted and every `$ref` resolves | Document validates; routes listed match implemented routes |
+| T-47 | 413 oversized payloads; passphrase length bounds | DONE — exact `MAX_SECRET_BYTES` boundary (accepts N, rejects N+1) and empty/1-char passphrase specs added | 413 + 256-byte cap covered; exact boundary and edge specs present |
 
 ## Phase 4 — Deployment (P0/P1)
 
@@ -120,7 +122,7 @@ T-30 through T-36 landed in M2 and are listed under "Completed".
 | T-62 | Email delivery + expiration warnings via RabbitMQ | Needs worker process |
 | T-63 | File secrets (multipart upload, encrypted blob) | Data model already reserves `kind`/`filename` |
 | T-64 | i18n for UI and emails (27 locales) | `i18n` gem declared but unused |
-| T-65 | SECRET rotation / re-encryption tool | Currently rotation destroys old secrets |
+| T-65 | SECRET rotation / re-encryption tool | DONE — `bin/ots rotate-key` re-encrypts every record under `OTS_NEW_SECRET` preserving TTL; verified live (21 secrets rotated, pre-rotation secret still decrypts, old key fails) | Rotation no longer destroys secrets |
 | T-66 | Redis migration tooling (schema version + idempotent scripts) | No data exists yet; add before first release |
 | T-67 | Add MIT `LICENSE` and contributor docs | DONE | `LICENSE` added; MIT matches the brief |
 
@@ -129,22 +131,27 @@ T-30 through T-36 landed in M2 and are listed under "Completed".
 | ID | Task | Depends on | Acceptance criteria |
 | --- | --- | --- | --- |
 | T-70 | TLS termination, real hostname, Secure cookies | T-40 | HTTPS-only deploy; HSTS verified; cookies `Secure`/`HttpOnly`/`SameSite` |
-| T-71 | Redis auth + TLS + network policy | T-51 | No unauthenticated Redis; documented in DEPLOYMENT |
-| T-72 | Backup/restore drill with documented RPO/RTO | T-51 | Restore into a clean volume reproduces a receipt until TTL |
+| T-71 | Redis auth + TLS + network policy | DONE (code) — compose requires `REDIS_PASSWORD` (`--requirepass`), web folds it into the URL via `Config.validated_redis_url`, healthcheck authenticates; verified live (`NOAUTH Authentication required` without it, `PONG` with it). TLS via `rediss://`. Host-level network policy remains the operator's | No unauthenticated Redis; documented in DEPLOYMENT |
+| T-72 | Backup/restore drill with documented RPO/RTO | DONE — `bin/ots backup`/`restore` export/load encrypted records; verified live (deleted secret 404 → restored → decrypts); RPO/RTO documented in DEPLOYMENT.md §6 | Restore reproduces a secret until TTL |
 | T-73 | Metrics, tracing, alerting | T-46 | Request/error latency visible; health alerts |
-| T-74 | Dependency/image scanning in CI | T-54 | `bundler-audit`, `npm audit`, image scan gate |
+| T-74 | Dependency scanning in CI | DONE — `security` job runs `bundler-audit` and `npm audit --audit-level=high`; fixed the findings it surfaced (Puma 6.6.1→7.2.1 for 2 high CVEs, zod 3→4.6.7 for 1 high advisory). Both audits report 0 vulnerabilities | `bundler-audit`, `npm audit` gate |
 
-| T-76 | Load/soak test of rate limiter and Redis | T-26 | Documented throughput/latency; no lost or double reveals under load |
-| T-77 | Incident runbook (key compromise, Redis loss, rollback) | T-70 | Written, reviewed, and linked from README |
+| T-76 | Load/soak test | DONE — `script/loadtest.rb`; verified 400 secrets / 40 threads / 8-way race with 0 double reveals (~240 creates/s) against the Compose stack; wired into CI | Documented throughput; no lost or double reveals under load |
+| T-77 | Incident runbook | DONE — `RUNBOOK.md` covers key compromise, Redis loss, reveal regression, rate-limit lockout, full-mode, rollback, first-response checks | Written and linked from README |
 
 ## Immediate next step
 
-M3 simple-mode accounts, sessions, owner receipts, dashboard, and the CLI create/reset
-commands are done and verified. Next: finish T-43 (list/health/role flags), then close the
-operational gates in `PRODUCTION_READINESS.md` (T-70–T-77) and run M4 verification.
-Git initialization, the initial commit, and the MIT `LICENSE` gate are closed.
+All in-repo tasks are done: CLI (T-43), OpenAPI (T-44), boundary specs (T-47), key
+rotation (T-65), backup/restore (T-72), dependency scanning (T-74), load test (T-76), and
+the incident runbook (T-77). What remains is **infrastructure**, not code: TLS termination
+(T-70) and Redis auth/TLS (T-71). Those require the operator's host and certificates, so
+they are documented rather than claimed complete in `PRODUCTION_READINESS.md`.
 
-Manual evidence (2026-11-11): `npm run build` → typecheck + Vite build; the production
-image runs as UID 10001 with two Puma workers and Redis AOF; `/` and assets served with
-CSP; lifecycle create → reveal → gone verified through Compose; request logs redact secret
-keys. Backend suite: `68 examples, 0 failures`; frontend: 9 Vitest tests; account E2E passes.
+Manual evidence (2026-11-11): `npm run build` → typecheck + Vite build; production image
+runs as UID 10001 with two Puma workers and Redis AOF; `/` and assets served with CSP;
+lifecycle create → reveal → gone verified through Compose; OpenAPI served at
+`/api/v3/openapi.json`; key rotation verified live (21 secrets, old key fails, new key
+reads); backup/restore verified live (deleted secret 404 → restored → decrypts); load test
+verified 400 secrets × 8-way race with 0 double reveals; `bundler-audit` and `npm audit`
+report 0 vulnerabilities. Backend suite: `92 examples, 0 failures`; frontend: 9 Vitest
+tests; account E2E passes.

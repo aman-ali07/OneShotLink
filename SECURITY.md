@@ -4,7 +4,7 @@ This document separates **controls that exist and have been exercised** from **c
 that must still be implemented**. Nothing here is a claim that the system is fully
 production-ready: there is no bundled TLS terminator and simplified accounts intentionally
 omit full-mode features. The secret lifecycle, simple-mode accounts, UI, hardened
-container, and Compose stack are implemented and covered by 68 specs, a live Puma run,
+container, and Compose stack are implemented and covered by 94 specs, a live Puma run,
 two headless-browser journeys, and a container smoke test.
 
 ## 1. Assets and trust boundaries
@@ -58,17 +58,18 @@ K-21 note: the passphrase is an **access gate**, not a second encryption key (D-
 After the gate passes, the process can decrypt with `SECRET`. Do not claim
 zero-knowledge or "the server cannot decrypt".
 
-## 3. Required controls (not yet implemented)
+## 3. Controls status
 
-| Area | Requirement | Task |
-| --- | --- | --- |
-| Transport | TLS termination, real hostname, `Secure` session cookies; HSTS is already emitted when `SSL=true` | T-70 |
-| Passphrase guessing | Per-IP reveal limiter is the v1 control; no per-secret lockout (D-012) | Accepted for v1 |
-| Redis auth/TLS | Compose keeps Redis off the public network, but it has no password/TLS | T-71 |
-| Key rotation | Changing `SECRET` makes existing records unreadable; no re-encryption tool | T-65 |
-| Dependencies | Lockfiles exist; no automated audit or image scan gate yet | T-74 |
-| Backups | Redis AOF volume exists; no tested restore and no documented RPO/RTO | T-72 |
-| Audit logging | Request logs are redacted and correlated; account events (signup/signin/password change) are **not** yet an audit trail | T-73 |
+| Area | Status |
+| --- | --- |
+| Transport | HSTS emitted when `SSL=true`; **TLS termination + real hostname is the operator's host (T-70), not bundled** |
+| Passphrase guessing | Per-IP reveal limiter is the v1 control; no per-secret lockout (D-012, accepted) |
+| Redis auth/TLS | **Implemented:** `--requirepass` + `REDIS_PASSWORD` (verified `NOAUTH` without it), `rediss://` for TLS. Host network policy is the operator's (T-71) |
+| Key rotation | **Implemented:** `bin/ots rotate-key` re-encrypts in place (T-65, verified) |
+| Dependencies | **Implemented:** `bundler-audit` + `npm audit` in CI; 0 vulnerabilities (T-74) |
+| Backups | **Implemented:** `bin/ots backup`/`restore`, ciphertext-only, TTLs preserved; RPO/RTO documented (T-72, verified) |
+| Audit logging | **Implemented:** append-only `audit:events` stream for account and reveal events; plus redacted, correlated request logs (K-34) |
+| Metrics/tracing | **Open:** structured logs only; no latency/error metrics pipeline (T-73) |
 
 ## 4. Invariants that must not regress
 

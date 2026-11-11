@@ -49,10 +49,10 @@ A future full mode adds PostgreSQL + RabbitMQ behind the same logic objects.
 | `lib/onetime/web/request_logger.rb` | One redacted request log line per request | Implemented + unit-tested |
 | `lib/onetime/web/head_requests.rb` | Serve HEAD through GET routes, strip body | Implemented + tested |
 | `frontend/` | Vue 3 SPA, Zod API client, conceal/reveal views, design tokens | Implemented + browser-verified |
-| `spec/` | RSpec unit + rack-test integration against Redis DB 15 | Implemented (68 examples) |
+| `spec/` | RSpec unit + rack-test integration against Redis DB 15 | Implemented (94 examples) |
 | `lib/onetime/models/organization.rb`, `receipt.rb` | Organizations and a separate receipt model | Deferred; receipt lives in `secret.rb` for now |
 | `apps/api/v1.rb`, `apps/api/v3.rb` | Roda sub-apps | Not needed yet; one app class |
-| `bin/ots` | CLI: customer create / password reset (list, health, roles still planned) | Partially implemented |
+| `bin/ots` | CLI: customers (create/list/show/set-role/reset-password), health, backup, restore, rotate-key, version | Implemented and shipped in the image |
 | `frontend/` | Vue SPA (see §6) | Implemented (M2) |
 | `Dockerfile`, `compose.yaml`, `.github/workflows/ci.yml` | Self-host packaging and CI | Implemented + smoke-tested |
 

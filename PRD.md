@@ -159,7 +159,7 @@ As a small-team operator, I can enable accounts without PostgreSQL.
 7. ✅ Simple-mode signup → owner receipt → signout → signin verified in a browser;
    dashboard contains no secret plaintext.
 
-Criteria 1–4 were verified on 2026-11-11 (68 specs, 0 failures) plus a live Puma run.
+Criteria 1–4 were verified on 2026-11-11 (94 specs, 0 failures) plus a live Puma run.
 The browser vertical slice, headless journey, and the production Compose stack also
 passed. Strict production status still depends on the operational items in
 [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md); see [KNOWN_ISSUES.md](KNOWN_ISSUES.md).

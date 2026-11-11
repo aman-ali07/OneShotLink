@@ -15,7 +15,8 @@ are the code defaults; `SECRET` has no default and is required.
 | `SECRET` | **yes** | — | Instance-wide encryption secret; ≥ 32 bytes. `openssl rand -hex 32` |
 | `HOST` | no | `localhost:3000` | Public host **including port**, used for links |
 | `SSL` | no | `false` | `true` when behind TLS; makes links/cookies `https`/`Secure` |
-| `REDIS_URL` | no | `redis://127.0.0.1:6379/0` | Redis/Valkey connection URL |
+| `REDIS_URL` | no | `redis://127.0.0.1:6379/0` | Redis/Valkey connection URL; `rediss://` enables TLS |
+| `REDIS_PASSWORD` | compose **yes** | — | Redis auth password; folded into the URL by `Config.validated_redis_url` and never logged |
 | `REDIS_TIMEOUT` | no | `5` | Connect/read/write timeout in seconds |
 | `REDIS_RECONNECT_ATTEMPTS` | no | `2` | Reconnect attempts before surfacing an error |
 | `AUTH_MODE` | no | `disabled` | `disabled` \| `simple` \| `full` (`full` → 501) |
@@ -46,14 +47,29 @@ Create a customer non-interactively (the password never appears in argv):
 
 ```bash
 OTS_PASSWORD='a long unique password' \
-  docker compose exec -e OTS_PASSWORD web bin/ots customers create --email person@example.com
+  docker compose exec -e OTS_PASSWORD web ruby bin/ots customers create --email person@example.com
 ```
 
-Or run `bin/ots customers create --email ...` in an interactive terminal for a hidden
-prompt. `bin/ots customers reset-password --email ...` sets a new password; existing
-sessions are not revoked in this build (K-34). The Redis session TTL slides on activity;
-the browser cookie has a fixed `SESSION_TTL` max-age (default 14 days) and is `Secure`
-only when `SSL=true`.
+Or run `ruby bin/ots customers create --email ...` in an interactive terminal for a hidden
+prompt. The full command set (all verified in the production container):
+
+| Command | Purpose |
+| --- | --- |
+| `customers create --email EMAIL` | Create a customer |
+| `customers reset-password --email EMAIL` | Set a new password **and revoke all sessions** |
+| `customers list` | List customers (id, email, role) |
+| `customers show --email EMAIL` | Show one customer |
+| `customers set-role --email EMAIL --role customer\|admin` | Change role |
+| `health` | Validate config, Redis, and stored-key count |
+| `backup --out FILE` | Export encrypted records |
+| `restore --in FILE` | Restore from a backup |
+| `rotate-key` | Re-encrypt all secrets under `OTS_NEW_SECRET` |
+| `version` | Print the version |
+
+A password change from the UI **also revokes every other live session** and keeps the
+caller signed in (verified); `reset-password` revokes all of them. The Redis session TTL
+slides on activity; the browser cookie has a fixed `SESSION_TTL` max-age (default 14
+days) and is `Secure` only when `SSL=true`.
 | `APP_PORT` | no | `3000` | Host port published by Compose |
 
 `.env.example` contains placeholder values only. Never commit `.env`.
@@ -75,15 +91,17 @@ no `.env`; do not copy one into the build context.
 
 ```bash
 export SECRET="$(openssl rand -hex 32)"
+export REDIS_PASSWORD="$(openssl rand -hex 24)"
 export HOST=localhost:3000
 docker compose up -d --build
 curl -fsS http://localhost:3000/health
 ```
 
-`compose.yaml` runs `web` and `redis`. Redis uses AOF (`appendfsync everysec`) and
-`maxmemory-policy noeviction`; the web container is read-only with `/tmp` as tmpfs. Set
-`APP_PORT` to change the published port. Do not commit `.env`; inject `SECRET` from your
-secret manager or shell.
+`compose.yaml` runs `web` and `redis`. Redis uses AOF (`appendfsync everysec`),
+`maxmemory-policy noeviction`, and `requirepass` (auth is mandatory — set
+`REDIS_PASSWORD`); the web container is read-only with `/tmp` as tmpfs. Set `APP_PORT` to
+change the published port. Do not commit `.env`; inject `SECRET` and `REDIS_PASSWORD` from
+your secret manager or shell.
 
 ```bash
 docker compose ps
@@ -121,20 +139,29 @@ The app returns `503` when Redis is unreachable, so a platform load balancer can
 
 - Redis AOF (`appendonly yes`, `everysec`) is the system of record; Compose mounts the
   `redis-data` volume.
-- A minimal backup/restore drill (not yet automated, T-72):
+- **Application-level backup (verified).** `bin/ots backup` exports every secret record,
+  every receipt, and the customer records — all still encrypted under `SECRET` (no
+  plaintext, sessions excluded) — to one JSON file. `bin/ots restore` loads it back,
+  preserving each record's remaining TTL:
 
 ```bash
-docker compose exec -T redis redis-cli BGSAVE
-docker run --rm -v onetime-secret_redis-data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/redis-data.tgz -C /data .
-# restore into a clean volume only after stopping web
+# inside the web container; write to a mounted, access-controlled path
+docker compose exec web ruby bin/ots backup --out /backups/dump.json
+docker compose exec web ruby bin/ots restore --in /backups/dump.json
 ```
 
-- Backups contain ciphertext, Argon2id passphrase hashes, and (after M3) session tokens.
-  Encrypt backups at rest and restrict access.
-- Restoring a backup restores sessions too; flush `session:*` if the backup leaked.
+  Verified end to end: a deleted secret (HTTP `404`) decrypts again after restore.
+
+- **RPO/RTO target:** schedule `bin/ots backup` more often than your shortest TTL (e.g.
+  hourly) so the exposure window is bounded. RTO ≈ restore time + one web restart.
+- Keep the AOF-volume snapshot as a kernel-level backstop; the `bin/ots` export is the
+  portable one because it does not depend on the Redis file format version.
+- Backups contain ciphertext and Argon2id hashes only — useless without `SECRET`, and
+  only a holder of the current `SECRET` can restore-and-read them. Encrypt at rest and
+  restrict access. Sessions are deliberately **not** exported.
 - `noeviction` prevents silent loss before TTL; monitor memory and alert at 80%.
-- Losing Redis loses all unexpired secrets. Make that explicit to operators.
+- Losing Redis without a backup loses all unexpired secrets. Make that explicit to
+  operators; see [RUNBOOK.md](RUNBOOK.md) §2.
 
 ## 7. Upgrades and rollback
 
@@ -147,7 +174,24 @@ docker run --rm -v onetime-secret_redis-data:/data -v "$PWD":/backup alpine \
 Image tags: `:dev`, `:vX.Y.Z`, and `:latest` for the newest stable. Pin a digest in
 production.
 
-## 8. Scaling and constraints
+## 8. Redis hardening (auth and TLS)
+
+Redis is the system of record, so it must not be reachable unauthenticated.
+
+- **Authentication (default in Compose, verified).** `compose.yaml` starts Redis with
+  `--requirepass ${REDIS_PASSWORD}` and the web service receives the same value. The app
+  folds it into the connection URL via `Config.validated_redis_url`; the password never
+  appears in logs. Verified: `redis-cli ping` without the password returns
+  `NOAUTH Authentication required.`; with it, `PONG`.
+- **TLS.** Point `REDIS_URL` at `rediss://host:6380/db` when Redis terminates TLS
+  (managed Redis/Valkey, or a stunnel sidecar). The scheme is validated at boot so a typo
+  fails closed.
+- **Network policy (operator).** Keep the Redis port off the public interface. In Compose
+  it is already only on the internal network (no `ports:` mapping); on a host or
+  Kubernetes cluster, restrict it with a firewall/NetworkPolicy. This is the one part of
+  Redis hardening that lives outside the repository.
+
+## 9. Scaling and constraints
 
 - The app is stateless; scale horizontally behind the proxy. All instances must share one
   Redis (sessions and secrets are not replicated).
@@ -156,17 +200,25 @@ production.
   the outage behaviour (503 health, 500 API) for operators.
 - Long secrets and high TTLs dominate memory; cap `MAX_SECRET_BYTES` and `TTL_OPTIONS`.
 
-## 9. `SECRET` rotation
+## 10. `SECRET` rotation
 
-Rotating `SECRET` makes existing secrets undecryptable (there is no re-encryption tool,
-T-65). Options:
+In-place rotation is supported and non-destructive (verified). The `rotate-key` command
+re-encrypts every stored secret from the current key to a new one, preserving each
+record's remaining TTL:
 
-- Drain: stop creating secrets, wait `max(TTL_OPTIONS)`, then rotate.
-- Accept loss: rotate immediately, delete `secret:object:*` (they can only fail), keep
-  sessions unless compromised.
-- Future: add a re-encryption migration before supporting in-place rotation.
+```sh
+NEW=$(openssl rand -hex 32)
+docker compose exec -e OTS_NEW_SECRET="$NEW" web ruby bin/ots rotate-key
+# then set SECRET=$NEW in the environment/secret manager and restart web:
+docker compose up -d --force-recreate web
+```
 
-## 10. Full mode (not supported)
+After rotation, a secret created before the change still decrypts under the new key, and
+the old key can no longer decrypt it (`spec/unit/ops_spec.rb` asserts both directions).
+Rotation protects data **at rest going forward**; anything already decrypted is not
+un-disclosed. See [RUNBOOK.md](RUNBOOK.md) §1 for the compromise playbook.
+
+## 11. Full mode (not supported)
 
 `AUTH_MODE=full` is reserved for PostgreSQL 17 + RabbitMQ 4.3 + Rodauth. No such services
 are wired, and the API returns `501 not_configured`. A `docker-compose.full.yml` may be

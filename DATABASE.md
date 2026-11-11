@@ -32,6 +32,8 @@ Redis 7+ (or Valkey 7+). Commands used: `GET`, `SET ... EX`, `DEL`, `EVAL`, `INC
 | `customer:index:<sha256>` | string → `<id>` | none | Email lookup/uniqueness index (hashed, never raw email) | Implemented (T-40) |
 | `customer:<id>:secrets` | sorted set | none | Owner's receipt index, score = `created_at` epoch | Implemented (T-28); reveal removes the member |
 | `session:<sha256(token)>` | hash | `SESSION_TTL` (14 d, sliding) | Server-side session (`customer_id`, `created_at`, `last_seen`) | Implemented (T-41); Redis never stores the raw token |
+| `customer:sessions:<id>` | set | `SESSION_TTL` | Digest of each live session for a customer, so a password change can revoke them all | Implemented (K-34); removed on signout/revoke |
+| `audit:events` | stream | `MAXLEN` ~100k | Append-only account/security events (`event`, `at`, `actor_id`, `request_id`, `ip`, `detail`) | Implemented (K-34) |
 | `organization:object:<id>` | hash | none | Organization record | Deferred (P2) |
 | `organization:<id>:members` | set | none | Member customer IDs + roles | Deferred (P2) |
 | `customdomain:<domain>` | hash | none | Domain → org mapping + verification state | Deferred (P2) |

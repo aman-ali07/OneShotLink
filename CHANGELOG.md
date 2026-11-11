@@ -9,6 +9,53 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Production hardening (2026-11-11) — verified
+
+- **CLI completed (T-43):** `bin/ots` now ships in the image with `customers create`,
+  `reset-password` (revokes all sessions), `list`, `show`, `set-role`, `health`,
+  `backup`, `restore`, `rotate-key`, and `version`. All executed inside the production
+  container. Passwords are never accepted in argv.
+- **Key rotation (T-65):** `bin/ots rotate-key` re-encrypts every stored secret under a new
+  `SECRET` while preserving TTLs. Verified live: 21 secrets rotated, a pre-rotation secret
+  still decrypts under the new key, and the old key fails.
+- **Backup/restore (T-72):** `bin/ots backup`/`restore` export and reload encrypted records
+  (no plaintext, sessions excluded, TTLs preserved). Verified live: a deleted secret (404)
+  decrypts again after restore.
+- **Dependency scanning (T-74):** new `security` CI job runs `bundler-audit` and
+  `npm audit --audit-level=high`. It surfaced real issues, now fixed: **Puma 6.6.1 →
+  7.2.1** (2 high CVEs) and **zod 3 → 4.6.7** (1 high advisory). Both audits report 0
+  vulnerabilities.
+- **Audit trail (K-34):** append-only `audit:events` Redis stream records signup, signin,
+  failed signin, signout, password change, session revocation, and reveal events. Only
+  identifiers, request ids, and IPs — never emails, passwords, or secret values.
+- **Load test (T-76):** `script/loadtest.rb` proves the single-use invariant under
+  concurrency. Verified: 400 secrets, 40 threads, 8-way race, **0 double reveals**
+  (~240 creates/s). Wired into CI.
+- **OpenAPI 3.1 (T-44):** served at `/api/v3/openapi.json`; a spec asserts every documented
+  path is mounted and every `$ref` resolves.
+- **Exact boundary specs (T-47):** accepts exactly `MAX_SECRET_BYTES`, rejects one byte
+  more; covers empty and one-character passphrases.
+- **Redis auth (T-71):** Compose requires `REDIS_PASSWORD` (`--requirepass`), the web folds
+  it into the URL via `Config.validated_redis_url`, and the healthcheck authenticates.
+  Verified: unauthenticated `PING` returns `NOAUTH`. `rediss://` enables TLS.
+- **Incident runbook (T-77):** `RUNBOOK.md` covers key compromise, Redis loss, reveal
+  regression, rate-limit lockout, full-mode, rollback, and first-response checks.
+- **Packaging fix:** `bin/` and `script/` are now copied into the runtime image, so the CLI
+  and load test are available in production.
+
+### Security (2026-11-11) — verified
+
+- **Password change now revokes other sessions.** Sessions are recorded in a
+  per-customer index (`customer:sessions:<id>`); changing a password deletes every other
+  live session and keeps the caller signed in. Verified live in the production container
+  (second device `401`, caller `200`) and covered by `spec/unit/session_spec.rb` (K-34).
+- **Rate-limit visibility.** Every rate-limited response and every success within a limit
+  now carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`, in
+  addition to the existing `Retry-After` (K-26). Verified over HTTP: `201` with
+  `remaining: 1`, then `429` with `remaining: 0`.
+- Removed the unused `Crypto.data_key`; record keys derive from `SECRET` plus a per-record
+  salt through a single function (K-09).
+
 ### Added (M3 simple-mode accounts, 2026-11-11) — verified
 
 - Customer records backed by Redis: `customer:<id>` hash plus
