@@ -58,8 +58,114 @@ module Cli
       abort "Password must be 12 to 256 characters."
     end
     Onetime::Models::Customer.update_password(customer[:id], password)
-    puts "Password updated"
+    # A reset is an administrative credential change: drop every live session.
+    Onetime::Models::Session.revoke_all(customer[:id])
+    puts "Password updated; all sessions revoked"
     print_customer(customer)
+  rescue Onetime::Error => e
+    abort "Error (#{e.code}): #{e.message}"
+  end
+
+  def list
+    ids = Onetime::Store.redis.keys("customer:index:*")
+    if ids.empty?
+      puts "No customers."
+      return
+    end
+
+    puts "id\temail\trole"
+    ids.each do |index_key|
+      id = Onetime::Store.redis.get(index_key)
+      next unless id
+
+      customer = Onetime::Models::Customer.find(id)
+      next unless customer
+
+      puts "#{customer[:id]}\t#{customer[:email]}\t#{customer[:role]}"
+    end
+  end
+
+  def show(email)
+    abort "Usage: ots customers show --email EMAIL" if email.to_s.empty?
+    customer = Onetime::Models::Customer.find_by_email(email)
+    abort "No customer with that email." unless customer
+
+    print_customer(customer)
+    puts "role: #{customer[:role]}"
+    puts "created_at: #{customer[:created_at]}"
+  end
+
+  def set_role(email, role)
+    abort "Usage: ots customers set-role --email EMAIL --role customer|admin" if email.to_s.empty?
+    unless %w[customer admin].include?(role.to_s)
+      abort "Role must be one of: customer, admin"
+    end
+    customer = Onetime::Models::Customer.find_by_email(email)
+    abort "No customer with that email." unless customer
+
+    Onetime::Models::Customer.update_role(customer[:id], role)
+    puts "Role updated"
+    print_customer(customer)
+    puts "role: #{role}"
+  end
+
+  def health
+    checks = {}
+
+    checks["config"] = begin
+      Onetime::Config.validate!
+      "ok"
+    rescue Onetime::Config::Error => e
+      "fail (#{e.message})"
+    end
+
+    checks["redis"] = Onetime::Store.healthy? ? "ok" : "fail (no PONG)"
+
+    checks["secret_keys"] = begin
+      count = Onetime::Store.redis.keys("#{Onetime::Models::Secret::OBJECT_PREFIX}*").length
+      "#{count} stored"
+    rescue StandardError => e
+      "fail (#{e.class})"
+    end
+
+    checks.each { |name, result| puts "#{name}: #{result}" }
+    abort "Health check failed" if checks.values.any? { |v| v.start_with?("fail") }
+    puts "Status: ok"
+  end
+
+  def rotate_key
+    unless ENV["OTS_NEW_SECRET"]
+      abort "Set OTS_NEW_SECRET to the new instance secret (>= 32 bytes)."
+    end
+    if ENV["OTS_NEW_SECRET"].bytesize < 32
+      abort "OTS_NEW_SECRET must be at least 32 bytes."
+    end
+    if ENV["OTS_NEW_SECRET"] == ENV["SECRET"]
+      abort "OTS_NEW_SECRET must differ from the current SECRET."
+    end
+
+    stats = Onetime::Logic::RotateKey.new(new_secret: ENV["OTS_NEW_SECRET"]).call
+    puts "Re-encrypted #{stats[:reencrypted]} secret(s) with the new key."
+    puts "Skipped #{stats[:skipped]} unreadable record(s)." if stats[:skipped].positive?
+    puts "Update SECRET to OTS_NEW_SECRET and restart the web process."
+  rescue Onetime::Error => e
+    abort "Error (#{e.code}): #{e.message}"
+  end
+
+  def backup(path)
+    abort "Usage: ots backup --out FILE" if path.to_s.empty?
+    stats = Onetime::Backup.export(path)
+    puts "Wrote #{stats[:secrets]} secret record(s) and #{stats[:customers]} customer(s) to #{path}"
+  rescue Onetime::Error => e
+    abort "Error (#{e.code}): #{e.message}"
+  end
+
+  def restore(path)
+    abort "Usage: ots restore --in FILE" if path.to_s.empty?
+    abort "No such file: #{path}" unless File.file?(path)
+
+    stats = Onetime::Backup.restore(path)
+    puts "Restored #{stats[:secrets]} secret record(s) and #{stats[:customers]} customer(s) from #{path}"
   rescue Onetime::Error => e
     abort "Error (#{e.code}): #{e.message}"
   end
@@ -69,13 +175,23 @@ module Cli
       Usage: ots COMMAND [options]
 
       Commands:
-        customers create --email EMAIL          Create a customer
-        customers reset-password --email EMAIL  Set a new password
-        version                                 Print the version
+        customers create --email EMAIL            Create a customer
+        customers reset-password --email EMAIL    Set a new password (revokes sessions)
+        customers list                            List customers (id, email, role)
+        customers show --email EMAIL              Show one customer
+        customers set-role --email EMAIL --role R  Set role (customer|admin)
+        health                                    Validate config and Redis
+        backup --out FILE                         Export encrypted records to FILE
+        restore --in FILE                         Restore records from a backup FILE
+        rotate-key                                Re-encrypt all secrets under OTS_NEW_SECRET
+        version                                   Print the version
 
       Password input:
         Set OTS_PASSWORD for automation, or enter it at a hidden prompt.
         Passwords are never accepted as command-line arguments.
+
+      Key rotation:
+        OTS_NEW_SECRET=<new secret> ots rotate-key
     TEXT
   end
 end
@@ -84,6 +200,9 @@ command = ARGV.shift
 options = {}
 parser = OptionParser.new do |opts|
   opts.on("--email EMAIL", "Customer email") { |value| options[:email] = value }
+  opts.on("--role ROLE", "Role (customer|admin)") { |value| options[:role] = value }
+  opts.on("--out FILE", "Output file for backup") { |value| options[:out] = value }
+  opts.on("--in FILE", "Input file for restore") { |value| options[:in] = value }
   opts.on("-h", "--help", "Show help") { puts opts; exit }
 end
 parser.parse!(ARGV)
@@ -94,8 +213,19 @@ when "customers"
   case action
   when "create" then Cli.create(options[:email])
   when "reset-password" then Cli.reset_password(options[:email])
+  when "list" then Cli.list
+  when "show" then Cli.show(options[:email])
+  when "set-role" then Cli.set_role(options[:email], options[:role])
   else Cli.help
   end
+when "health"
+  Cli.health
+when "backup"
+  Cli.backup(options[:out])
+when "restore"
+  Cli.restore(options[:in])
+when "rotate-key"
+  Cli.rotate_key
 when "version"
   puts Onetime::VERSION
 else

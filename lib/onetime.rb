@@ -11,6 +11,7 @@ require_relative "onetime/password"
 require_relative "onetime/store"
 require_relative "onetime/limiter"
 require_relative "onetime/audit"
+require_relative "onetime/backup"
 require_relative "onetime/models/customer"
 require_relative "onetime/models/session"
 require_relative "onetime/models/secret"
@@ -18,6 +19,7 @@ require_relative "onetime/logic/conceal_secret"
 require_relative "onetime/logic/reveal_secret"
 require_relative "onetime/logic/sign_up"
 require_relative "onetime/logic/sign_in"
+require_relative "onetime/logic/rotate_key"
 
 module Onetime
   # Structured-ish logging without secret material. Callers log identifiers and

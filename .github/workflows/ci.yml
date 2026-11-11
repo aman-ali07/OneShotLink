@@ -8,6 +8,23 @@ permissions:
   contents: read
 
 jobs:
+  security:
+    name: Dependency scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Ruby dependency audit
+        run: bundle exec bundler-audit check --update
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Frontend dependency audit (high and above fails)
+        run: npm --prefix frontend ci --no-audit --no-fund && npm --prefix frontend audit --audit-level=high
+
   backend:
     name: Backend specs
     runs-on: ubuntu-latest
@@ -51,7 +68,7 @@ jobs:
   container:
     name: Container smoke test
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: [security, backend, frontend]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,6 +80,7 @@ jobs:
       - name: Boot compose stack and run a lifecycle smoke test
         env:
           SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+          REDIS_PASSWORD: ci-only-redis-password-0123456789
           APP_PORT: "3000"
           AUTH_MODE: simple
         run: |
@@ -81,6 +99,23 @@ jobs:
           npm --prefix e2e ci --no-audit --no-fund
           BASE_URL=http://127.0.0.1:3000 npm --prefix e2e test
           BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:accounts
+          docker compose down -v
+      - name: Load test — single-use invariant under concurrency
+        run: |
+          # Restart the stack with the rate limits raised so we exercise the
+          # atomic reveal path rather than the limiter.
+          docker compose down -v
+          SECRET=ci-only-secret-0123456789abcdef0123456789abcdef \
+            REDIS_PASSWORD=ci-only-redis-password-0123456789 \
+            APP_PORT=3000 RATE_LIMIT_CONCEAL=100000 RATE_LIMIT_REVEAL=100000 \
+            docker compose up -d --no-build
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health >/dev/null; then break; fi
+            sleep 2
+          done
+          docker run --rm --network=host -v "$PWD":/app -w /app \
+            -e BASE_URL=http://127.0.0.1:3000 \
+            ruby:3.3-slim ruby script/loadtest.rb 100 20
           docker compose down -v
       - name: Dump Compose logs on failure
         if: failure()

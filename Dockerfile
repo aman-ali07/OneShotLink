@@ -42,6 +42,8 @@ COPY Gemfile Gemfile.lock ./
 COPY config.ru ./
 COPY config ./config
 COPY lib ./lib
+COPY bin ./bin
+COPY script ./script
 COPY --from=assets /app/public/app ./public/app
 RUN mkdir -p tmp && chown -R ots:ots /app
 

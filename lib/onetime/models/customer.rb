@@ -85,6 +85,10 @@ module Onetime
         Store.redis.hset(key(customer_id), "password_hash", Password.create(password))
       end
 
+      def update_role(customer_id, role)
+        Store.redis.hset(key(customer_id), "role", role)
+      end
+
       # Only fields safe to return from the API.
       def public_view(customer)
         {
