@@ -13,12 +13,12 @@ stream, tested backup/restore, in-place key rotation, and a load-tested single-u
 invariant. Simple-mode accounts, opaque sessions with revocation, CSRF checks, owner
 receipts, and the dashboard are implemented and covered by backend and browser tests.
 
-**All in-repo gates are closed**, including Redis authentication. Two items remain that
-belong to the operator's infrastructure and cannot be closed from the repository:
-**TLS termination** (T-70) and **Redis network policy** (T-71, the firewall/reachability
-half — auth and `rediss://` are already implemented). Until TLS is configured on the host,
-do not call the deployment "production ready" in public copy, and do not claim
-zero-knowledge (D-012).
+**All in-repo gates are closed**, including Redis authentication and metrics. Two items
+remain that belong to the operator's infrastructure and cannot be closed from the
+repository: **TLS termination** (T-70) and **Redis network policy** (T-71, the
+firewall/reachability half — auth and `rediss://` are already implemented). Until TLS is
+configured on the host, do not call the deployment "production ready" in public copy, and
+do not claim zero-knowledge (D-012).
 Do not deploy with the default `AUTH_MODE=disabled` if you need accounts — that mode has
 no accounts by design.
 

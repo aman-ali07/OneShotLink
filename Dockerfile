@@ -45,7 +45,7 @@ COPY lib ./lib
 COPY bin ./bin
 COPY script ./script
 COPY --from=assets /app/public/app ./public/app
-RUN mkdir -p tmp && chown -R ots:ots /app
+RUN mkdir -p tmp /backups && chown -R ots:ots /app /backups
 
 USER ots
 EXPOSE 3000

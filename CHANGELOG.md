@@ -9,6 +9,29 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (metrics, 2026-11-11) — verified
+
+- **Prometheus metrics endpoint (T-73).** `GET /metrics` (behind `METRICS_ENABLED`,
+  default off) serves Prometheus text: `onetime_up`, `onetime_redis_up`,
+  `onetime_version_info`, per-family request counters and duration sum/count,
+  `onetime_errors_total`, and `onetime_redis_memory_used_ratio` (for the >=80% alert).
+  The `family` label is a fixed set, so a secret key or raw path can never explode
+  cardinality. Built on a new `Onetime::Metrics` module (no new dependency, no background
+  thread) and a `Store.memory_stats` Redis INFO call. Verified live in the container and
+  by 10 new specs (suite now 104). Alert thresholds are documented in DEPLOYMENT.md §5.1.
+
+### Verified (restore drill, 2026-11-11)
+
+- **Measured RTO (T-72).** Ran a real restore-into-clean-volume drill with 81 stored
+  secrets: `bin/ots backup` 1.5 s, `docker compose down -v` + `up` to `/health = 200`
+  10.5 s, `bin/ots restore` 1.7 s — **total RTO ≈ 12.4 s**. A sentinel secret returned
+  `404` while the volume was gone and its value with the original TTL after the restore.
+- **Fixed the documented backup path.** `/backups` did not exist under the read-only
+  root filesystem, so the documented `bin/ots backup --out /backups/dump.json` failed with
+  `ENOENT`/`EACCES`. Added a `backup-data` named volume and made the image create
+  `/backups` owned by the app user, so the volume inherits that ownership and the command
+  works as the normal (non-root) user and `docker cp` can read it back.
+
 ### Verified (TLS path, 2026-11-11)
 
 - **App-side TLS behavior proven (T-70).** The app was run behind a real TLS terminator

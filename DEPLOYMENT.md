@@ -168,6 +168,25 @@ right-to-left and stops at the first untrusted hop.
 The health body must not include Redis URLs, keyspace counts, or configuration values.
 The app returns `503` when Redis is unreachable, so a platform load balancer can remove it.
 
+### 5.1 Metrics and alerting (T-73)
+
+Set `METRICS_ENABLED=true` and scrape `GET /metrics` (Prometheus text format). It is off
+by default because the series reveal traffic volume. Counters are per-process, so scrape
+every worker, or scrape the load-balanced address.
+
+Suggested alert thresholds:
+
+| Alert | Expression | Meaning |
+| --- | --- | --- |
+| Redis down | `onetime_redis_up == 0` for 1m | The app cannot reach Redis; `/health` is 503 |
+| Redis memory | `onetime_redis_memory_used_ratio >= 0.8` for 5m | `noeviction` means writes will start failing near the limit |
+| Error rate | `rate(onetime_errors_total[5m]) > 0.05` | 5xx share rising |
+| Latency | `rate(onetime_request_duration_seconds_sum[5m]) / rate(onetime_request_duration_seconds_count[5m])` | Mean latency per route family |
+
+`family` is a fixed label set (`health`, `metrics`, `web`, `api_v1`, `api_v3_guest`,
+`api_v3`, `other`), never a secret key, so cardinality stays bounded. Distributed
+tracing is not included.
+
 ## 6. Persistence and backup
 
 - Redis AOF (`appendonly yes`, `everysec`) is the system of record; Compose mounts the
@@ -178,15 +197,27 @@ The app returns `503` when Redis is unreachable, so a platform load balancer can
   preserving each record's remaining TTL:
 
 ```bash
-# inside the web container; write to a mounted, access-controlled path
+# The root filesystem is read-only; /backups is a writable named volume
+# (backup-data) owned by the app user, so this path persists across restarts.
 docker compose exec web ruby bin/ots backup --out /backups/dump.json
 docker compose exec web ruby bin/ots restore --in /backups/dump.json
+
+# Copy the dump off the host's Docker volume with docker cp:
+docker cp "$(docker compose ps -q web):/backups/dump.json" ./dump.json
 ```
+
+  `/backups` is writable because the image creates it owned by the app user, so the volume
+  inherits that ownership on first use. Do not use `/tmp`: it is a tmpfs and is wiped on
+  restart. If you write a dump outside `/backups`, read it back with
+  `docker exec <web> cat <path> > dump.json` — `docker cp` cannot read from the tmpfs on a
+  read-only container.
 
   Verified end to end: a deleted secret (HTTP `404`) decrypts again after restore.
 
-- **RPO/RTO target:** schedule `bin/ots backup` more often than your shortest TTL (e.g.
-  hourly) so the exposure window is bounded. RTO ≈ restore time + one web restart.
+- **RPO/RTO (measured):** schedule `bin/ots backup` more often than your shortest TTL
+  (e.g. hourly) so the exposure window is bounded. A clean-volume drill measured RTO
+  ≈ **12 s** locally (1.5 s backup + 10.5 s restart + 1.7 s restore for 81 secrets); see
+  RUNBOOK.md.
 - Keep the AOF-volume snapshot as a kernel-level backstop; the `bin/ots` export is the
   portable one because it does not depend on the Redis file format version.
 - Backups contain ciphertext and Argon2id hashes only — useless without `SECRET`, and

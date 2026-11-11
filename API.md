@@ -65,6 +65,24 @@ requests must send `Content-Type: application/json`. v1 accepts
 
 Health checks must not reveal Redis URL, keyspace size, or configuration values.
 
+## 3a. Metrics
+
+| Route | Response |
+| --- | --- |
+| `GET /metrics` | `200` Prometheus text exposition, or `404` when `METRICS_ENABLED` is off (default) |
+
+Disabled by default because the series reveal traffic volume. Series:
+`onetime_up`, `onetime_redis_up`, `onetime_version_info`,
+`onetime_requests_total{family,status}`, `onetime_errors_total`,
+`onetime_request_duration_seconds_{sum,count}{family}`, and
+`onetime_redis_memory_{used_bytes,max_bytes,used_ratio}`.
+
+`family` is a fixed, bounded label (`health`, `metrics`, `web`, `api_v1`,
+`api_v3_guest`, `api_v3`, `other`) — never a secret key or raw path. Counters are
+per-process; scrape every worker to see totals. Alert on `onetime_redis_up == 0`,
+`onetime_redis_memory_used_ratio >= 0.8`, and a rising
+`rate(onetime_errors_total[5m])`.
+
 ## 4. API v1 (legacy compatibility)
 
 Form-encoded, anonymous, no session. Rate limits still apply (per IP).

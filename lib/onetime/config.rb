@@ -24,6 +24,7 @@ module Onetime
       "RATE_LIMIT_WINDOW" => "60",
       "TRUST_PROXY" => "false",
       "TRUSTED_PROXIES" => "",
+      "METRICS_ENABLED" => "false",
       "REDIS_TIMEOUT" => "5",
       "REDIS_RECONNECT_ATTEMPTS" => "2"
     }.freeze
@@ -103,6 +104,10 @@ module Onetime
 
     def ui_enabled?
       %w[true 1 yes on].include?(self["UI_ENABLED"].to_s.downcase)
+    end
+
+    def metrics_enabled?
+      %w[true 1 yes on].include?(self["METRICS_ENABLED"].to_s.downcase)
     end
 
     def ttl_options

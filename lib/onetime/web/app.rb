@@ -19,6 +19,7 @@ module Onetime
 
       plugin :error_handler
       plugin :halt
+      plugin :hooks
       plugin :public, root: PUBLIC_ROOT,
                      headers: { "Cache-Control" => "public, max-age=31536000, immutable" }
 
@@ -78,6 +79,35 @@ module Onetime
           version: VERSION
         }
         [status, body]
+      end
+
+      # Timed before/after hooks feed the metrics counters. Block form (not
+      # instance-method overrides) is what Roda registers.
+      before do
+        @request_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      end
+
+      after do |res|
+        started = @request_started_at
+        next unless started
+
+        duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+        # The status must come from the rack response array; mutating
+        # response.status here would not affect what is sent.
+        status = res ? res[0] : 500
+        Metrics.record(family: metrics_family(request.path_info), status: status, duration: duration)
+      end
+
+      # Bounded label set: never derive a family from a key or raw path.
+      def metrics_family(path)
+        case path
+        when "/health" then "health"
+        when "/metrics" then "metrics"
+        when %r{\A/api/v1(/|\z)} then "api_v1"
+        when %r{\A/api/v3/guest(/|\z)} then "api_v3_guest"
+        when %r{\A/api(/|\z)} then "api_v3"
+        else "web"
+        end
       end
 
       def public_config
@@ -371,7 +401,7 @@ module Onetime
       route do |r|
         response["X-Request-Id"] = request_id
         response["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains" if Config.ssl?
-        if r.path.start_with?("/api", "/health")
+        if r.path.start_with?("/api", "/health", "/metrics")
           response["Cache-Control"] = "no-store"
           response["Pragma"] = "no-cache"
         end
@@ -393,6 +423,20 @@ module Onetime
           status, body = health_response
           response.status = status
           json(body)
+        end
+
+        # Prometheus scrape target. Off unless METRICS_ENABLED is set, because the
+        # series expose traffic volume.
+        r.get "metrics" do
+          unless Config.metrics_enabled?
+            response.status = 404
+            next json(error_body("not_found", "Not found."))
+          end
+
+          redis_up = Store.healthy?
+          memory = redis_up ? Store.memory_stats : nil
+          response["Content-Type"] = "text/plain; charset=utf-8"
+          Metrics.render(redis_memory: memory, redis_up: redis_up)
         end
 
         r.on "api" do

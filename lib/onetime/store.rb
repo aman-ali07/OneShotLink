@@ -31,6 +31,15 @@ module Onetime
         false
       end
 
+      # used_memory / maxmemory for the metrics endpoint. Returns nil when Redis
+      # is unreachable so /metrics can still render application counters.
+      def memory_stats
+        info = redis.info("memory")
+        { used: info["used_memory"].to_i, max: info["maxmemory"].to_i }
+      rescue StandardError
+        nil
+      end
+
       # Atomically consume a record: delete the key only if its packed value is
       # still exactly the one we read and verified. Two concurrent reveals race
       # here and exactly one wins; the loser gets nil and a 404.

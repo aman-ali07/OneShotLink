@@ -78,10 +78,14 @@ has no second copy by design; this is data loss for the period since the last ba
 
 3. The service resumes normal operation once `/health` returns `200`.
 
-**RPO / RTO (target, not a guarantee):** back up on a schedule shorter than your
-longest TTL — with a 1-hour AOF and hourly `bin/ots backup`, RPO ≈ 1 hour and RTO ≈
-time to restore the dump plus one web restart. A secret whose TTL expired during the
-outage is correctly absent after restore (its `ttl` is preserved in the export).
+**RPO / RTO (measured 2026-11-11, single host):** a restore-into-clean-volume drill was
+run end to end. With 81 stored secrets, `bin/ots backup` took **1.5 s**, a full
+`docker compose down -v` + `up` took **10.5 s** to `/health = 200`, and `bin/ots restore`
+took **1.7 s** — a **total RTO of ~12.4 s**. A sentinel secret was confirmed `404` while the
+volume was gone and returned its value with its TTL preserved after the restore. These
+are local figures; expect more on a remote host. RPO is set by your backup interval —
+back up more often than your shortest TTL. A secret whose TTL expired during the outage
+is correctly absent after restore (its `ttl` is preserved in the export).
 
 **Backups never contain plaintext.** They are ciphertext under the instance `SECRET`,
 so a stolen backup is useless without the key — and a restore requires the current key.
