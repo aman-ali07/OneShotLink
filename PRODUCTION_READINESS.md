@@ -65,7 +65,7 @@ block a public "production ready" claim, not local use.
 
 | Item | Risk | Owner task |
 |---|---|---|
-| TLS termination + real hostname | HSTS/Secure cookies depend on `SSL=true`; no bundled TLS. Set at the proxy/host. | T-70 |
+| TLS termination + real hostname | The **app side is verified**: behind a TLS terminator with `SSL=true`/`HOST`/`TRUST_PROXY`, HSTS, `Secure`/`HttpOnly`/`SameSite` cookies, HTTPS links, and XFF spoofing protection were all confirmed at runtime (and the negative controls with `SSL=false`). What remains is the operator's real hostname and certificate at the proxy — run the §4.1 checklist on the live domain. | T-70 |
 | Redis network policy | Redis auth is now enforced (`REDIS_PASSWORD`/`--requirepass`, verified) and TLS is available via `rediss://`; the remaining piece is restricting who can reach the port, which is a host/firewall decision. | T-71 |
 
 Everything else that used to be listed here — backup/restore (T-72), dependency scanning

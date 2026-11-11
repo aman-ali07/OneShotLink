@@ -9,6 +9,22 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Verified (TLS path, 2026-11-11)
+
+- **App-side TLS behavior proven (T-70).** The app was run behind a real TLS terminator
+  (Caddy with a local CA) using `SSL=true`, `HOST`, and `TRUST_PROXY`. Confirmed over
+  HTTPS/2: `200` on `/health` with a valid chain, HSTS
+  `max-age=31536000; includeSubDomains`, session cookie
+  `secure; httponly; samesite=lax`, `201` create, and the full hardening header set.
+  Negative controls with `SSL=false` dropped HSTS and the `Secure` flag, so both are
+  config-driven rather than hardcoded.
+- **`X-Forwarded-For` spoofing blocked.** With `TRUST_PROXY=false`, rotating the header
+  did not reset the limiter (429 on the 4th request). With a trusted proxy, distinct XFF
+  values got distinct buckets, while varying the leftmost value with a constant real
+  client stayed in one bucket and 429'd on the 4th — the right-to-left walk stops at the
+  first untrusted hop. A DEPLOYMENT.md §4.1 checklist covers the remaining live-domain
+  checks.
+
 ### Fixed (CI, 2026-11-11) — verified
 
 - **CI runs on GitHub (K-32):** the workflow now executes end to end. Its first real run

@@ -130,7 +130,7 @@ T-30 through T-36 landed in M2 and are listed under "Completed".
 
 | ID | Task | Depends on | Acceptance criteria |
 | --- | --- | --- | --- |
-| T-70 | TLS termination, real hostname, Secure cookies | T-40 | HTTPS-only deploy; HSTS verified; cookies `Secure`/`HttpOnly`/`SameSite` |
+| T-70 | TLS termination, real hostname, Secure cookies | APP SIDE DONE — verified behind a real TLS terminator (Caddy, local CA) with `SSL=true`/`HOST`/`TRUST_PROXY`: HSTS `max-age=31536000; includeSubDomains` present, session cookie `secure; httponly; samesite=lax`, HTTPS 201 create, and all hardening headers sent. Negative control (`SSL=false`): no HSTS, no `Secure` flag. `X-Forwarded-For` spoofing blocked — rotating the leftmost value kept one bucket and 429'd on request 4; a trusted proxy's XFF is honored per client. Remaining: real hostname + certificate at the operator's proxy. Checklist in DEPLOYMENT.md §4.1 | HTTPS-only deploy; HSTS verified; cookies `Secure`/`HttpOnly`/`SameSite` |
 | T-71 | Redis auth + TLS + network policy | DONE (code) — compose requires `REDIS_PASSWORD` (`--requirepass`), web folds it into the URL via `Config.validated_redis_url`, healthcheck authenticates; verified live (`NOAUTH Authentication required` without it, `PONG` with it). TLS via `rediss://`. Host-level network policy remains the operator's | No unauthenticated Redis; documented in DEPLOYMENT |
 | T-72 | Backup/restore drill with documented RPO/RTO | DONE — `bin/ots backup`/`restore` export/load encrypted records; verified live (deleted secret 404 → restored → decrypts); RPO/RTO documented in DEPLOYMENT.md §6 | Restore reproduces a secret until TTL |
 | T-73 | Metrics, tracing, alerting | T-46 | Request/error latency visible; health alerts |

@@ -124,6 +124,39 @@ docker compose down -v       # deletes secrets and receipts — destructive
 - The app sets CSP, HSTS (when `SSL=true`), nosniff, frame-deny, no-referrer,
   Permissions-Policy, COOP, and CORP. Do not weaken CSP at the proxy.
 
+### 4.1 Verify TLS on the live domain (T-70)
+
+Run these against the real hostname after the proxy is up. Each line must return the
+stated value; the app-side of all of them is already verified locally.
+
+```bash
+H=https://secrets.example.com
+
+# 1. HTTPS only, certificate chain valid
+curl -sS -o /dev/null -w 'http=%{http_code} verify=%{ssl_verify_result}\n' "$H/health"
+# expect: http=200 verify=0
+
+# 2. HSTS present (requires SSL=true)
+curl -sSI "$H/" | grep -i strict-transport-security
+# expect: strict-transport-security: max-age=31536000; includeSubDomains
+
+# 3. Session cookie is Secure + HttpOnly + SameSite
+curl -sS -D- -o /dev/null -X POST "$H/api/v3/signup" \
+  -H 'content-type: application/json' \
+  -d '{"email":"probe@example.com","password":"correct-horse-battery-staple"}' \
+  | grep -i set-cookie
+# expect: ...; secure; httponly; samesite=lax
+
+# 4. Plain HTTP redirects to HTTPS (the proxy terminates, not the app)
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://secrets.example.com/
+# expect: 301/308 to https://...
+```
+
+**Rate-limit identity.** With `TRUST_PROXY=true`, confirm the proxy is overwriting (not
+blindly appending) `X-Forwarded-For` and that `TRUSTED_PROXIES` lists the proxy CIDR. A
+spoofed leftmost value must not create a new bucket — the app walks the header
+right-to-left and stops at the first untrusted hop.
+
 ## 5. Health checks
 
 | Check | Expected |
