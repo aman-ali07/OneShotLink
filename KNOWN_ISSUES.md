@@ -20,8 +20,9 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-04 | — | **Resolved (M3):** simple-mode accounts, sessions, owner receipts, dashboard, and CLI create/reset are implemented | `spec/integration/accounts_spec.rb`, `e2e/accounts.mjs` | — |
 | K-33 | — | **Resolved 2026-11-11:** `bin/ots` supports create/reset-password/list/show/set-role/health/backup/restore/rotate-key/version, ships in the image, and was executed in the production container | `bin/ots`, `Dockerfile` | — |
 | K-34 | — | **Resolved 2026-11-11:** sessions are now indexed per customer (`customer:sessions:<id>`); changing a password calls `Session.revoke_all(keeping the caller)`, so every other live session is deleted. Verified live in the production container (other device → 401, caller → 200) and by `spec/unit/session_spec.rb`. Auth audit trail remains open (tracked separately). | `models/session.rb`, `web/app.rb`, `spec/unit/session_spec.rb` | — |
-| K-05 | S3 | Directory is not a git repository; no history, no `.gitignore` | `git status` fails | T-11 |
-| K-06 | S3 | `LICENSE` is missing even though MIT is the stated license | root listing | T-67 |
+| K-35 | S4 | The marketing claim "a link preview cannot burn your secret" is true of the **share link** (the SPA consumes only on an explicit confirm) but **not** of the v3 API: `GET /api/v3/guest/secret/:key` consumes the secret. Anyone pasting an API URL into a chat client will lose it | `lib/onetime/web/app.rb:570-573`, `RevealView.vue` | Landing/FAQ copy states the API caveat (`replica/launch/landing.md` §6); revisit if an API status endpoint or preview-safe GET is added |
+| K-05 | — | **Resolved:** the repository is a git repo with history on `main`, an `origin` remote, and a `.gitignore` covering `.env` and build output | `git status`, `.gitignore` | — |
+| K-06 | — | **Resolved:** `LICENSE` exists, is MIT ("Copyright (c) 2026 Aman Ali"), and is tracked | `git ls-files LICENSE` | — |
 
 ## Correctness / design risks
 

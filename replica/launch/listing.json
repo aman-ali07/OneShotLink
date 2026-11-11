@@ -1,0 +1,17 @@
+{
+  "_note": "DRAFT. OneShotLink is web + self-hosted only today, and the original has no official iOS/Android app either (replica/fixes.md sources table). This listing exists so the copy is linted and ready if a mobile wrapper is ever built; it is not submitted anywhere, and the app name below is not registered on either store.",
+  "avoid": ["Onetime Secret", "OneTimeSecret", "onetimesecret"],
+  "app_store": {
+    "name": "OneShotLink: Secrets Once",
+    "subtitle": "Self-hosted one-time links",
+    "promotional_text": "Point the app at your own instance: one-time links for passwords and keys, no account needed on either end, and the reveal is one button, not a page load.",
+    "description": "OneShotLink shares a password, an API key or a note through a link that works exactly once. After the recipient opens it, the record is deleted from the server.\n\nThe difference is where it runs. You give the app the address of an instance you or your team operates. Your secrets go to your infrastructure, not to ours.\n\nHow it works:\n1. Paste the secret, pick an expiry, add an optional passphrase as an extra access check.\n2. Send the link. The recipient confirms before anything is consumed, so a chat preview does not spend it.\n3. The secret is gone: one view, or the expiry you set.\n\nWhat it does with your data, plainly: secrets are encrypted at rest with AES-256-GCM using a key derived from the instance secret, and deleted by an atomic compare-and-delete on reveal. The server holds that key, so it can read a secret once it is revealed. The passphrase is an access check, not a second key. This app does not claim zero-knowledge encryption, because that would not be true.\n\nOne instance, flat pricing, no seat counting. The server-side project is open source and installs with two environment variables and one compose command.",
+    "keywords": "single use link,password share,ephemeral note,api key,vanish,burn after reading,guest access",
+    "whats_new": "First listing draft. Web and self-hosted product; this entry is not submitted to any store."
+  },
+  "google_play": {
+    "title": "OneShotLink: Secrets Once",
+    "short_description": "Send a password or key through a link that works once, on your own server.",
+    "full_description": "OneShotLink shares a password, an API key or a note through a link that works exactly once. After the recipient opens it, the record is deleted from the server.\n\nThe difference is where it runs. You point the app at an instance you or your team operates, so secrets go to your infrastructure rather than to a hosting company.\n\nHow it works:\n1. Paste the secret, choose an expiry, and optionally add a passphrase as an extra access check.\n2. Send the link. Nothing is consumed until the recipient confirms, so a chat preview does not spend it.\n3. One view, or your expiry, and the secret is gone from the server.\n\nThe honest version of the crypto: secrets are encrypted at rest with AES-256-GCM under a key derived from the instance secret, and reveal is an atomic compare-and-delete. The server holds the key and can read a revealed secret. The passphrase is an access check, not a second key, and this app does not claim zero-knowledge encryption.\n\nSelf-host it from the project with one compose command and two environment variables. Flat pricing per instance, no seat counting, no feature gates."
+  }
+}
