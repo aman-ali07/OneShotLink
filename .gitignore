@@ -20,9 +20,6 @@ public/app/
 npm-debug.log*
 yarn-error.log*
 
-# Loop engineering runtime (state, transcripts, verdicts)
-.loop/
-
 # Test / runtime artifacts
 .rspec_status
 *.pid

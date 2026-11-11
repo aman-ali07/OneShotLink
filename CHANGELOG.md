@@ -28,33 +28,6 @@ overflow, even 55–56px section gaps, one `h1` per page, no duplicate ids, rend
 16.74:1 (body), 7.30:1 (muted) and 5.47:1 (button); the only sub-3:1 pair is a decorative
 hairline rule. Not deployed, no logo, no OG image, no analytics.
 
-### Added (loop engineering, 2026-11-12) — verified (self-test, floor run)
-
-- **A goal-directed agent loop, so long work no longer needs a human retyping the next
-  instruction.** `script/loop.sh` runs observe -> act -> verify -> record -> repeat,
-  persisting state in `.loop/`, committing each iteration as
-  `chore(loop): iter N - verify P/T`, and stopping on: goal met, no verifier progress for
-  two iterations (exit 3), six attempts (exit 4), iteration budget (exit 5), agent blocked
-  (exit 0), or a rule violation (exit 1).
-- **The verdict is machine-checked and human-owned.** `script/loop_verify.sh` reads
-  `docs/loop/goal.criteria` — `F*` floor gates and `T*` target criteria — and prints
-  `GOAL: MET | NOT_MET | UNDEFINED`. The floor mirrors this repo's documented gates
-  (`TESTING.md`): Redis DB 15, RSpec in `ots-dev`, Vitest, typecheck, build; it runs green
-  in ~35s. With no `T*` armed the loop reports `GOAL: UNDEFINED` and does nothing, so it
-  cannot invent scope.
-- **The agent cannot move the goal.** `goal.criteria`, `docs/loop/GOAL.md`,
-  `docs/loop/PROMPT.md`, `script/loop_verify.sh` and `AGENTS.md` are hashed at run start;
-  edits are reverted and the loop stops.
-- **`script/loop_selftest.sh`** drives the real controller with fake agents and asserts
-  every stop condition (29 checks), in the same spirit as `preflight_selftest.sh`: the
-  gate cannot rot into "always green". It also proves a malformed criteria row (a `|` in
-  the command column) is rejected rather than silently mis-parsed.
-- **Docs:** `docs/loop/GOAL.md` (arm a target, floor vs target, deep gates),
-  `docs/loop/PLAN.md` (plan memory), `docs/loop/LOG.md` (append-only evidence), and a new
-  `AGENTS.md` §5 plus a row in its read-first table.
-- **Not armed yet:** the only `TODO` in `TASKS.md` is T-78 (landing route); its two `T*`
-  criteria sit commented in `goal.criteria`, ready to uncomment. Nothing else was built.
-
 ### Changed (R-09 rebrand, 2026-11-11) — verified (sweep, build, specs)
 
 - **The product is now OneShotLink.** The original working title is gone from the UI, page

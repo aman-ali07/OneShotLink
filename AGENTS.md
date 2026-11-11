@@ -36,7 +36,6 @@ automatically. Read the relevant file before working in that area:
 | Known defects / gaps | [KNOWN_ISSUES.md](KNOWN_ISSUES.md) |
 | Clone map + feature matrix | [replica/recon.md](replica/recon.md), [replica/features.csv](replica/features.csv) |
 | Clone stack, schema, build order | [replica/architecture.md](replica/architecture.md) |
-| Automated loop: goal criteria, controller, stop conditions | [docs/loop/GOAL.md](docs/loop/GOAL.md) |
 
 There is no `opencode.json`/`opencode.jsonc` in this repo. Do not add one unless a
 concrete need appears (MCP server, permissions, custom agent). No nested `AGENTS.md`
@@ -232,38 +231,3 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
-
----
-
-## 5. Loop Engineering (the automated loop in this repo)
-
-`§4` above says "define success criteria, loop until verified". This section is that
-rule with a machine behind it, so a long-running agent can work without a human
-retyping the next instruction.
-
-```
-script/loop.sh            controller: observe -> act -> verify -> record -> repeat
-script/loop_verify.sh     the verdict, from docs/loop/goal.criteria
-script/loop_observe.sh    live repo state + open TASKS.md rows, rendered as text
-script/loop_prompt.sh     static instructions + that observation = the self-prompt
-script/loop_selftest.sh   tests the controller itself with fake agents
-docs/loop/GOAL.md         how to arm a target, floor vs target, deep gates
-```
-
-Rules of the loop:
-
-- **The goal is data, not prose.** `docs/loop/goal.criteria` holds `F*` floor gates
-  (this repo's real gates from `TESTING.md`) and `T*` target criteria. The loop ends
-  only when `script/loop_verify.sh` prints `GOAL: MET`. With no `T*` armed it prints
-  `GOAL: UNDEFINED` and the controller refuses to work — "keep it green" is not a goal.
-- **The agent does not own the goal.** `goal.criteria`, `GOAL.md`, `PROMPT.md`,
-  `loop_verify.sh` and this file are hashed before the run; if the agent edits one,
-  the controller reverts it and stops the loop.
-- **One iteration = one criterion flip.** The agent writes its plan to
-  `docs/loop/PLAN.md` and its evidence to `docs/loop/LOG.md` (append-only) before
-  stopping, because nobody re-prompts it.
-- **Commits are the controller's.** One `chore(loop): iter N - verify P/T` per
-  iteration, so a bad iteration is one `git revert` and thrash is visible in `git log`.
-- **Stops:** `0` met/blocked/undefined, `1` rule violation or agent crash, `3`
-  stalled (no verifier progress for two iterations), `4` attempts exhausted, `5`
-  iteration budget exhausted. State and transcripts live in `.loop/` (git-ignored).
