@@ -14,10 +14,10 @@ of a self-hosted repo, and the managed tier is not for sale (`pricing.md` §6).
 | 3 | Preflight gate passes with a real domain + certificate | **Blocked** — operator action: `HOST=https://<domain> PREFLIGHT_ALLOW_SIGNUP=1 script/preflight.sh` | operator |
 | 4 | Host firewall drops host → backend:6379 | **Blocked** — the nft/ufw rule in `DEPLOYMENT.md` §4.0 is written, not applied | operator |
 | 5 | Restore drill repeated on the target host | **Blocked** — done once locally, RTO ≈ 12.4 s | operator |
-| 6 | Privacy policy, terms, support URL live | Not written | `replica-deploy` |
+| 6 | Privacy policy, terms, support URL live | **Written, not deployed** — `site/privacy.html`, `site/terms.html`; the operating entity/jurisdiction still has to be filled in by whoever runs the host | `replica-deploy` |
 | 7 | Trademark screening for the name (US/EU/CA/WIPO, stores, handles) | **Not run** — listed in `replica/brand.md` §2 | human + lawyer |
 | 8 | LD+JSON / OG image / favicon from the logo brief | Not made (brief only) | design |
-| 9 | Landing route built in the app | Not built — copy approved in `landing.md` | build |
+| 9 | Landing page built | **Done, not deployed** — static site in `site/` (index, privacy, terms, styles, favicon); measured at 1280px and 375px, contrast verified, no third-party requests. Deliberately not a Vue route: the instance is the product | repo |
 
 Rows 3–5 are the same three items the app has been waiting on since M3. They are the
 launch, more than anything below is.

@@ -159,7 +159,8 @@ Two references survive on purpose and neither is a hit:
   `"onetimesecret/v1"` HKDF salt was still in the code; that is stale and was corrected in
   `KNOWN_ISSUES.md` during this task.
 
-Not done, and not claimed: a logo has not been produced (brief only), the GitHub repository
+Not done, and not claimed: a logo has not been produced (brief only — `site/favicon.svg` is
+the brief's placeholder mark, not a designed identity), the GitHub repository
 description/topics and the remote name are unchanged, and no domain has been registered.
 
 Next: `/replica-launch` (R-10). Landing copy must not imply zero-knowledge (D-012) or

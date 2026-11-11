@@ -100,6 +100,38 @@ the host gates close**.
 - No analytics pixels until the analytics decision in `launch-plan.md` is made; the page
   must not ship a third-party script before the privacy page says so.
 
-**Not built yet.** This file is the approved copy. Putting it into `frontend/` as a route
-is a product change (new view, router entry, screenshot, contrast re-check) and is tracked
-as the next step in `TASKS.md`, not claimed here.
+## Built
+
+The copy above is the page: `site/index.html` (+ `privacy.html`, `terms.html`, `styles.css`,
+`favicon.svg`). It is a standalone static site, not a Vue route, because the instance **is**
+the product — a marketing page inside a self-hosted app would be shipped to every user's
+debian box. Files are plain HTML with one local stylesheet, so there is no build step, no
+CSP change, and no third-party request of any kind.
+
+Verified locally (`python3 -m http.server`, headless Chrome at 1280px and 375px):
+
+- All five files return `200`; the only outbound links are to the GitHub repository.
+- No page-level horizontal scroll (`scrollWidth == clientWidth` at both widths); the wide
+tables scroll inside their own `.table-scroll` container. Zero elements overflow.
+- Section spacing is even (measured gaps 55–56px on all three pages), one `h1` per page,
+  no duplicate `id`s, no zero-size text, no `<img>` without `alt`.
+- Contrast measured on the **rendered** colours, not the token file:
+
+| Pair | Ratio | AA |
+| --- | --- | --- |
+| Body text on background | 16.74:1 | pass |
+| Body text on card surface | 17.49:1 | pass |
+| Muted text on background | 7.30:1 | pass |
+| Button text on accent | 5.47:1 | pass |
+| Button text on accent (hover) | 7.74:1 | pass |
+| Accent on background | 5.24:1 | pass |
+| Warning text on surface | 6.47:1 | pass |
+| 1px table/rule divider on surface | 1.26:1 | **decorative** — exempt |
+
+The last row is the only sub-3:1 value on the page and it is a hairline rule, not a control
+or a graphic carrying meaning: rows are separated by 10px padding and 600-weight header
+cells, so nothing is lost if the line is invisible. Interactive borders in the *app* use
+`--border-input` (#78716c, 4.59:1), not this rule colour.
+
+Not built: no logo (the favicon is the brief's placeholder mark), no OG image, no analytics
+(the decision in `launch-plan.md` §2 comes first), and the page is not deployed anywhere yet.

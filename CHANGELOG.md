@@ -9,6 +9,25 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (landing site + legal pages, 2026-11-11) — verified locally, not deployed
+
+- **`site/`** — a standalone static landing page plus `privacy.html` and `terms.html`, built
+  from `replica/launch/landing.md`. Plain HTML with one local stylesheet: no build step, no
+  third-party request, no analytics. It is deliberately not a Vue route, because the
+  instance is the product and a marketing page would otherwise ship inside every self-hosted
+  deployment.
+- The privacy page states what is actually stored (secret ciphertext, receipts, account email
+  plus Argon2id hash, hashed session tokens, request logs with no IP or body) and that the
+  server can read a revealed secret — the honest version of D-012, not a zero-knowledge
+  claim.
+- The terms page states pre-alpha state, MIT licence, no warranty and no SLA, and leaves the
+  operating entity and jurisdiction blank on purpose rather than inventing them.
+
+Verified by headless Chrome at 1280px and 375px: all pages return 200, no page-level
+overflow, even 55–56px section gaps, one `h1` per page, no duplicate ids, rendered contrast
+16.74:1 (body), 7.30:1 (muted) and 5.47:1 (button); the only sub-3:1 pair is a decorative
+hairline rule. Not deployed, no logo, no OG image, no analytics.
+
 ### Added (loop engineering, 2026-11-12) — verified (self-test, floor run)
 
 - **A goal-directed agent loop, so long work no longer needs a human retyping the next
