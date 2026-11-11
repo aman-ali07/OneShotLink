@@ -28,3 +28,6 @@ yarn-error.log*
 
 # Reference screenshots of the original: never shipped
 replica/screens/*.png
+
+# Loop run artifacts (TUI transcripts/prompts): regenerable, never shippable
+.loop-runs/

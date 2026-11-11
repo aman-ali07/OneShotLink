@@ -4,7 +4,30 @@
 
 | Pattern | Cadence | Status | Command |
 |---------|---------|--------|---------|
-| Daily Triage | 1d | L1 report-only | `/loop 1d Run $loop-triage` |
+| Daily Triage | 1d | L1 report-only | `script/loop-free-pi.sh` |
+
+### How this loop is actually invoked here
+
+The kit was scaffolded with `--tool claude`, but this machine runs **free-pi**
+(`npx free-pi-cli@latest`), which has no headless/print mode — it is a TUI. So the
+cycle is driven through tmux by `script/loop-free-pi.sh`:
+
+```bash
+script/loop-free-pi.sh --keep      # one cycle, leave the session viewable
+tmux attach -t loop-freepi         # watch it (detach: Ctrl-b d)
+script/loop-free-pi.sh             # one cycle, clean up when done
+```
+
+The runner pastes a cycle prompt that points the agent at `.claude/skills/loop-triage/SKILL.md`
+plus this repo's `loop-constraints.md`, waits for the screen to go idle, and drops the
+transcript in `.loop-runs/` (git-ignored). It never commits: you review `STATE.md` and
+`loop-run-log.md`, then commit them.
+
+Daily scheduling without Claude Code's `/loop`:
+
+```cron
+17 9 * * *  cd ~/projects/onetime-secret && script/loop-free-pi.sh >> .loop-runs/cron.log 2>&1
+```
 
 ## Human Gates
 
