@@ -1,0 +1,28 @@
+feature,area,priority,original,clone,notes
+Create a secret from pasted text,core,must,yes,yes,text only; HTTP create verified
+Reveal exactly once and destroy immediately,core,must,yes,yes,atomic consume; 8-way race verified
+Configurable expiry (TTL),core,must,yes,yes,allowlist + Redis TTL verified
+Copyable one-time link,core,must,yes,yes,link + copy button in UI and API
+Optional passphrase gate,core,must,yes,partial,Argon2id access gate; not zero-knowledge (D-012/K-21)
+Expired / already-viewed / unknown terminal states,core,must,yes,yes,uniform 404 verified
+REST API create and reveal,integrations,must,yes,yes,v1 form+JSON and v3 guest verified
+Guest use without an account,onboarding,must,yes,yes,anonymous create/reveal verified
+Encryption of secret content at rest,security,must,yes,yes,AES-256-GCM; ciphertext-only Redis spec
+Rate limiting on create and reveal,security,must,yes,yes,429 + Retry-After verified
+Accessible responsive create/reveal UI,ux,must,yes,yes,Vue SPA; headless journey + 375/768/1280 overflow checks
+Email/password accounts (simple mode),accounts,should,yes,no,Redis sessions + Argon2id; original offers accounts + SSO
+Owner dashboard of active receipts,accounts,should,yes,no,inferred screen S09; no UI yet
+Email verification and password reset,accounts,should,yes,no,requires email delivery; deferred
+Custom domains for branded links,branding,should,yes,no,paid-plan feature; deferred (T-61)
+Incoming secret request links,collaboration,should,yes,no,paid-plan feature; deferred
+Localized UI (16+ locales advertised),i18n,should,yes,no,English only in v1; i18n gem declared
+Light / dark / auto theme,ux,should,yes,no,follow prefers-color-scheme in design system
+Organizations / RBAC / SSO,teams,could,yes,no,Team Plus feature; deferred (T-60/T-61)
+MFA and WebAuthn,security,could,yes,no,full auth mode; deferred (T-60)
+Security audit trail,security,could,yes,no,paid-plan feature; deferred
+OpenAPI document and rate-limit headers,integrations,could,yes,no,planned T-44/T-26
+QR code for the one-time link,sharing,could,yes,no,nice-to-have; not evidenced as required
+Original name / logo / copy / visual identity,brand,skip,yes,skip,clean-room rule: never copy; rebrand before launch
+Regional hosting and data-residency operations,infrastructure,skip,yes,skip,their infrastructure and legal footprint - not a feature to code
+Subscription billing and plan management,billing,skip,yes,skip,only needed if the clone sells; out of v1 scope
+Their customer base and network effects,network,skip,yes,skip,cannot be cloned; must be earned

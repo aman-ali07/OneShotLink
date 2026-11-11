@@ -1,0 +1,30 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Ruby
+.bundle/
+vendor/bundle/
+*.gem
+coverage/
+tmp/
+log/
+
+# Frontend
+node_modules/
+e2e/node_modules/
+frontend/dist/
+frontend/.vite/
+public/app/
+npm-debug.log*
+yarn-error.log*
+
+# Test / runtime artifacts
+.rspec_status
+*.pid
+*.log
+.DS_Store
+
+# Reference screenshots of the original: never shipped
+replica/screens/*.png

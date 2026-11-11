@@ -1,0 +1,68 @@
+/* Design tokens as CSS custom properties + Tailwind 4 theme mapping.
+   Source of truth: replica/design/tokens.json (checked by contrast.py).
+   Components must use token utilities (bg-surface, text-muted), never raw hex. */
+
+:root {
+  --ots-bg: #fafaf9;
+  --ots-surface: #ffffff;
+  --ots-border: #e7e5e4;
+  --ots-border-input: #78716c;
+  --ots-text: #1c1917;
+  --ots-text-muted: #57534e;
+  --ots-accent: #0f766e;
+  --ots-on-accent: #ffffff;
+  --ots-danger: #b91c1c;
+  --ots-success: #15803d;
+  --ots-warning: #b45309;
+
+  --ots-font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ots-font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --ots-space-1: 4px;
+  --ots-space-2: 8px;
+  --ots-space-3: 12px;
+  --ots-space-4: 16px;
+  --ots-space-6: 24px;
+  --ots-space-8: 32px;
+  --ots-space-12: 48px;
+  --ots-space-16: 64px;
+
+  --ots-radius-sm: 6px;
+  --ots-radius-md: 10px;
+  --ots-radius-lg: 16px;
+  --ots-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+  --ots-motion-fast: 120ms;
+  --ots-motion-base: 200ms;
+  --ots-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ots-content-max: 42rem;
+}
+
+/* Tailwind 4: generates bg-bg, text-muted, border-border, etc. */
+@theme {
+  --color-bg: var(--ots-bg);
+  --color-surface: var(--ots-surface);
+  --color-border: var(--ots-border);
+  --color-border-input: var(--ots-border-input);
+  --color-text: var(--ots-text);
+  --color-muted: var(--ots-text-muted);
+  --color-accent: var(--ots-accent);
+  --color-on-accent: var(--ots-on-accent);
+  --color-danger: var(--ots-danger);
+  --color-success: var(--ots-success);
+  --color-warning: var(--ots-warning);
+
+  --font-sans: var(--ots-font-sans);
+  --font-mono: var(--ots-font-mono);
+  --radius-sm: var(--ots-radius-sm);
+  --radius-md: var(--ots-radius-md);
+  --radius-lg: var(--ots-radius-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

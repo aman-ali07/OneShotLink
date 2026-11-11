@@ -1,0 +1,68 @@
+name: onetime-secret
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    build:
+      context: .
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      SECRET: ${SECRET:?SECRET is required (openssl rand -hex 32)}
+      REDIS_URL: redis://redis:6379/0
+      HOST: ${HOST:-localhost:3000}
+      SSL: ${SSL:-false}
+      AUTH_MODE: ${AUTH_MODE:-disabled}
+      UI_ENABLED: ${UI_ENABLED:-true}
+      TTL_OPTIONS: ${TTL_OPTIONS:-1800,43200,86400,259200}
+      DEFAULT_TTL: ${DEFAULT_TTL:-86400}
+      SESSION_TTL: ${SESSION_TTL:-1209600}
+      MAX_SECRET_BYTES: ${MAX_SECRET_BYTES:-1048576}
+      RATE_LIMIT_CONCEAL: ${RATE_LIMIT_CONCEAL:-30}
+      RATE_LIMIT_REVEAL: ${RATE_LIMIT_REVEAL:-60}
+      RATE_LIMIT_SIGNIN: ${RATE_LIMIT_SIGNIN:-10}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-60}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      PUMA_MAX_THREADS: ${PUMA_MAX_THREADS:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  redis-data:

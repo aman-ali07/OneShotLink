@@ -1,0 +1,12 @@
+{
+  "name": "onetime-secret-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node journey.mjs",
+    "test:accounts": "node accounts.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.10.0"
+  }
+}

@@ -1,0 +1,103 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "io/console"
+require "optparse"
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+begin
+  require "bundler/setup"
+rescue LoadError
+  # Running from a plain gem install; dependencies are already on the load path.
+end
+require "onetime"
+
+module Cli
+  module_function
+
+  def password_from(name = "Password")
+    if ENV["OTS_PASSWORD"]
+      return ENV["OTS_PASSWORD"]
+    end
+
+    unless $stdin.tty?
+      abort "Set OTS_PASSWORD or run this command from an interactive terminal."
+    end
+
+    value = IO.console.getpass("#{name}: ")
+    if name == "Password"
+      again = IO.console.getpass("Confirm password: ")
+      abort "Passwords do not match." unless value == again
+    end
+    value
+  end
+
+  def print_customer(customer)
+    puts "id: #{customer[:id]}"
+    puts "email: #{customer[:email]}"
+  end
+
+  def create(email)
+    abort "Usage: ots customers create --email EMAIL" if email.to_s.empty?
+    password = password_from
+    result = Onetime::Logic::SignUp.new(email: email, password: password).call
+    Onetime::Models::Session.destroy(result[:session_token])
+    puts "Created customer"
+    print_customer(result[:customer])
+  rescue Onetime::Error => e
+    abort "Error (#{e.code}): #{e.message}"
+  end
+
+  def reset_password(email)
+    abort "Usage: ots customers reset-password --email EMAIL" if email.to_s.empty?
+    customer = Onetime::Models::Customer.find_by_email(email)
+    abort "No customer with that email." unless customer
+
+    password = password_from("New password")
+    unless password.is_a?(String) && password.bytesize.between?(12, 256)
+      abort "Password must be 12 to 256 characters."
+    end
+    Onetime::Models::Customer.update_password(customer[:id], password)
+    puts "Password updated"
+    print_customer(customer)
+  rescue Onetime::Error => e
+    abort "Error (#{e.code}): #{e.message}"
+  end
+
+  def help
+    puts <<~TEXT
+      Usage: ots COMMAND [options]
+
+      Commands:
+        customers create --email EMAIL          Create a customer
+        customers reset-password --email EMAIL  Set a new password
+        version                                 Print the version
+
+      Password input:
+        Set OTS_PASSWORD for automation, or enter it at a hidden prompt.
+        Passwords are never accepted as command-line arguments.
+    TEXT
+  end
+end
+
+command = ARGV.shift
+options = {}
+parser = OptionParser.new do |opts|
+  opts.on("--email EMAIL", "Customer email") { |value| options[:email] = value }
+  opts.on("-h", "--help", "Show help") { puts opts; exit }
+end
+parser.parse!(ARGV)
+
+case command
+when "customers"
+  action = ARGV.shift
+  case action
+  when "create" then Cli.create(options[:email])
+  when "reset-password" then Cli.reset_password(options[:email])
+  else Cli.help
+  end
+when "version"
+  puts Onetime::VERSION
+else
+  Cli.help
+end
