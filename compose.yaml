@@ -25,6 +25,12 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    # Data plane only: `internal` removes the gateway, so Redis has no route
+    # to the internet and cannot be reached from outside this network.
+    # cap_drop is deliberately not set here: the image entrypoint runs as root
+    # and needs SETUID/SETGID/CHOWN to drop to the redis user.
+    networks:
+      - backend
 
   web:
     build:
@@ -56,6 +62,11 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${APP_PORT:-3000}:3000"
+    networks:
+      # Frontend carries the published port and normal egress.
+      - frontend
+      # Backend is internal-only; this is the only path to Redis.
+      - backend
     init: true
     read_only: true
     tmpfs:
@@ -67,6 +78,10 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    # The app runs as a non-root user with a read-only rootfs, so it can drop
+    # every capability.
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
       interval: 15s
@@ -77,3 +92,10 @@ services:
 volumes:
   redis-data:
   backup-data:
+
+networks:
+  # Public-facing plane (the only one with a route off the host).
+  frontend:
+  # Internal plane: no gateway, so no egress and no ingress from outside.
+  backend:
+    internal: true

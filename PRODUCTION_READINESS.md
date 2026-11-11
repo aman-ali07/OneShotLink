@@ -13,10 +13,11 @@ stream, tested backup/restore, in-place key rotation, and a load-tested single-u
 invariant. Simple-mode accounts, opaque sessions with revocation, CSRF checks, owner
 receipts, and the dashboard are implemented and covered by backend and browser tests.
 
-**All in-repo gates are closed**, including Redis authentication and metrics. Two items
-remain that belong to the operator's infrastructure and cannot be closed from the
-repository: **TLS termination** (T-70) and **Redis network policy** (T-71, the
-firewall/reachability half — auth and `rediss://` are already implemented). Until TLS is
+**All in-repo gates are closed**, including Redis authentication, network isolation, and
+metrics. Two items remain that belong to the operator's infrastructure and cannot be
+closed from the repository: **TLS termination** (T-70) and the **host-side firewall rule**
+for Redis (T-71 — Compose now gives Redis an internal, egress-free network with no
+published port; only a host process routing to the bridge IP is left). Until TLS is
 configured on the host, do not call the deployment "production ready" in public copy, and
 do not claim zero-knowledge (D-012).
 Do not deploy with the default `AUTH_MODE=disabled` if you need accounts — that mode has
@@ -66,7 +67,7 @@ block a public "production ready" claim, not local use.
 | Item | Risk | Owner task |
 |---|---|---|
 | TLS termination + real hostname | The **app side is verified**: behind a TLS terminator with `SSL=true`/`HOST`/`TRUST_PROXY`, HSTS, `Secure`/`HttpOnly`/`SameSite` cookies, HTTPS links, and XFF spoofing protection were all confirmed at runtime (and the negative controls with `SSL=false`). What remains is the operator's real hostname and certificate at the proxy — run the §4.1 checklist on the live domain. | T-70 |
-| Redis network policy | Redis auth is now enforced (`REDIS_PASSWORD`/`--requirepass`, verified) and TLS is available via `rediss://`; the remaining piece is restricting who can reach the port, which is a host/firewall decision. | T-71 |
+| Redis network policy | Redis auth is enforced (`REDIS_PASSWORD`/`--requirepass`, verified) and TLS is available via `rediss://`. **Isolation is now in Compose:** Redis sits on an `internal: true` network with no published port, so it has no egress and is unreachable from other networks (verified). The remaining piece is the host-side rule that stops a host process from routing to the container IP — `AUTH` is enforced there, and DEPLOYMENT.md §4.0 has the nftables/ufw snippet. | T-71 |
 
 Everything else that used to be listed here — backup/restore (T-72), dependency scanning
 (T-74), key rotation (T-65), auth audit trail and session revocation (K-34), load/soak

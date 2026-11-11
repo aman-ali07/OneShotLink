@@ -131,7 +131,7 @@ T-30 through T-36 landed in M2 and are listed under "Completed".
 | ID | Task | Depends on | Acceptance criteria |
 | --- | --- | --- | --- |
 | T-70 | TLS termination, real hostname, Secure cookies | APP SIDE DONE — verified behind a real TLS terminator (Caddy, local CA) with `SSL=true`/`HOST`/`TRUST_PROXY`: HSTS `max-age=31536000; includeSubDomains` present, session cookie `secure; httponly; samesite=lax`, HTTPS 201 create, and all hardening headers sent. Negative control (`SSL=false`): no HSTS, no `Secure` flag. `X-Forwarded-For` spoofing blocked — rotating the leftmost value kept one bucket and 429'd on request 4; a trusted proxy's XFF is honored per client. Remaining: real hostname + certificate at the operator's proxy. Checklist in DEPLOYMENT.md §4.1 | HTTPS-only deploy; HSTS verified; cookies `Secure`/`HttpOnly`/`SameSite` |
-| T-71 | Redis auth + TLS + network policy | DONE (code) — compose requires `REDIS_PASSWORD` (`--requirepass`), web folds it into the URL via `Config.validated_redis_url`, healthcheck authenticates; verified live (`NOAUTH Authentication required` without it, `PONG` with it). TLS via `rediss://`. Host-level network policy remains the operator's | No unauthenticated Redis; documented in DEPLOYMENT |
+| T-71 | Redis auth + TLS + network policy | DONE (code) — compose requires `REDIS_PASSWORD` (`--requirepass`), web folds it into the URL via `Config.validated_redis_url`, healthcheck authenticates; verified live (`NOAUTH Authentication required` without it, `PONG` with it). TLS via `rediss://`. **Network policy:** Redis is on an `internal: true` network with no published port — verified no egress (`nc 1.1.1.1:443` fails, DNS dead) and unreachable from an unrelated bridge network, while the app still creates/reveals/restores. `web` drops all capabilities. Residual: the host can still route to the container IP (Docker attaches the host to the bridge); `AUTH` is enforced there and DEPLOYMENT.md §4.0 gives the nftables/ufw rule to close it | No unauthenticated Redis; documented in DEPLOYMENT |
 | T-72 | Backup/restore drill with documented RPO/RTO | DONE — `bin/ots backup`/`restore` export/load encrypted records. **Clean-volume drill run 2026-11-11:** 81 secrets, sentinel `404` during outage and returned its value with TTL preserved after restore; backup 1.5 s, restart 10.5 s, restore 1.7 s, **RTO ≈ 12.4 s**. Fixed: the documented `/backups` path needed a writable named volume (read-only rootfs), added via `backup-data` + image `mkdir /backups` owned by the app user | Restore reproduces a secret until TTL |
 | T-73 | Metrics, tracing, alerting | DONE (metrics) — `GET /metrics` serves Prometheus text behind `METRICS_ENABLED` (default off): `onetime_up`, `onetime_redis_up`, `onetime_requests_total{family,status}`, `onetime_errors_total`, request duration sum/count, and `onetime_redis_memory_used_ratio` for the >=80% alert. Verified live and by 10 specs (104 total). Distributed tracing is not included | Request/error latency visible; health alerts |
 | T-74 | Dependency scanning in CI | DONE — `security` job runs `bundler-audit` and `npm audit --audit-level=high`; fixed the findings it surfaced (Puma 6.6.1→7.2.1 for 2 high CVEs, zod 3→4.6.7 for 1 high advisory). Both audits report 0 vulnerabilities | `bundler-audit`, `npm audit` gate |
@@ -144,8 +144,10 @@ T-30 through T-36 landed in M2 and are listed under "Completed".
 All in-repo tasks are done: CLI (T-43), OpenAPI (T-44), boundary specs (T-47), key
 rotation (T-65), backup/restore (T-72), dependency scanning (T-74), load test (T-76), and
 the incident runbook (T-77). What remains is **infrastructure**, not code: TLS termination
-(T-70) and Redis auth/TLS (T-71). Those require the operator's host and certificates, so
-they are documented rather than claimed complete in `PRODUCTION_READINESS.md`.
+(T-70) and the host-side firewall rule for Redis (T-71 — Compose already isolates Redis on
+an internal, egress-free network with no published port). Those require the operator's
+host and certificates, so they are documented rather than claimed complete in
+`PRODUCTION_READINESS.md`.
 
 Manual evidence (2026-11-11): `npm run build` → typecheck + Vite build; production image
 runs as UID 10001 with two Puma workers and Redis AOF; `/` and assets served with CSP;

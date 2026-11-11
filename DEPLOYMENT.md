@@ -124,6 +124,44 @@ docker compose down -v       # deletes secrets and receipts — destructive
 - The app sets CSP, HSTS (when `SSL=true`), nosniff, frame-deny, no-referrer,
   Permissions-Policy, COOP, and CORP. Do not weaken CSP at the proxy.
 
+### 4.0 Redis network isolation (T-71)
+
+Compose puts Redis on an **`internal: true`** network (`backend`) and publishes no port
+for it. An internal Docker network has no gateway, so Redis has:
+
+- **no egress** — it cannot reach the internet, so a compromise in Redis has no
+  outbound exfiltration path;
+- **no ingress** from outside that network — only `web` (the sole other member) can
+  reach `redis:6379`.
+
+`web` is attached to `backend` (to reach Redis) and `frontend` (which carries the
+published port). Verified: from a container on an unrelated bridge network the Redis
+port is unreachable, `nc` to `1.1.1.1:443` fails, and DNS does not resolve — while the
+app still creates, reveals, and restores secrets normally.
+
+**Residual risk the host must close.** Docker attaches the host to every bridge it
+creates, so a process *on the host* can still route to the container IP
+(`172.x.y.z:6379`). Redis still requires `AUTH` there (`NOAUTH Authentication required`
+without the password), which is defence in depth, but the host should block the path:
+
+```bash
+# Find the backend subnet for this project
+SUBNET=$(docker network inspect onetime-secret_backend \
+  --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}')
+
+# nftables: drop host -> backend:6379
+nft add table inet ots
+nft add chain inet ots out '{ type filter hook output priority 0; policy accept; }'
+nft add rule inet ots out ip daddr "$SUBNET" tcp dport 6379 drop
+
+# ufw equivalent, if you use ufw
+ufw deny out to "$SUBNET" port 6379 proto tcp
+```
+
+If your cloud/provider uses a network policy (Kubernetes NetworkPolicy, a VPC
+security group for the Docker bridge subnet), use that instead — the goal is the same:
+only the `web` container may open `redis:6379`.
+
 ### 4.1 Verify TLS on the live domain (T-70)
 
 Run these against the real hostname after the proxy is up. Each line must return the

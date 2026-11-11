@@ -9,6 +9,20 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Security (Redis network policy, 2026-11-11) — verified
+
+- **Redis can no longer reach the internet (T-71).** Compose now puts Redis on an
+  `internal: true` network (`backend`) and `web` on both `backend` and a `frontend`
+  network that carries the published port. An internal network has no gateway, so Redis
+  has no egress and cannot be reached from outside that network. Verified live: from the
+  Redis container `nc 1.1.1.1:443` fails and DNS does not resolve, and the port is
+  unreachable from a container on an unrelated bridge network — while create, reveal,
+  the passphrase path, and backup/restore all still work. The `web` container now drops
+  all Linux capabilities (`cap_drop: ALL`).
+- **Residual, documented:** Docker attaches the host to the bridge, so a host process can
+  still route to the container IP; `AUTH` is enforced there, and DEPLOYMENT.md §4.0 gives
+  an nftables/ufw rule to block it.
+
 ### Added (metrics, 2026-11-11) — verified
 
 - **Prometheus metrics endpoint (T-73).** `GET /metrics` (behind `METRICS_ENABLED`,
