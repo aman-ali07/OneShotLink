@@ -69,6 +69,13 @@ jobs:
     name: Container smoke test
     runs-on: ubuntu-latest
     needs: [security, backend, frontend]
+    # Compose interpolates these on every invocation, including `down`, so they
+    # must be present for the whole job — not just the `up` steps.
+    env:
+      SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+      REDIS_PASSWORD: ci-only-redis-password-0123456789
+      APP_PORT: "3000"
+      AUTH_MODE: simple
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -78,11 +85,6 @@ jobs:
           cache-dependency-path: e2e/package-lock.json
       - run: docker build -t onetime-secret-web .
       - name: Boot compose stack and run a lifecycle smoke test
-        env:
-          SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
-          REDIS_PASSWORD: ci-only-redis-password-0123456789
-          APP_PORT: "3000"
-          AUTH_MODE: simple
         run: |
           docker compose up -d --no-build
           for i in $(seq 1 30); do
@@ -101,14 +103,14 @@ jobs:
           BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:accounts
           docker compose down -v
       - name: Load test — single-use invariant under concurrency
+        env:
+          RATE_LIMIT_CONCEAL: "100000"
+          RATE_LIMIT_REVEAL: "100000"
         run: |
           # Restart the stack with the rate limits raised so we exercise the
           # atomic reveal path rather than the limiter.
           docker compose down -v
-          SECRET=ci-only-secret-0123456789abcdef0123456789abcdef \
-            REDIS_PASSWORD=ci-only-redis-password-0123456789 \
-            APP_PORT=3000 RATE_LIMIT_CONCEAL=100000 RATE_LIMIT_REVEAL=100000 \
-            docker compose up -d --no-build
+          docker compose up -d --no-build
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:3000/health >/dev/null; then break; fi
             sleep 2
