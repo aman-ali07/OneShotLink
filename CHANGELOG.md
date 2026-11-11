@@ -11,6 +11,10 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ### Added (go-live gate, 2026-11-11) — verified
 
+- **`script/preflight_selftest.sh`** proves the gate cannot rot: it stands the app up
+  behind a throwaway TLS terminator and asserts that `preflight.sh` passes on a good
+  config and fails on a self-signed cert, a plain-HTTP 200, a host-reachable Redis, and
+  a missing `HOST` (5 assertions, all passing). Wired into CI after the load test.
 - **`script/preflight.sh`** turns the two remaining host gates into one command that
   exits non-zero on failure: HTTPS `200` with a validating chain, HSTS (rejecting
   `max-age=0`), the hardening headers, the session cookie's `Secure`/`HttpOnly`/`SameSite`

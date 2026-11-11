@@ -190,6 +190,9 @@ passphrase. It fails on any page/console error, plaintext in the URL, or localSt
 
 `.github/workflows/ci.yml`: Redis 7 service → `bundle exec rspec`; Node 24 → `npm ci`,
 `typecheck`, `build`; container job builds the image, boots Compose for a
-create → reveal → gone smoke test, then runs the committed browser E2E. The workflow has not yet run on GitHub (K-32). Tests
-must not require network access beyond gem/npm installs. Fail the build on any unhandled
-promise rejection or Ruby warning promoted by `.rspec` (`--warnings` once clean).
+create → reveal → gone smoke test, runs the committed browser E2E, runs the load test,
+then runs `script/preflight_selftest.sh` so the go-live gate keeps failing on bad
+configs. CI runs on every push (K-32 closed; the first real run found the load-test env
+bug). Tests must not require network access beyond gem/npm installs and image pulls.
+Fail the build on any unhandled promise rejection or Ruby warning promoted by `.rspec`
+(`--warnings` once clean).

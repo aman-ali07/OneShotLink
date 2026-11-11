@@ -119,6 +119,10 @@ jobs:
             -e BASE_URL=http://127.0.0.1:3000 \
             ruby:3.3-slim ruby script/loadtest.rb 100 20
           docker compose down -v
+      # Proves the go-live gate still passes on a good config and still fails
+      # on each bad one, so it cannot rot into an always-green check.
+      - name: Preflight gate self-test
+        run: script/preflight_selftest.sh
       - name: Dump Compose logs on failure
         if: failure()
         run: docker compose logs
