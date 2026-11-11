@@ -19,6 +19,8 @@ module Onetime
       customer.signin_failed
       customer.signout
       customer.password_changed
+      customer.deleted
+      customer.delete_failed
       customer.sessions_revoked
       secret.revealed
       secret.passphrase_failed

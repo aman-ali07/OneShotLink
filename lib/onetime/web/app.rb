@@ -548,6 +548,30 @@ module Onetime
                 json({ ok: true })
               end
 
+              # Deleting an account is a credential reset with no way back, so it
+              # asks for the password again rather than trusting the session
+              # alone. Secrets still inside their TTL are left to expire; only
+              # the account, its sessions and its receipts are removed.
+              r.delete true do
+                require_accounts!
+                verify_csrf!
+                customer = require_session!
+                body = parse_json_body
+                unless Models::Customer.authenticate(customer[:email], body["password"])
+                  audit("customer.delete_failed", actor_id: customer[:id])
+                  raise InvalidCredentials
+                end
+
+                removed = Logic::DeleteAccount.new(customer: customer).call
+                clear_session_cookie
+                audit(
+                  "customer.deleted",
+                  actor_id: customer[:id],
+                  detail: "receipts=#{removed[:receipts]} sessions=#{removed[:sessions]}"
+                )
+                json({ ok: true })
+              end
+
               r.get(/.*/) { v3_not_found }
               r.post(/.*/) { v3_not_found }
             end

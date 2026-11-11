@@ -20,6 +20,7 @@ require_relative "onetime/logic/conceal_secret"
 require_relative "onetime/logic/reveal_secret"
 require_relative "onetime/logic/sign_up"
 require_relative "onetime/logic/sign_in"
+require_relative "onetime/logic/delete_account"
 require_relative "onetime/logic/rotate_key"
 
 module Onetime
