@@ -1,0 +1,144 @@
+source,url,date,rating,text
+hacker-news,https://news.ycombinator.com/item?id=23020848,2020-04-29,,"So when I saw people using onetimesecret.com to share sensitive credentials at work (this is a free tool hosted by a third party that IMHO there was no reason to believe is trustworthy) I was a little bit taken aback, because to me this seemed only marginally better than putting the password in an email, and in many ways potentially much worse.
+Then I realized, it's open source, and you can host your own instance if you want to trust onetimesecret a bit less:
+https://github.com/onetimesecret/onetimesecret
+Then I realized (further) there is a fork that has been containerized and prepped for use on OpenShift (and ostensibly Kubernetes upstream, as well?)
+I have not set up my own hosted versions of these, but the fact that it's Open Source makes me feel hopeful that it should be trustworthy. And if you want to be lazy and don't run a hosted service, there is always the public version:
+https://onetimesecret.com
+Finally I realized, you can protect the exploding secret with a password, which I presume encrypts and decrypts in a localized context, in the browser (so data is not stored unsafely on onetimesecret's infrastructure in a way that it could be recovered by an adversary, without the shared secret at least, which granted could still be compromised.)
+If it matters to you, you will need to verify all of that for yourself, but I think that all of those details are facts, (at least if I was onetimesecret I wouldn't have published the source unless all those things were true.)"
+hacker-news,https://news.ycombinator.com/item?id=23023242,2020-04-29,,"That's the ticket though: I suspect the entropy is really bad.
+This is how encryption_key gets invoked: https://github.com/onetimesecret/onetimesecret/blob/8ba0511e...
+This is where the entropy is sourced from: https://github.com/onetimesecret/onetimesecret/blob/8ba0511e...
+The global secret comes from: https://github.com/onetimesecret/onetimesecret/blob/8ba0511e...
+self.key comes from gibbler.base(36): https://github.com/onetimesecret/onetimesecret/blob/8ba0511e...
+At no point is anything touching /dev/urandom, which is how cryptography keys should be generated.
+(Additionally, HKDF-SHA-256 should be used for splitting a master key into multiple sub-keys.)
+I don't know if I want to file an issue for this on Github or not. Usually when the crypto is this bad, there's a lot of cargo-culting and I don't have the emotional bandwidth to deal with a vim-crypt style debate."
+hacker-news,https://news.ycombinator.com/item?id=23020952,2020-04-29,,"https://github.com/onetimesecret/onetimesecret/blob/8ba0511e...
+I really wouldn't trust that KDF."
+hacker-news,https://news.ycombinator.com/item?id=26435940,2021-03-12,,"This is very exciting news for the Bitwarden team, if only beacuse Firefox Send went away and there's not really been a suitable replacement since. There was onetimesecret, but I never really trusted it...
+However, FF Send was shut down because keeping up with nefarious users uploading illegal content was a full-time job in and of itself... I wonder what Bitwarden will be doing to solve the problem."
+hacker-news,https://news.ycombinator.com/item?id=27715868,2021-07-02,,"I've used onetimesecret for a long time, so good to see alternatives and I like the sensible pricing structure here. This has me confused though:
+  *Secrets*
+  created: 1,179 | viewed: 960 | compromised: 0
+Is the number of compromised secrets a joke?"
+hacker-news,https://news.ycombinator.com/item?id=27484585,2021-06-12,,"I wanted a simple to use, easy to deploy tool to send sensitive data to clients. I was often using onetimesecret which is great, but still felt wary of trusting a hosted service for these things. While they have indeed open sourced their code, I wanted an even simpler/easy to deploy version (just php7/apache) that is also e2e encrypted. I hope this could be useful to others."
+hacker-news,https://news.ycombinator.com/item?id=42668663,2025-01-11,,"Hello everyone, I’d like to introduce *crypt.fyi*, an open-source, secure, and ephemeral secret-sharing platform for safely sharing sensitive information. Unlike email, Slack, or SMS, crypt.fyi ensures your data is private and disappears once accessed. It also offers additional configuration features like IP/CIDR allow-listing, max read-counts, and webhooks for extra control over your shared secrets.
+Existing tools like privatebin, pwpush, onetimesecret, etc. left something to be desired from a UX/I standpoint and/or had some missing security, privacy and/or product features, so my goal with crypt.fyi is to combine modern security with clean, intuitive interfaces and novel features. It includes a CLI and browser extension for easy integration into your workflow, making it simple to share passwords, API keys, and confidential messages securely and in-context.
+Self-hosting is easy with Docker and Docker Compose. Feel free to fork it or try it out—your feedback is welcome!
+https://github.com/osbytes/crypt.fyi"
+hacker-news,https://news.ycombinator.com/item?id=7345661,2014-03-05,,"Similar forgetful sharing sites:
+https://onetimesecret.com/ – also sends messages. Does not support images or view limits greater than 1, but does support requiring a password to view.
+http://volafile.io/ – for sharing files. Create a private or public chatroom where you can upload files and they are deleted after 24 hours. See, for example, the Hacker News room: http://volafile.io/r/BCcsa6."
+hacker-news,https://news.ycombinator.com/item?id=19373453,2019-03-12,,"Which is why you put a trivial password on the file, which isn't included as part of the link.
+Then, any automated system which sees the link cannot accidentally cause the file to be ""downloaded"" which would cause the link to be invalidated.  They can see the link itself, but they don't have the password, therefore they can't download the content to scan it.
+I have used onetimesecret.com a number of times in this way."
+hacker-news,https://news.ycombinator.com/item?id=31893500,2022-06-27,,"Yes, but there is no indication they are publishing it in the search results.
+The original post is just complaining that the malware scanning is visiting the links.
+They come to the following conclusion
+>This effectively makes all one-time use links like login/pass-reset/etc useless.
+Which we all know is not true because sites like onetimesecret.com allow for entering a separate password to prevent this sort of thing when it does happen.
+It would be an interesting discussion to talk about what Microsoft's whitelisting process looks like, but the original article doesn't seem to understand what is going on well enough to drive the conversation in that direction."
+hacker-news,https://news.ycombinator.com/item?id=27352378,2021-06-01,,"I use https://www.saltify.io however I didn't know onetimesecret is open source, this is helpful as we use it a lot at work, seems worth building our own. Thanks for sharing that."
+hacker-news,https://news.ycombinator.com/item?id=41525144,2024-09-12,,"There's a bit more info on our blog:
+https://docs.onetimesecret.com/blog/2024-09-12-ddos-day-4
+https://docs.onetimesecret.com/blog/2024-09-09-denial-of-ser..."
+hacker-news,https://news.ycombinator.com/item?id=23021207,2020-04-29,,"We are using a hosted version of onetimesecret for internal usage.
+We mainly used it on Slack. We made a slash command (/secret) to easily share passwords on Slack.
+So the only thing you need to do is write /secret YourPassword.
+After that, you need to be authenticated via Google SSO as we added a proxy. Yes, we know, the password goes through Slack."
+hacker-news,https://news.ycombinator.com/item?id=37864235,2023-10-12,,"https://www.oncer.io/
+Encrypted messages without history - for when you want to send an api key or password or the like and don't want it sitting in the recipients WhatsApp/Signal history, for example, or going over non-encrypted channels like email or Slack. And you don't want to set up a complicated encryption messaging thing. There are similar services already: e.g. onetimesecret, burnernote - but I wanted something that did encryption client side. I also wanted to set up channels, to send multiple messages between 2 devices without doing ""trust on first use"" for each new message.
+The encryption takes place in the browser - if you're a developer: you can even use browser devtools debugging/network sections to confirm the private key never leaves your device.
+I plan to work on the ux, and also further strengthen the encryption (e.g. does the signal protocol work for this...? will implement something that should provide some form of forward secrecy in any case), and make a Flutter-based client so it's super convenient to use on all platforms (maybe also enable things like nfc-based key change...).
+Would be very interested to hear from anyone who would like to help! :)"
+hacker-news,https://news.ycombinator.com/item?id=23021352,2020-04-29,,"I think Keybase does a decent job here.
+You can invite someone to a team by email, and they need to install the app, pick a username, and follow the join team instructions.
+It's probably technically not as easy for a one off situation as onetimesecret.com, but the app download, setup and chat are pretty familiar UI models for many people.
+In the long run, it gives you multiple ways of sharing that secret. Encrypt it and stick in the wiki, use an encrypted git repo, exploding messages via team chat, etc.
+That being said, a real password manager is the proper tool here. I personally like LastPass, and it does require registration but has ""1-to-1"" sharing in the free version."
+hacker-news,https://news.ycombinator.com/item?id=26439235,2021-03-12,,"The idea of the other party needing to setup an account is off-putting to me.
+The way I handle this currently is to use https://onetimesecret.com without any added context, just the password string, and then send an email / message such as:
+Here are the credentials that you requested:
+Username: foobar
+Password: https://onetimesecret.com/secret/6usoxihjgv1d (this link only works one time within X days)
+You could even setup a separate link for the username, etc."
+hacker-news,https://news.ycombinator.com/item?id=23020863,2020-04-29,,"If you are just wanting to share the secret once (not persistently) this works really well:
+https://onetimesecret.com/
+You can use the public version or host yourself."
+security,https://security.stackexchange.com/questions/184706/can-we-trust-onetimesecret,2018-04-27,,"Alice: I need the file
+Bob: Sure, and I want to encrypt it first. Please put the strong PGP symmetric key with the copy&paste method to https://onetimesecret.com/ and send me the link.
+Alice. Done, the URL is xxxxxxxx
+Bob: Very funny, the link is empty.
+Alice: I know, it was only a test if i can trust you ... Here the correct one, xxxxxxxx
+Bob: Thank you very much. Did you have seen in the last Big Brother UK episode, the scene with the haircut?
+Alice: I have what?
+Bob: Malika has used a clipper in a comfortable way ...
+Alice: Hmm.
+Bob: Forget it, here the e-mail attachment, strongly encrypted with the AES128 algorithm. Have fun.
+Alice: Thanks, too. You're welcome. Bye
+Alice and Bob have used a service between them to exchange a password. The first look is, that they have done all right. But they have to trust the website onetimesecret. If the attacker owns the website, he knows the PGP symmetric key too. What is the better alternative to exchange a key?"
+security,https://security.stackexchange.com/questions/271105/best-method-to-send-credentials-to-clients,2023-07-05,,"I'm constantly exchanging credentials with my clients for things like database servers, cloud accounts, etc. Neither I nor my clients, have time to implement a sophisticated method for secure transmission.
+So far we've been relying on 2 main methods, each with its own risks:
+Slack/Discord/WhatsApp chat: I understand that this method is not ideal, although WhatsApp is end-to-end encrypted. The other I'm not sure. I have the sense that the risk of someone accessing those chats and exploiting those credentials is low
+OneTimeSecret site: the site https://onetimesecret.com is supposed to be secure and the secrets get burned after being read. But I'm not sure how reliable this site is. For all I know they might be storing all my secrets in a public txt file shared on the web
+I know both options have their limitations, but I'm having a hard time weighing the risk and deciding which one is best. Also is there a better alternative to these two methods?"
+stackoverflow,https://stackoverflow.com/questions/66911396/ruby-app-onetimesecret-getting-keep-getting-get-http-1-1-401-getting-oops,2021-04-01,,"i installed the app as was instructed in the README but i keep getting the : Oops! You found a bug. Let us know how it happened! page:
+this is how i start it :
+ bundle exec thin -e dev -R config.ru -p 7143 start
+/home/ec2-user/onetimesecret/onetimesecret/lib/onetime/core_ext.rb:30: warning: constant ::Fixnum is deprecated
+/usr/share/gems/gems/attic-0.5.3/lib/attic.rb:13: warning: constant ::Fixnum is deprecated
+/usr/share/gems/gems/gibbler-0.8.9/lib/gibbler.rb:654: warning: constant ::Fixnum is deprecated
+/usr/share/gems/gems/gibbler-0.8.9/lib/gibbler.rb:655: warning: constant ::Bignum is deprecated
+2021-04-01 14:38:33 +0000 Thin web server (v1.8.0 codename Possessed Pickle)
+2021-04-01 14:38:33 +0000 Maximum connections set to 1024
+2021-04-01 14:38:33 +0000 Listening on 0.0.0.0:7143, CTRL+C to stop
+E(1617287918):  [:limit, :homepage, ""88oij9uyld9inbygnn3j648n9hcl1yt"", 5]
+undefined method `join' for nil:NilClass
+/home/ec2-user/onetimesecret/onetimesecret/lib/onetime/app/helpers.rb:162:in `err'
+/home/ec2-user/onetimesecret/onetimesecret/lib/onetime/app/helpers.rb:75:in `rescue in carefully'
+/home/ec2-user/onetimesecret/onetimesecret/lib/onetime/app/helpers.rb:41:in `carefully'
+/home/ec2-user/onetimesecret/onetimesecret/lib/onetime/app/web/base.rb:10:in `publically'
+/home/ec2-user/onetimesecret/onetimesecret/lib/onetime/app/web.rb:14:in `index'
+/usr/share/gems/gems/otto-0.4.1/lib/otto.rb:281:in `call'
+/usr/share/gems/gems/otto-0.4.1/lib/otto.rb:108:in `call'
+/usr/share/gems/gems/rack-2.1.4/lib/rack/reloader.rb:51:in `call'
+/usr/share/gems/gems/rack-2.1.4/lib/rack/common_logger.rb:35:in `call'
+/usr/share/gems/gems/rack-2.1.4/lib/rack/urlmap.rb:77:in `block in call'
+/usr/share/gems/gems/rack-2.1.4/lib/rack/urlmap.rb:61:in `each'
+/usr/share/gems/gems/rack-2.1.4/lib/rack/urlmap.rb:61:in `call'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/connection.rb:86:in `block in pre_process'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/connection.rb:84:in `catch'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/connection.rb:84:in `pre_process'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/connection.rb:53:in `process'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/connection.rb:39:in `receive_data'
+/usr/share/gems/gems/eventmachine-1.2.7/lib/eventmachine.rb:195:in `run_machine'
+/usr/share/gems/gems/eventmachine-1.2.7/lib/eventmachine.rb:195:in `run'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/backends/base.rb:75:in `start'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/server.rb:162:in `start'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/controllers/controller.rb:87:in `start'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/runner.rb:203:in `run_command'
+/usr/share/gems/gems/thin-1.8.0/lib/thin/runner.rb:159:in `run!'
+/usr/share/gems/gems/thin-1.8.0/bin/thin:6:in `'
+/usr/local/bin/thin:23:in `load'
+/usr/local/bin/thin:23:in `'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/cli/exec.rb:63:in `load'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/cli/exec.rb:63:in `kernel_load'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/cli/exec.rb:28:in `run'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/cli.rb:494:in `exec'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/vendor/thor/lib/thor/command.rb:27:in `run'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/vendor/thor/lib/thor/invocation.rb:127:in `invoke_command'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/vendor/thor/lib/thor.rb:392:in `dispatch'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/cli.rb:30:in `dispatch'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/vendor/thor/lib/thor/base.rb:485:in `start'
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/cli.rb:24:in `start'
+/usr/local/share/gems/gems/bundler-2.2.15/exe/bundle:49:in `block in '
+/usr/local/share/gems/gems/bundler-2.2.15/lib/bundler/friendly_errors.rb:130:in `with_friendly_errors'
+/usr/local/share/gems/gems/bundler-2.2.15/exe/bundle:37:in `'
+/usr/local/bin/bundle:23:in `load'
+/usr/local/bin/bundle:23:in `'
+10.0.255.25 - - [01/Apr/2021:14:38:38 +0000] ""GET / HTTP/1.1"" 401 - 0.0253
+ new static route: /img (/img/favicon.png)
+10.0.255.25 - - [01/Apr/2021:14:38:38 +0000] ""GET /img/favicon.png HTTP/1.1"" 200 189 0.0004
+and i keep getting this :"

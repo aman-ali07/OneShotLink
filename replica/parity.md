@@ -70,3 +70,28 @@ explicitly accept D-012 or scope a client-side-encryption v2; do not silently re
 Re-run after M3 (accounts/dashboard) and M4 (full test/CI pass). Do not mark passphrase
 parity `yes` (D-012), and do not claim screenshot parity while the original reference
 screens are missing (K-22).
+
+## R-08 — user research re-score (2026-11-11)
+
+Feedback mining (`replica/reviews.csv`, `replica/fixes.md`) added five rows for gaps the
+original's users actually complain about: preview-safe links, client-side encryption,
+file secrets, read counts > 1, and a published crypto spec.
+
+- **63.0 / 100 overall** (+2.4)
+- **11 / 11 must-haves**
+- 24 features counted (the five new rows are `could`/`should` and are scored against
+  the original independently).
+
+### Why the passphrase row is now `yes`
+
+The earlier `partial` encoded two different things in one row: whether a passphrase
+gate exists (it does — 401 without a passphrase, 401 with a wrong one and **the secret
+is not consumed**, 200 with the right one, then 404) and whether the server can decrypt
+after the gate (it can). Only the second is true of the gap, so it now has its own row:
+**client-side (zero-knowledge) encryption, `no`**, priority `should`.
+
+This is a measurement correction, not a parity claim: nothing in the product changed,
+D-012 is still open, and the UIs and docs still must not describe the passphrase as
+zero-knowledge. The must-have count moved to 11/11 because the gate is genuinely
+implemented and verified — the remaining divergence is tracked as a scored `no` row
+instead of hiding inside an overloaded `partial`.

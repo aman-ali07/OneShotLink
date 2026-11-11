@@ -3,7 +3,7 @@ Create a secret from pasted text,core,must,yes,yes,text only; HTTP create verifi
 Reveal exactly once and destroy immediately,core,must,yes,yes,atomic consume; 8-way race verified
 Configurable expiry (TTL),core,must,yes,yes,allowlist + Redis TTL verified
 Copyable one-time link,core,must,yes,yes,link + copy button in UI and API
-Optional passphrase gate,core,must,yes,partial,Argon2id access gate; not zero-knowledge (D-012/K-21)
+Optional passphrase gate,core,must,yes,yes,Argon2id access gate; 401/401-not-consumed/200/404 verified. Not zero-knowledge (D-012) - tracked as its own row
 Expired / already-viewed / unknown terminal states,core,must,yes,yes,uniform 404 verified
 REST API create and reveal,integrations,must,yes,yes,v1 form+JSON and v3 guest verified
 Guest use without an account,onboarding,must,yes,yes,anonymous create/reveal verified
@@ -26,3 +26,8 @@ Original name / logo / copy / visual identity,brand,skip,yes,skip,clean-room rul
 Regional hosting and data-residency operations,infrastructure,skip,yes,skip,their infrastructure and legal footprint - not a feature to code
 Subscription billing and plan management,billing,skip,yes,skip,only needed if the clone sells; out of v1 scope
 Their customer base and network effects,network,skip,yes,skip,cannot be cloned; must be earned
+Preview-safe one-time links (survive link previewers/scanners),security,should,no,no,Evidence R-08: 2 reviews; passphrase today raises the bar but nothing warns the sender (replica/fixes.md 1.5)
+Client-side (zero-knowledge) encryption option,security,should,no,no,"Evidence R-08: 3 reviews; deliberate gap D-012 -- server-side AES only, passphrase is an access gate"
+File and image secrets,core,could,no,no,Evidence R-08: 2 reviews (2014 claim -- re-verify current); deferred T-63
+Read counts greater than one,core,could,no,no,Evidence R-08: 1 review (thin); 'view limits greater than 1'
+Published crypto spec and a 'verify it yourself' page,docs,should,partial,partial,"Evidence R-08: 6 reviews on trust/crypto; SECURITY.md exists, no standalone verifiable spec page yet"
