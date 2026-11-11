@@ -52,7 +52,7 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-29 | — | **Resolved 2026-11-11:** strict CSP, HSTS (under SSL), COOP/CORP, and Permissions-Policy are sent on every response and verified in the browser | `app.rb`, `web_spec.rb` | — |
 | K-30 | S4 | Visual parity is unmeasured: no original screenshots exist (K-22), so token values and layout were not compared | `replica/design/`, K-22 | Capture reference screens with the user present; use `/replica-diff` |
 | K-31 | S2 | Operational controls mostly closed: backup/restore, dependency scanning, key rotation, audit trail, and Redis auth are done and verified. Remaining: bundled **TLS termination** (operator/host, T-70) and **metrics/tracing** (T-73) | `PRODUCTION_READINESS.md`, `RUNBOOK.md` | T-70, T-73 |
-| K-32 | S3 | The production image and Compose stack were verified locally; the workflow is syntactically valid and includes the new `security` job and load test, but has **not yet executed on GitHub** | `.github/workflows/ci.yml` | Run once on push and record the result |
+| K-32 | — | **Resolved 2026-11-11:** CI executed on GitHub across all four jobs. The first run failed in the container job: the load-test step ran a bare `docker compose down -v` with no env, and Compose interpolates `${SECRET}`/`${REDIS_PASSWORD}` on `down` too, so it aborted before restarting the stack. Fixed by hoisting the CI values to job level; the rerun (43060570677) is green and the load test reports 100/100 secrets revealed exactly once. | `.github/workflows/ci.yml` | — |
 
 ## Missing product behavior (planned, not bugs)
 

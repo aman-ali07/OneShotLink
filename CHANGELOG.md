@@ -9,6 +9,17 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (CI, 2026-11-11) — verified
+
+- **CI runs on GitHub (K-32):** the workflow now executes end to end. Its first real run
+  (43060013486) passed dependency scanning, backend specs, and the frontend build, then
+  failed in the container job: the load-test step opened with a bare
+  `docker compose down -v`, and Compose interpolates `${SECRET}`/`${REDIS_PASSWORD}` on
+  `down` as well as `up`, so the step aborted with "required variable SECRET is missing a
+  value" before restarting the stack. The CI values moved to job level and the duplicated
+  inline env was dropped. The rerun (43060570677) is green across all four jobs, and the
+  load test reports **100/100 secrets revealed exactly once** on GitHub.
+
 ### Production hardening (2026-11-11) — verified
 
 - **CLI completed (T-43):** `bin/ots` now ships in the image with `customers create`,
