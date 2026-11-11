@@ -200,3 +200,4 @@ Read [AGENTS.md](AGENTS.md) before clone work.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+# OneShotLink
