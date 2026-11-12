@@ -9,6 +9,20 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Changed (a 1-character passphrase was not an access gate, 2026-11-12) — verified
+
+- **Breaking for API clients:** `passphrase` must now be at least 8 bytes, or absent/empty
+  for "no passphrase". A 1–7 byte passphrase used to be accepted and is now
+  `422 validation_error` with nothing written. Records created before this change still
+  reveal with their original (shorter) passphrase — the floor is enforced on create only.
+- The old behaviour was deliberate but indefensible: the per-IP reveal limiter is the only
+  guessing control, so a one-character gate falls in seconds and distributed guessing
+  defeats the limiter further. Rationale and the rejected alternatives: `docs/DECISIONS.md`
+  D-014.
+- UI: the passphrase field has `minlength`, mirrors the check before sending, and says
+  "8 characters minimum"; the OpenAPI document carries `minLength: 8`. Spec rewritten and
+  watched fail (`201` → `422`); suite 118 examples, 11 Vitest, build clean.
+
 ### Fixed (a chunked request bypassed the body cap, 2026-11-12) — verified
 
 - `POST /api/v1/share` only compared `CONTENT_LENGTH` with `MAX_SECRET_BYTES + 16 KiB`, and a

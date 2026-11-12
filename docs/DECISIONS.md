@@ -206,3 +206,27 @@ silently consuming. Nothing is lost on the double-reveal invariant: two racers s
 read and decrypt, exactly one wins the compare-and-delete, and the loser gets `404` without
 ever seeing plaintext. Cost: a losing racer does the decryption work for nothing, which is
 measured in microseconds and already covered by the concurrency load test.
+
+## D-014 — An 8-byte floor on the passphrase
+
+**Status:** accepted (narrows D-012; supersedes the "1–256" bound in T-47)
+
+**Context.** The create path accepted any non-empty passphrase, including a single
+character, and TESTING.md asserted that behaviour deliberately. The passphrase is an access
+gate whose only guessing control is the per-IP reveal limiter (60 attempts per minute by
+default). A 1–2 character passphrase therefore falls to a handful of attempts from a few
+addresses — the Argon2id cost buys little when the secret space is a few dozen values, and
+distributed guessing defeats the per-IP limiter entirely.
+
+**Decision.** Reject a supplied passphrase shorter than 8 bytes at the create boundary
+(`422 validation_error`, nothing written). An empty string or absent field still means "no
+passphrase". The bound is a constant in `ConcealSecret`, not an environment knob: a floor
+that can be lowered to 1 is not a control. The reveal path does not enforce a length, so
+records created before this decision keep revealing with their original passphrase.
+
+**Consequences.** This is a contract change for API clients: a 1–7 byte passphrase that
+used to return `201` now returns `422`. The UI sets `minlength`, mirrors the check, and
+explains the rule next to the field. 8 bytes is still short for a human-chosen passphrase —
+the honest ceiling is a longer minimum or a generated one, which is a copy/UX decision, not
+a code one. MFA, per-secret attempt budgets and passphrase-strength scoring remain out of
+scope (D-012, K-21).

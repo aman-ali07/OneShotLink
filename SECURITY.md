@@ -42,7 +42,7 @@ inside the trust boundary but are assumed readable by an attacker only together 
 | Redacted request logs | `Web::RequestLogger` | Verified: secret keys absent; only method/path/status/duration/request ID |
 | Bounded Redis timeouts and reconnect | `Store.redis` env config | Verified live: with Redis stopped, `/health` → `503 degraded`, writes → `503` + `Retry-After`, and the instance recovers without a restart |
 | Non-root, read-only container with no secrets | `Dockerfile`, `compose.yaml` | Verified: UID 10001, read-only rootfs, no `.env` in image |
-| Input limits: TTL allowlist, `MAX_SECRET_BYTES` cap, passphrase 1–256 bytes (an empty string means none); the body actually read is capped on both the JSON and the form path | `ConcealSecret`, `App#read_body_within_limit!` | Verified: exact boundary accepts N and rejects N+1 (`413`); a 1-character passphrase is accepted and enforced (T-47); a chunked form body with no `Content-Length` is refused with `413` and writes nothing (K-37) |
+| Input limits: TTL allowlist, `MAX_SECRET_BYTES` cap, passphrase 8–256 bytes (an empty string means none); the body actually read is capped on both the JSON and the form path | `ConcealSecret`, `App#read_body_within_limit!` | Verified: exact boundary accepts N and rejects N+1 (`413`); a 7-byte passphrase is `422` and writes nothing, 8 bytes is accepted and enforced (D-014, T-47); a chunked form body with no `Content-Length` is refused with `413` and writes nothing (K-37) |
 | Error hygiene: no stack traces/Redis errors, request ID only | `app.rb` error handler | Verified by 404/500 paths. A Redis outage answers `503 service_unavailable` + `Retry-After` on both API versions (never a `500`, never the driver's message) |
 | No auto-reveal on page load, and no GET consumes a secret (link previews are safe) | `RevealView.vue`, `app.rb#peek_payload` | Verified in the browser and over HTTP: `GET /api/v3/guest/secret/:key` answers metadata only, three GETs in a row leave the key intact, and only `POST …/reveal` consumes (K-35 resolved). The v1 GET is still destructive — that contract is frozen (API.md §4) |
 | No plaintext in URL, localStorage, or sessionStorage | SPA state only | Verified: `localStorage === "{}"` after create; URL contains only the key |
@@ -95,7 +95,7 @@ zero-knowledge or "the server cannot decrypt".
 | Link leaked before reveal | One-time reveal, short TTL, optional passphrase | Anyone with the link first wins |
 | Brute-force secret keys | 128-bit IDs + reveal rate limit | None practical |
 | Spam creation | Conceal rate limit + 1 MiB cap | Distributed IPs can still spam |
-| Passphrase brute force | Argon2id + IP reveal limit | Distributed guessing remains possible |
+| Passphrase brute force | Argon2id + 8-byte floor (D-014) + per-IP reveal limit | Distributed guessing above the floor remains possible |
 | Race to reveal twice | Atomic Lua compare-and-delete | None known |
 | Redis dump leaked | AES-256-GCM; key only in env | With `SECRET`, all unexpired secrets open |
 | Log exfiltration | Redaction, IDs only, no bodies | Application bugs could still leak |

@@ -284,7 +284,7 @@ RSpec.describe "Secret lifecycle API" do
       end
     end
 
-    it "treats empty and one-character passphrases as absent or valid" do
+    it "treats an empty passphrase as absent and enforces the 8-byte floor" do
       # Empty string means "no passphrase": no passphrase required on reveal.
       post "/api/v3/guest/conceal", JSON.generate(secret: "p0", ttl: 1800, passphrase: ""), JSON_HEADERS
       expect(last_response.status).to eq(201)
@@ -292,13 +292,19 @@ RSpec.describe "Secret lifecycle API" do
       reveal_v3(key)
       expect(last_response.status).to eq(200)
 
-      # A single character is a real passphrase and must be enforced.
-      post "/api/v3/guest/conceal", JSON.generate(secret: "p1", ttl: 1800, passphrase: "x"), JSON_HEADERS
+      # Below the floor is refused at the boundary, before a record is written.
+      post "/api/v3/guest/conceal", JSON.generate(secret: "p1", ttl: 1800, passphrase: "1234567"), JSON_HEADERS
+      expect(last_response.status).to eq(422)
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq("validation_error")
+      expect(Onetime::Store.redis.keys("secret:*")).to be_empty
+
+      # Exactly 8 bytes is a real passphrase and must be enforced on reveal.
+      post "/api/v3/guest/conceal", JSON.generate(secret: "p1", ttl: 1800, passphrase: "12345678"), JSON_HEADERS
       expect(last_response.status).to eq(201)
       key = JSON.parse(last_response.body)["secret_key"]
-      post "/api/v3/guest/secret/#{key}/reveal", JSON.generate(passphrase: "y"), JSON_HEADERS
+      post "/api/v3/guest/secret/#{key}/reveal", JSON.generate(passphrase: "87654321"), JSON_HEADERS
       expect(last_response.status).to eq(401)
-      post "/api/v3/guest/secret/#{key}/reveal", JSON.generate(passphrase: "x"), JSON_HEADERS
+      post "/api/v3/guest/secret/#{key}/reveal", JSON.generate(passphrase: "12345678"), JSON_HEADERS
       expect(last_response.status).to eq(200)
     end
 

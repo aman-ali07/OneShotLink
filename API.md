@@ -93,7 +93,7 @@ Form-encoded, anonymous, no session. Rate limits still apply (per IP).
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `secret` | string | yes | 1 byte – 1 MiB |
-| `passphrase` | string | no | 1–256 chars |
+| `passphrase` | string | no | 8–256 chars; an empty string means no passphrase (D-014) |
 | `ttl` | integer | no | Must be in `TTL_OPTIONS`; default `DEFAULT_TTL` |
 
 `200`:
@@ -167,7 +167,8 @@ require a session.
 }
 ```
 
-Errors: `422 validation_error` (bad TTL, empty/oversized secret, passphrase > 256),
+Errors: `422 validation_error` (bad TTL, empty/oversized secret, passphrase shorter than 8
+or longer than 256 bytes; an empty passphrase means none),
 `413 payload_too_large`, `429 rate_limited`, `401 unauthorized` for the authenticated
 route. Under `AUTH_MODE=full` the authenticated routes return `501 not_configured` rather
 than silently falling back to anonymous creation (D-003); full mode is not implemented and

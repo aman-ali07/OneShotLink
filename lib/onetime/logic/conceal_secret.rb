@@ -4,6 +4,10 @@ module Onetime
   module Logic
     # Create a one-time secret after validating every boundary value.
     class ConcealSecret
+      # A one- or two-character passphrase is not an access gate: the per-IP
+      # reveal limiter alone would let it fall in a minute of guessing (D-014).
+      # Records created before this floor still reveal — the check is on create.
+      MIN_PASSPHRASE_BYTES = 8
       MAX_PASSPHRASE_BYTES = 256
       SUPPORTED_KINDS = %w[text].freeze
 
@@ -71,6 +75,9 @@ module Onetime
         return nil if @passphrase.nil? || @passphrase == ""
         raise ValidationError, "passphrase must be a string" unless @passphrase.is_a?(String)
         raise ValidationError, "passphrase cannot be empty" if @passphrase.empty?
+        if @passphrase.bytesize < MIN_PASSPHRASE_BYTES
+          raise ValidationError, "passphrase must be at least #{MIN_PASSPHRASE_BYTES} characters"
+        end
         raise ValidationError, "passphrase is too long" if @passphrase.bytesize > MAX_PASSPHRASE_BYTES
 
         @passphrase

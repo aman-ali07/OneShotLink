@@ -357,7 +357,8 @@ module Onetime
               "properties" => {
                 "secret" => { "type" => "string", "minLength" => 1 },
                 "ttl" => { "type" => "integer" },
-                "passphrase" => { "type" => "string", "maxLength" => 256 },
+                "passphrase" => { "type" => "string", "minLength" => 8, "maxLength" => 256,
+                                  "description" => "Optional access gate. 8-256 bytes; an empty string means no passphrase (D-014)." },
                 "kind" => { "type" => "string", "enum" => %w[text] }
               }
             },

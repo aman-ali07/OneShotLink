@@ -62,6 +62,10 @@ async function submit() {
     error.value = "The secret is too large. Use a shorter value.";
     return;
   }
+  if (passphrase.value !== "" && new TextEncoder().encode(passphrase.value).length < 8) {
+    error.value = "Use at least 8 characters for the passphrase, or leave it empty.";
+    return;
+  }
 
   submitting.value = true;
   try {
@@ -143,12 +147,13 @@ function reset() {
               v-model="passphrase"
               type="password"
               autocomplete="new-password"
+              minlength="8"
               maxlength="256"
               class="w-full rounded-md border border-border-input bg-surface px-3 py-2 text-sm"
               aria-describedby="passphrase-help"
             />
             <p id="passphrase-help" class="text-xs text-muted">
-              Share it separately from the link.
+              8 characters minimum, or leave it empty. Share it separately from the link.
             </p>
           </div>
         </div>
