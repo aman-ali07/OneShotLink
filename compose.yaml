@@ -61,7 +61,9 @@ services:
       PUMA_MAX_THREADS: ${PUMA_MAX_THREADS:-5}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      - "${APP_PORT:-3000}:3000"
+      # With a proxy on the host, set APP_BIND=127.0.0.1 so the app port is not
+      # reachable from the internet; the default suits a proxy on another host.
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
     networks:
       # Frontend carries the published port and normal egress.
       - frontend

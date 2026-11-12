@@ -82,8 +82,11 @@ EOF
 echo "== boot the production stack (SSL=true, HOST=$DOMAIN:$HTTPS_PORT) =="
 secret=$(openssl rand -hex 32)
 redis_password=$(openssl rand -hex 24)
+# APP_BIND matches DEPLOYMENT.md 4.2 step 2: the app port is loopback-only and the
+# proxy is the only way in.
 if ! SECRET="$secret" REDIS_PASSWORD="$redis_password" AUTH_MODE=simple \
-     APP_PORT="$APP_PORT" SSL=true HOST="$DOMAIN:$HTTPS_PORT" TRUSTED_PROXIES=127.0.0.1 \
+     APP_PORT="$APP_PORT" APP_BIND=127.0.0.1 SSL=true HOST="$DOMAIN:$HTTPS_PORT" \
+     TRUSTED_PROXIES=127.0.0.1 \
      docker compose -p "$PROJECT" up -d --wait >"$work/compose.log" 2>&1; then
   echo "compose failed to come up:" >&2
   tail -20 "$work/compose.log" >&2

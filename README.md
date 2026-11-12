@@ -102,9 +102,11 @@ curl -fsS localhost:3000/health
 ```
 
 Open `http://localhost:3000/`. The stack runs the web container as UID 10001 with a
-read-only root filesystem and a persistent Redis volume. Set `APP_PORT`, `HOST`, `SSL`,
-`TRUST_PROXY`, `TRUSTED_PROXIES`, and `WEB_CONCURRENCY` in the environment; see
-[.env.example](.env.example) and [DEPLOYMENT.md](DEPLOYMENT.md).
+read-only root filesystem and a persistent Redis volume. Set `APP_PORT`, `APP_BIND`,
+`HOST`, `SSL`, `TRUST_PROXY`, `TRUSTED_PROXIES`, and `WEB_CONCURRENCY` in the environment; see
+[.env.example](.env.example) and [DEPLOYMENT.md](DEPLOYMENT.md). Going live on a real
+hostname? [DEPLOYMENT.md](DEPLOYMENT.md) §4.2 is the deploy-day sequence, and
+`script/tls-rehearsal.sh` rehearses it on a scratch box first.
 
 Smoke test (verified 2026-11-11 through Compose):
 

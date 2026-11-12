@@ -36,6 +36,16 @@ exactly once → `/metrics` serves `onetime_up`/`onetime_redis_up`/request count
 `script/preflight_selftest.sh` 5/5. Backend suite 112 examples / 0 failures; Vitest 11;
 typecheck + Vite build clean; `bundler-audit` and `npm audit` clean.
 
+- **`APP_BIND` lets the app port stay private.** Compose published `APP_PORT` on every
+  interface, so a host-proxied deployment had port 3000 open to the internet unless the
+  operator rewrote the file. `APP_BIND` (default `0.0.0.0`, documented as `127.0.0.1` for a
+  host proxy) fixes that; verified: `docker port` shows `127.0.0.1:3460`, loopback answers
+  `200`, the LAN address is refused.
+- **The deploy day is written down.** DEPLOYMENT.md §4.2 is an ordered first-go-live
+  sequence — DNS, secrets, loopback bind, proxy config (Caddy and nginx), the Redis rule,
+  the preflight gate, a real browser round-trip, first backup + restore drill, metrics and
+  alerts, and how to record the deployment. Its `bin/ots backup`/`health`/`restore` commands
+  and the reveal→404→restore cycle were run verbatim before writing them down.
 - **The Redis plane has a stable subnet, and the host rule is proven.** `compose.yaml`
   pins the internal backend network to `10.77.13.0/24` (`REDIS_SUBNET`) instead of letting
   Docker assign one per project, so a host firewall rule keeps matching across redeploys

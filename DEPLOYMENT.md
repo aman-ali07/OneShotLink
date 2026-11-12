@@ -72,6 +72,7 @@ caller signed in (verified); `reset-password` revokes all of them. The Redis ses
 slides on activity; the browser cookie has a fixed `SESSION_TTL` max-age (default 14
 days) and is `Secure` only when `SSL=true`.
 | `APP_PORT` | no | `3000` | Host port published by Compose |
+| `APP_BIND` | no | `0.0.0.0` | Host interface the port is published on. Use `127.0.0.1` when the TLS proxy runs on the same host, so the app port is not reachable from the internet |
 
 `.env.example` contains placeholder values only. Never commit `.env`.
 
@@ -226,6 +227,136 @@ curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://secrets.example
 blindly appending) `X-Forwarded-For` and that `TRUSTED_PROXIES` lists the proxy CIDR. A
 spoofed leftmost value must not create a new bucket — the app walks the header
 right-to-left and stops at the first untrusted hop.
+
+### 4.2 Deploy-day sequence (first go-live)
+
+One pass, in order, on the real host. Every step ends in a check — do not move on
+until it passes. If a step fails, stop: `/` and `/health` behaving differently on a
+public hostname is usually DNS, the proxy, or `SSL`/`HOST` not being set.
+
+**0. Prerequisites.** Docker + Compose on the host, ports 80/443 open, and a DNS
+record already pointed at it (step 1 proves propagation, so create it first).
+
+**1. DNS resolves to this host.**
+
+```bash
+dig +short secrets.example.com
+# expect: the host's public IPv4 (and AAAA if you publish IPv6)
+```
+
+**2. Secrets and configuration.** Generate fresh values on the host and write them to
+`.env` (never commit it; the values stay in that file):
+
+```bash
+printf 'SECRET=%s\nREDIS_PASSWORD=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" >> .env
+```
+
+Then set, in the same `.env`:
+
+```ini
+HOST=secrets.example.com          # no scheme; links and cookie flags follow it
+SSL=true                          # HSTS, Secure cookies, https:// links
+AUTH_MODE=simple                  # or disabled for a pure secret-sharing instance
+TRUST_PROXY=true
+TRUSTED_PROXIES=127.0.0.1/32      # the proxy's CIDR — nothing wider
+APP_BIND=127.0.0.1                # proxy runs on this host
+METRICS_ENABLED=true              # only if /metrics is not public-facing
+```
+
+Check: `docker compose config >/dev/null` (a YAML/interpolation error fails here, not at
+boot) and `docker compose config | grep -c 'SECRET='` is not 0.
+
+**3. Bring the stack up.** `docker compose up -d --wait`. The healthcheck gates startup,
+so this returning 0 means Redis and the app are both healthy.
+
+Check: `docker compose ps` shows `web` and `redis` both `healthy`; `curl -s
+http://127.0.0.1:3000/health` returns `{"status":"ok","redis":"ok",...}`; `curl -s
+http://<host-lan-ip>:3000/health` must **fail** — with `APP_BIND=127.0.0.1` the app port
+is reachable from the proxy and nothing else.
+
+**4. Terminate TLS.** nginx and Caddy both forward to `127.0.0.1:3000`; the app never
+serves TLS itself. Minimal Caddy (`/etc/caddy/Caddyfile`):
+
+```
+secrets.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000 {
+		header_up X-Forwarded-For {remote_host}
+	}
+}
+```
+
+Minimal nginx, with the body cap the app assumes:
+
+```nginx
+server {
+	listen 443 ssl http2;
+	server_name secrets.example.com;
+	ssl_certificate     /etc/letsencrypt/live/secrets.example.com/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/secrets.example.com/privkey.pem;
+	client_max_body_size 2m;
+	location / {
+		proxy_pass http://127.0.0.1:3000;
+		proxy_set_header Host $host;
+		proxy_set_header X-Forwarded-For $remote_addr;   # overwrite, never $proxy_add_...
+		proxy_set_header X-Forwarded-Proto $scheme;
+	}
+}
+server { listen 80; server_name secrets.example.com; return 301 https://$host$request_uri; }
+```
+
+Check: `curl -sSI https://secrets.example.com/ | grep -i strict-transport` → the HSTS
+header from the app (if it is missing, `SSL=true` did not take effect or the proxy strips
+it).
+
+**5. Close the host path to Redis (T-71).** Apply the rule from §4.0 in the form your
+firewall uses, then check it with the gate in step 6 rather than by eye.
+
+**6. Run the go-live gate.**
+
+```bash
+HOST=https://secrets.example.com PREFLIGHT_ALLOW_SIGNUP=1 script/preflight.sh
+```
+
+It must print `PREFLIGHT PASSED` with `0` failures and exit 0. The cookie check creates a
+throwaway account (`preflight-<ts>@example.invalid`); delete it afterwards with
+`docker compose exec web ruby bin/ots customers list` /
+`... set-role`, or leave it — it has no access. Rehearse this whole flow on a scratch
+host first with `script/tls-rehearsal.sh --with-redis` (§4.0, `TESTING.md` §3.2).
+
+**7. Prove a real secret round-trip on the public hostname.** In a browser: create a
+secret with a passphrase, open the link in a private window from the LAN (wrong
+passphrase rejected, secret preserved, correct passphrase reveals once, reload shows
+gone). Automated equivalent:
+`BASE_URL=https://secrets.example.com npm --prefix e2e test`.
+
+**8. First backup, and prove it restores.** Backups contain ciphertext only, so a dump is
+useless without `SECRET` — store it off the host and keep `SECRET` in the same secret
+manager:
+
+```bash
+docker compose exec web ruby bin/ots backup --out /backups/dump.json
+docker cp "$(docker compose ps -q web):/backups/dump.json" ./dump-$(date +%F).json
+docker compose exec web ruby bin/ots health      # config + Redis reachable
+```
+
+Check the dump is non-empty and record its size; schedule it more often than your
+shortest TTL (§6). A restore drill is `bin/ots restore --in FILE` on a scratch stack.
+
+**9. Watch it.** Point your scraper at `/metrics` (§5.1) and alert on `onetime_up == 0`,
+`onetime_redis_up == 0`, `/health` non-200, and Redis memory > 80% (the policy is
+`noeviction`, so pressure means failed writes, not silent loss). Confirm one alert can
+actually fire — a channel nobody has seen fire is not a channel.
+
+**10. Record the deployment.** Tag the commit you deployed (`git tag -a deploy-$(date
++%F) -m "first go-live"`), note the deployed image digest, and keep `RUNBOOK.md` next to
+the credentials: §1 `SECRET` compromise, §2 Redis loss, §3 double reveal, §4 lockout, §6
+rollback.
+
+After go-live, the two things that silently rot are the certificate (renewal) and the
+Redis firewall rule (a host rebuild). Both are checked by `script/preflight.sh` — run it
+after any change to the host, not only on day one.
 
 ## 5. Health checks
 
