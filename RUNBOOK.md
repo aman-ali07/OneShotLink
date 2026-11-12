@@ -69,7 +69,12 @@ has no second copy by design; this is data loss for the period since the last ba
 
 **First response:**
 
-1. Confirm Redis state: `docker compose exec redis redis-cli DBSIZE`.
+1. Confirm Redis state. Auth is mandatory, so an unauthenticated `redis-cli` answers
+   `NOAUTH Authentication required.` **and still exits 0** — do not read that as "0 keys":
+
+   ```sh
+   docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning DBSIZE'
+   ```
 2. Restore the most recent backup into a clean Redis (verified):
 
    ```sh
@@ -89,6 +94,36 @@ is correctly absent after restore (its `ttl` is preserved in the export).
 
 **Backups never contain plaintext.** They are ciphertext under the instance `SECRET`,
 so a stolen backup is useless without the key — and a restore requires the current key.
+
+---
+
+## 2b. Redis is up but full (memory ceiling)
+
+**Symptom:** `/health` returns `200 {"status":"ok","redis":"ok"}` — Redis answers `PING`
+fine — but creates and reveals answer `503 service_unavailable` with `Retry-After`. The web
+log shows `OOM command not allowed when used memory > 'maxmemory'.`
+
+**Impact:** nothing is lost, but writes **and** reveals are refused because the atomic
+consume is a Lua `EVAL` and Redis will not run it at the ceiling. TTLs keep running while
+storage is full, so a secret can expire before you free space — this is the reason the
+ratio alert exists (DEPLOYMENT.md §5.1).
+
+**First response:**
+
+1. Confirm the ceiling:
+   `docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning info memory'`
+   — `used_memory_human` at or above `maxmemory_human`.
+2. Raise the ceiling (`docker compose` reads `REDIS_MAXMEMORY`; a runtime change works
+   until the next restart):
+   `docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning config set maxmemory 512mb'`
+3. Then find out why: is `REDIS_MAXMEMORY` below the working set, or is `TTL_OPTIONS`
+   offering long TTLs with 1 MiB secrets? Fix the setting, not the data.
+4. Do **not** lower `maxmemory` to force evictions: the policy is `noeviction` on purpose,
+   and evicting a live secret would destroy it silently.
+
+**Verified 2026-11-12** on a 6 MB ceiling: the write that crossed it got `503` +
+`Retry-After: 5`, reveals answered `503` while full, and once `maxmemory` was raised the
+secrets stored before the ceiling revealed `200` with their full contents.
 
 ---
 

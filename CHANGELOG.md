@@ -26,6 +26,18 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   revealed `200` with full content once `maxmemory` was raised. DEPLOYMENT.md §9 says so,
   including that TTLs keep running while storage is full.
 
+### Docs (TECH_STACK versions and an incident command that lied, 2026-11-12) — verified
+
+- `TECH_STACK.md` listed Puma `~> 6.6`, Roda `~> 3.87` and Zod `^3.24.1`, and called the
+  frontend "scaffolded". The lockfiles resolve **7.2.1**, **3.109.0** and **^4.6.7** — the
+  Puma and Zod jumps being the CVE fixes from T-74.
+- `RUNBOOK.md` §2 told operators to confirm Redis state with `redis-cli DBSIZE`. With
+  `requirepass` set that prints `NOAUTH Authentication required.` **and exits 0**, so an
+  incident responder would read it as "0 keys, Redis is empty". It now passes the password.
+- New `RUNBOOK.md` §2b covers the mode the Redis ceiling introduces: health `ok` while
+  writes and reveals `503`, why the `EVAL` consume is refused, what to raise, and why
+  lowering `maxmemory` to force eviction is the wrong fix.
+
 ### Docs (status files no longer contradict the code, 2026-11-12) — verified
 
 - `KNOWN_ISSUES.md` still listed accounts, the dashboard, the admin CLI, OpenAPI

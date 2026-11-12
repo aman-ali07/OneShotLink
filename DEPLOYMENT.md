@@ -491,7 +491,7 @@ Redis is the system of record, so it must not be reachable unauthenticated.
   crossed the ceiling got `503` + `Retry-After: 5`, and the earlier secrets revealed
   normally once `maxmemory` was raised. Note that TTLs keep running while storage is full,
   so a secret can expire before the operator frees space — alert on the ratio below 0.8 to
-  make that window unreachable in practice.
+  make that window unreachable in practice. Runbook: [RUNBOOK.md](RUNBOOK.md) §2b.
 - Long secrets and high TTLs dominate memory; cap `MAX_SECRET_BYTES` and `TTL_OPTIONS`.
 
 ## 10. `SECRET` rotation
