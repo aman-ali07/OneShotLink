@@ -14,8 +14,8 @@
   the atomic consume script *is* the behavior under test.
 - **Unit specs for pure logic.** Crypto, IDs, password hashing, limiter math, config
   parsing. No network.
-- **Frontend:** Zod schemas get unit tests; TypeScript strict + build is the gate. A
-  browser E2E run (Playwright) is out of v1 scope.
+- **Frontend:** Zod schemas get unit tests (Vitest); TypeScript strict + build is the gate.
+  Two committed browser journeys (puppeteer-core) cover the lifecycle and the account flow.
 - **No tautological tests.** Assert on responses, Redis state, and error codes — not on
   mocks created in the same example.
 - **Red → green.** Add a failing spec for the bug first, then fix it. If a test was never
@@ -32,13 +32,13 @@ bundle exec rspec spec/unit           # fast unit suite
 bundle exec rspec spec/integration/secrets_api_spec.rb:42
 ```
 
-Frontend (once `frontend/` exists):
+Frontend:
 
 ```bash
 npm --prefix frontend ci
+npm --prefix frontend run test        # vitest: 11 tests (schema + error mapping)
 npm --prefix frontend run typecheck
-npm --prefix frontend run test        # vitest (planned)
-npm --prefix frontend run build
+npm --prefix frontend run build       # also the gate for the SPA shell in Rack
 ```
 
 Docker path on a host without Ruby (this is the command that was run):
@@ -52,11 +52,14 @@ docker run --rm --network=host \
 `spec_helper` defaults to `REDIS_URL=redis://127.0.0.1:6399/15`, so start Redis first:
 
 ```bash
-redis-server --port 6399 --save '' --daemonize yes
+# with a local redis-server, or without one installed:
+docker run -d --rm --name ots-test-redis -p 6399:6379 redis:7.4-alpine
 ```
 
-**DB 15 only.** `spec_helper` calls `FLUSHDB` on DB 15 and refuses a URL that is not DB 15;
-never use `FLUSHALL`. The `ots-dev` image and `ots-bundle` volume are built once (see
+**DB 15 only.** `spec_helper` calls `FLUSHDB` on DB 15, refuses a URL that is not DB 15,
+and refuses to run at all when another client is already attached to DB 15 — so a stray
+server or a second suite can neither be flushed nor make a run under-report. Never use
+`FLUSHALL`. The `ots-dev` image and `ots-bundle` volume are built once (see
 [README.md](README.md)).
 
 ## 3. Current backend coverage (M1–M2, verified)
@@ -69,19 +72,22 @@ never use `FLUSHALL`. The `ots-dev` image and `ots-bundle` volume are built once
 | `spec/unit/password_spec.rb` | 4 | Argon2id, malformed hashes, bcrypt legacy |
 | `spec/unit/store_spec.rb` | 4 | atomic win/lose, mismatch, empty expectation |
 | `spec/unit/session_spec.rb` | 6 | digest-only storage, TTL refresh, destroy, revoke-all with exception, full revocation, per-customer isolation |
-| `spec/integration/web_spec.rb` | 9 | health + Redis-down 503, config, CSP/HSTS, typed 404, SPA shell, HEAD |
-| `spec/unit/request_logger_spec.rb` | 3 | request fields, secret-key redaction, asset skip |
-| `frontend/src/lib/api.test.ts` | 9 | conceal/reveal payloads, typed errors, malformed responses, network failure |
-| `e2e/journey.mjs` | 1 journey | create → reveal → gone, wrong/correct passphrase, no console errors |
-| `e2e/accounts.mjs` | 1 journey | signup → owner receipt → reload → signout → signed-out prompt → signin; no plaintext on dashboard |
-| `spec/integration/accounts_spec.rb` | 17 | signup/cookie/at-rest, duplicate email, validation, signin/401, session TTL/deletion, signout, CSRF, owner isolation, password change, other-session revocation, audit trail, disabled/full gates |
-| `spec/integration/secrets_api_spec.rb` | 18 | v3 create/reveal/gone, at-rest, passphrase, race, expiry, v1 form+JSON, validation, 413, exact-size boundary, empty/1-char passphrase, 429, proxy trust, auth-disabled fail-closed, full-mode 501 |
 | `spec/unit/config_spec.rb` | 8 | boot validation, auth mode, proxy CIDRs, Redis URL scheme + password folding |
 | `spec/unit/ops_spec.rb` | 8 | audit events/redaction, key rotation (re-encrypt, old key fails, TTL preserved), backup export/restore, sessions excluded |
+| `spec/unit/metrics_spec.rb` | 7 | exposition format, counters by family/status, duration, Redis up + memory ratio, `METRICS_ENABLED` gate |
+| `spec/unit/request_logger_spec.rb` | 3 | request fields, secret-key redaction, asset skip |
+| `spec/integration/web_spec.rb` | 11 | health + Redis-down 503, datastore-outage 503 on both API versions, config, CSP/HSTS, typed 404, SPA shell, HEAD |
+| `spec/integration/secrets_api_spec.rb` | 19 | v3 create/reveal/gone, at-rest, passphrase, race, expiry, undecryptable record survives, v1 form+JSON, validation, 413, exact-size boundary, empty/1-char passphrase, 429, proxy trust, auth-disabled fail-closed, full-mode 501 |
+| `spec/integration/accounts_spec.rb` | 23 | signup/cookie/at-rest, duplicate email, validation, signin/401, session TTL/deletion, signout, CSRF, owner isolation, password change, other-session revocation, atomic account deletion, audit trail, disabled/full gates |
+| `spec/integration/metrics_spec.rb` | 3 | `/metrics` off by default (`404`), text exposition when enabled, no secrets in the output |
 | `spec/integration/openapi_spec.rb` | 4 | valid 3.1 doc, `$ref`s resolve, documented paths are mounted, cookie scheme on owner/account routes |
+| `frontend/src/lib/api.test.ts` | 11 | conceal/reveal payloads, typed errors, malformed responses, network failure, delete-account |
+| `e2e/journey.mjs` | 1 journey | create → reveal → gone, wrong/correct passphrase, no console errors |
+| `e2e/accounts.mjs` | 1 journey | signup → owner receipt → reload → signout → signed-out prompt → signin → delete account |
 
-Backend total: **94 examples, 0 failures**; frontend: **9 Vitest tests, 0 failures**.
-Not yet covered: tamper-through-HTTP (unit only). The exact size boundary is now covered.
+Backend total: **113 examples, 0 failures**; frontend: **11 Vitest tests, 0 failures**.
+Not yet covered: tamper-through-HTTP (unit only — the integration spec stubs the decrypt).
+The exact size boundary is covered.
 
 Operational checks that run outside RSpec:
 
@@ -94,7 +100,7 @@ npm --prefix frontend audit --audit-level=high
 ## 3.1 Frontend and browser evidence (M2)
 
 - `npm --prefix frontend run build` → `vue-tsc --noEmit` clean, Vite build to
-  `public/app` (≈166 kB JS, ≈13 kB CSS).
+  `public/app` (≈208 kB JS, ≈14 kB CSS).
 - Rack: `/` → `200 text/html`; `/assets/index-*.js` → `200 text/javascript`; deep links
   → the SPA shell; unknown API paths remain JSON `404`.
 - Headless Chrome (puppeteer-core) completed: conceal → link → reveal → reload → gone,
@@ -102,8 +108,9 @@ npm --prefix frontend audit --audit-level=high
   exercised with a wrong attempt (secret preserved) then the correct one.
 - Responsive DOM audit: no horizontal overflow at 375, 768, or 1280 px.
 
-The browser script lives outside the repo for M2; M4 should commit a repeatable
-Playwright/puppeteer test and add Vitest coverage for `lib/api.ts` schemas.
+Both journeys are committed (`e2e/journey.mjs`, `e2e/accounts.mjs`, puppeteer-core) and
+run in CI against a live Compose stack; `lib/api.ts` has Vitest coverage. Sizes above are
+from the current build (`index-*.js` ≈ 208 kB, `index-*.css` ≈ 14 kB).
 
 ## 3.2 TLS rehearsal (T-70, repeatable)
 
@@ -140,7 +147,7 @@ check name resolution or a public chain. Ports default to `13457`/`18443`/`18088
 | Wrong passphrase | `401 invalid_passphrase`; record still present; correct passphrase then succeeds |
 | No passphrase supplied | `401 passphrase_required`; record preserved |
 | Encryption at rest | read `secret:object:<key>` from Redis; plaintext substring absent; `ciphertext` present |
-| Tamper | flip a ciphertext byte in Redis; reveal returns `500` generic, no partial output |
+| Tamper | flip a ciphertext byte in Redis; reveal returns `500` generic, no partial output, and the record is left in place (decrypt precedes the consume, D-013) |
 | Expired key reuse | re-creating the same key is impossible (IDs are random); no resurrection |
 | TTL validation | value not in `TTL_OPTIONS` → `422`; negative/zero → `422` |
 | Oversized secret | > 1 MiB → `413 payload_too_large`; no Redis key written |

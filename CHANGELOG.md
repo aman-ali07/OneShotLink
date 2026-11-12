@@ -9,6 +9,19 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Docs (TESTING.md recounted from the suite, 2026-11-12) — verified
+
+- The coverage table was stale and incomplete: **94** backend examples (really 113), **9**
+  Vitest tests (really 11), and `spec/unit/metrics_spec.rb` +
+  `spec/integration/metrics_spec.rb` were missing entirely. Every count in the table now
+  comes from running `rspec` on that file, not from adding up the previous table.
+- Three claims had outlived the code: "a browser E2E run (Playwright) is out of v1 scope"
+  and "the browser script lives outside the repo for M2" (both journeys are committed and
+  run in CI), and "vitest (planned)" (it exists). Bundle sizes refreshed too (208/14 kB).
+- Documented the new spec guard: the suite refuses to run when another client is attached to
+  DB 15, and gets a Docker command for the test Redis since `redis-server` is not installed
+  on every host.
+
 ### Docs (API contract audited against the routes, 2026-11-12) — verified
 
 - `API.md` documented a **`colonel` admin API that does not exist**. `GET
