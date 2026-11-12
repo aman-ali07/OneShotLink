@@ -230,25 +230,48 @@ module Onetime
         nil
       end
 
+      # Every request body is read under one ceiling: the secret cap plus room
+      # for the surrounding JSON/form fields. CONTENT_LENGTH is advisory, so the
+      # actual read is what gets capped.
+      def body_limit
+        Config.max_secret_bytes + 16_384
+      end
+
       def parse_json_body
         unless request.content_type.to_s.include?("application/json")
           raise ValidationError, "Content-Type must be application/json"
         end
 
-        limit = Config.max_secret_bytes + 16_384
-        raise PayloadTooLarge if env["CONTENT_LENGTH"].to_i > limit
-
-        # CONTENT_LENGTH is advisory for chunked requests; cap the actual read
-        # so a client cannot make the process allocate an unbounded body.
-        raw = request.body.read(limit + 1)
-        request.body.rewind
-        raise PayloadTooLarge if raw.bytesize > limit
-        parsed = JSON.parse(raw)
+        parsed = JSON.parse(read_body_within_limit!)
         raise ValidationError, "Body must be a JSON object" unless parsed.is_a?(Hash)
 
         parsed
       rescue JSON::ParserError
         raise ValidationError, "Malformed JSON body"
+      end
+
+      # Rack parses a form body itself, so the cap has to happen before r.params:
+      # read the declared length (if any), then the bytes themselves, and rewind
+      # so Rack parses exactly the bytes that were bounded. Without this, a
+      # chunked request with no CONTENT_LENGTH could allocate unbounded memory.
+      def bounded_form_params(r)
+        read_body_within_limit!
+        r.params
+      end
+
+      def read_body_within_limit!
+        limit = body_limit
+        raise PayloadTooLarge if declared_body_too_large?
+
+        raw = request.body.read(limit + 1)
+        request.body.rewind
+        raise PayloadTooLarge if raw.bytesize > limit
+
+        raw
+      end
+
+      def declared_body_too_large?
+        env["CONTENT_LENGTH"].to_i > body_limit
       end
 
       def reveal_payload(key, passphrase: nil)
@@ -408,14 +431,16 @@ module Onetime
 
       def create_v1(r)
         env["onetime.api_version"] = "v1"
-        raise PayloadTooLarge if env["CONTENT_LENGTH"].to_i > (Config.max_secret_bytes + 16_384)
+        # A declared oversized body is refused before the body is read or the
+        # rate-limit budget is spent.
+        raise PayloadTooLarge if declared_body_too_large?
 
         enforce_rate_limit!(:conceal)
 
         params = if request.content_type.to_s.include?("application/json")
                    parse_json_body
                  else
-                   r.params
+                   bounded_form_params(r)
                  end
 
         result = Logic::ConcealSecret.new(

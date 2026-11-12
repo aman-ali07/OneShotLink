@@ -8,7 +8,7 @@ configurable TTL.
 > **Project status: production-packaged core with optional simple-mode accounts,
 > pre-alpha product.** The anonymous create → one-time reveal flow and optional accounts
 > run in a hardened non-root container with Redis persistence, CI, and redacted logs.
-> **114 backend specs pass**; the TypeScript/Vite build, a headless-Chrome secret journey,
+> **118 backend specs pass**; the TypeScript/Vite build, a headless-Chrome secret journey,
 > and a browser signup → receipt → signout → signin journey were verified. Operational
 > controls are closed in the repository (Redis auth, backups, metrics, dependency scanning,
 > key rotation, Redis isolation); what is left is **TLS on the operator's own host and
@@ -86,7 +86,7 @@ lib/onetime/
 replica/                 # recon, feature matrix, architecture, design tokens, parity
 bin/ots                  # CLI: customers, health, backup/restore, rotate-key
 script/loadtest.rb       # single-use invariant under concurrency
-spec/                    # 114 unit + integration examples (Redis DB 15)
+spec/                    # 118 unit + integration examples (Redis DB 15)
 e2e/journey.mjs          # committed create → reveal → gone browser test
 e2e/accounts.mjs         # committed signup → receipt → signout → signin journey
 Dockerfile               # multi-stage UI build + non-root Ruby runtime
@@ -162,7 +162,7 @@ docker run --rm --network=host \
   ots-dev bundle exec rspec
 ```
 
-Expected: `114 examples, 0 failures`. The suite only touches Redis DB 15 and calls
+Expected: `118 examples, 0 failures`. The suite only touches Redis DB 15 and calls
 `FLUSHDB` there, never `FLUSHALL`.
 
 Frontend checks:

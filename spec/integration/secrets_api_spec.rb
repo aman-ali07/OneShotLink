@@ -157,6 +157,35 @@ RSpec.describe "Secret lifecycle API" do
       end
     end
 
+    it "leaves the record intact when a stored ciphertext is corrupted" do
+      # The real thing, not a stubbed decrypt: flip a byte in the stored record
+      # and reveal over HTTP. AES-GCM must reject it, the caller must get a
+      # generic 500 with no partial plaintext, and the bytes must still be in
+      # Redis (SECURITY.md invariant 9) — so putting the record back makes the
+      # secret readable again.
+      key = create_v3(secret: "tamper-evidence-12345")["secret_key"]
+      object_key = "secret:object:#{key}"
+      original = Onetime::Store.redis.get(object_key)
+
+      record = JSON.parse(original)
+      ciphertext = Base64.strict_decode64(record["ciphertext"])
+      ciphertext.setbyte(0, ciphertext.getbyte(0) ^ 0xff)
+      record["ciphertext"] = Base64.strict_encode64(ciphertext)
+      Onetime::Store.redis.set(object_key, JSON.generate(record), keepttl: true)
+
+      reveal_v3(key)
+      expect(last_response.status).to eq(500)
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq("internal_error")
+      expect(last_response.body).not_to include("tamper-evidence")
+      expect(Onetime::Store.redis.exists?(object_key)).to be(true)
+
+      Onetime::Store.redis.set(object_key, original, keepttl: true)
+      reveal_v3(key)
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["secret_value"]).to eq("tamper-evidence-12345")
+      expect(Onetime::Store.redis.exists?(object_key)).to be(false)
+    end
+
     it "does not destroy the secret when it cannot be decrypted" do
       # A rotated or wrong SECRET makes decryption impossible. That is an
       # operator fault, not a reveal: the record must survive so the operator
@@ -219,6 +248,27 @@ RSpec.describe "Secret lifecycle API" do
         post "/api/v3/guest/conceal", JSON.generate(secret: "123456", ttl: 1800), JSON_HEADERS
         expect(last_response.status).to eq(413)
         expect(JSON.parse(last_response.body).dig("error", "code")).to eq("payload_too_large")
+        expect(Onetime::Store.redis.keys("secret:*")).to be_empty
+      end
+    end
+
+    it "caps an undeclared form body, not just a declared Content-Length" do
+      # CONTENT_LENGTH is advisory: a chunked request carries none, and Rack
+      # parses a form body before any domain validation sees it. Without a cap
+      # on the actual read, padding a small secret with a huge field allocates
+      # whatever the client sends.
+      with_env("MAX_SECRET_BYTES" => "16") do
+        body = "secret=small&ttl=1800&pad=#{'a' * (128 * 1024)}"
+        env = Rack::MockRequest.env_for(
+          "/api/v1/share",
+          method: "POST",
+          input: body,
+          "CONTENT_TYPE" => "application/x-www-form-urlencoded"
+        )
+        env.delete("CONTENT_LENGTH")
+
+        status, = Onetime::Web::App.call(env)
+        expect(status).to eq(413)
         expect(Onetime::Store.redis.keys("secret:*")).to be_empty
       end
     end

@@ -109,7 +109,9 @@ Form-encoded, anonymous, no session. Rate limits still apply (per IP).
 }
 ```
 
-`422` → `{"message":"..."}`. Rate-limited → `429` with `Retry-After`.
+`422` → `{"message":"..."}`. An oversized body is `413` whether the size is declared in
+`Content-Length` or not — the bytes actually read are capped, so a chunked upload cannot
+exceed `MAX_SECRET_BYTES`. Rate-limited → `429` with `Retry-After`.
 
 ### `POST /api/v1/secret/:key` and `GET /api/v1/secret/:key`
 
@@ -283,4 +285,4 @@ curl -sX POST http://localhost:3000/api/v1/secret/<key>
 Verified 2026-11-12 against the production image through Compose (Redis DB 15 for the
 specs): create `201`, first reveal `200`, second reveal `404`; four parallel reveals
 produced one `200` and three `404`; the v1 shapes above were copied from live responses.
-`bundle exec rspec` → 114 examples, 0 failures.
+`bundle exec rspec` → 118 examples, 0 failures.

@@ -3,7 +3,7 @@
 Last reviewed: 2026-11-12. Severity: **S1** blocks use / security, **S2** blocks a
 feature, **S3** quality/operability, **S4** documentation/process.
 
-> The core has been executed: 114 backend specs pass in Docker against Redis DB 15, a live
+> The core has been executed: 118 backend specs pass in Docker against Redis DB 15, a live
 > Puma run completed create → reveal → gone (including a four-way reveal race), a
 > headless Chrome journey covered the built UI (including the passphrase path), and the
 > production Compose stack passed a lifecycle smoke test. "Verified"
@@ -54,6 +54,7 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-30 | S4 | Visual parity is unmeasured: no original screenshots exist (K-22), so token values and layout were not compared | `replica/design/`, K-22 | Capture reference screens with the user present; use `/replica-diff` |
 | K-31 | S2 | Operational controls mostly closed: backup/restore, dependency scanning, key rotation, audit trail, Redis auth, `/metrics` (T-73), and the Redis host firewall (T-71) are done and verified. Remaining: **TLS termination on the real domain** (operator/host action, T-70 — the app side is rehearsed by `script/tls-rehearsal.sh`) and distributed tracing, which is not implemented | `PRODUCTION_READINESS.md`, `RUNBOOK.md` | T-70 |
 | K-36 | — | **Resolved 2026-11-12:** a Redis at its memory ceiling reported `500 internal_error` and, because `compose.yaml` never set `--maxmemory`, `noeviction` enforced nothing and `onetime_redis_memory_used_ratio` was never exported. Now the OOM condition is a `503` + `Retry-After` like any other datastore outage, and Compose sets `--maxmemory` (`REDIS_MAXMEMORY`, default `256mb`). Measured on a 6 MB stack: the crossing write got `503`, and earlier secrets revealed intact once the ceiling was raised | `lib/onetime/web/app.rb#datastore_error?`, `compose.yaml`, `spec/integration/web_spec.rb`, DEPLOYMENT.md §9 | — |
+| K-37 | — | **Resolved 2026-11-12:** the v1 form path capped only the *declared* `CONTENT_LENGTH`, which a chunked request does not send — Rack then parsed the whole form body before any validation, so 128 KB was accepted with `MAX_SECRET_BYTES=16` and a real deployment could be made to allocate whatever a client sent. The bytes actually read are now capped on the form path too, through the same helper the JSON path uses (`413` + nothing written; live proof: a 2 MB chunked form post answers `413`, a normal form post and v1 JSON still answer `200`) | `lib/onetime/web/app.rb#read_body_within_limit!`, `spec/integration/secrets_api_spec.rb` | — |
 | K-32 | — | **Resolved 2026-11-11:** CI executed on GitHub across all four jobs. The first run failed in the container job: the load-test step ran a bare `docker compose down -v` with no env, and Compose interpolates `${SECRET}`/`${REDIS_PASSWORD}` on `down` too, so it aborted before restarting the stack. Fixed by hoisting the CI values to job level; the rerun (43060570677) is green and the load test reports 100/100 secrets revealed exactly once. | `.github/workflows/ci.yml` | — |
 
 ## Missing product behavior (planned, not bugs)

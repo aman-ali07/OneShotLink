@@ -1,6 +1,6 @@
 # Testing
 
-> **Status: 114 backend examples, 0 failures (2026-11-12), plus two verified headless
+> **Status: 118 backend examples, 0 failures (2026-11-12), plus two verified headless
 > browser journeys and a Compose smoke test.** Ruby/Bundler are not installed on the
 > host, so backend tests run in the `ots-dev` Docker image against Redis DB 15. Lifecycle,
 > passphrase, TTL, at-rest encryption, concurrency, v1, rate limits, and simple-mode
@@ -77,7 +77,7 @@ server or a second suite can neither be flushed nor make a run under-report. Nev
 | `spec/unit/metrics_spec.rb` | 7 | exposition format, counters by family/status, duration, Redis up + memory ratio, `METRICS_ENABLED` gate |
 | `spec/unit/request_logger_spec.rb` | 3 | request fields, secret-key redaction, asset skip |
 | `spec/integration/web_spec.rb` | 12 | health + Redis-down 503, datastore-outage 503 on both API versions (including a full Redis, not just a dropped one), config, CSP/HSTS, typed 404, SPA shell, HEAD |
-| `spec/integration/secrets_api_spec.rb` | 19 | v3 create/reveal/gone, at-rest, passphrase, race, expiry, undecryptable record survives, v1 form+JSON, validation, 413, exact-size boundary, empty/1-char passphrase, 429, proxy trust, auth-disabled fail-closed, full-mode 501 |
+| `spec/integration/secrets_api_spec.rb` | 23 | v3 create/reveal/gone, at-rest, passphrase, race, expiry, corrupted-record tamper survives, undecryptable record survives, v1 form+JSON, validation, 413 (declared and undeclared bodies), exact-size boundary, empty/1-char passphrase, 429, proxy trust, auth-disabled fail-closed, full-mode 501 |
 | `spec/integration/accounts_spec.rb` | 23 | signup/cookie/at-rest, duplicate email, validation, signin/401, session TTL/deletion, signout, CSRF, owner isolation, password change, other-session revocation, atomic account deletion, audit trail, disabled/full gates |
 | `spec/integration/metrics_spec.rb` | 3 | `/metrics` off by default (`404`), text exposition when enabled, no secrets in the output |
 | `spec/integration/openapi_spec.rb` | 4 | valid 3.1 doc, `$ref`s resolve, documented paths are mounted, cookie scheme on owner/account routes |
@@ -85,9 +85,11 @@ server or a second suite can neither be flushed nor make a run under-report. Nev
 | `e2e/journey.mjs` | 1 journey | create → reveal → gone, wrong/correct passphrase, no console errors |
 | `e2e/accounts.mjs` | 1 journey | signup → owner receipt → reload → signout → signed-out prompt → signin → delete account |
 
-Backend total: **114 examples, 0 failures**; frontend: **11 Vitest tests, 0 failures**.
-Not yet covered: tamper-through-HTTP (unit only — the integration spec stubs the decrypt).
-The exact size boundary is covered.
+Backend total: **118 examples, 0 failures**; frontend: **11 Vitest tests, 0 failures**.
+Tampering is covered two ways: the real one over HTTP (a flipped ciphertext byte in Redis →
+`500`, no plaintext, record intact, then readable again once the bytes are put back) and a
+stubbed decrypt for the rotated-`SECRET` case. The exact size boundary is covered, and so is
+the body cap on a chunked request that carries no `Content-Length`.
 
 Operational checks that run outside RSpec:
 
@@ -151,7 +153,7 @@ check name resolution or a public chain. Ports default to `13457`/`18443`/`18088
 | Tamper | flip a ciphertext byte in Redis; reveal returns `500` generic, no partial output, and the record is left in place (decrypt precedes the consume, D-013) |
 | Expired key reuse | re-creating the same key is impossible (IDs are random); no resurrection |
 | TTL validation | value not in `TTL_OPTIONS` → `422`; negative/zero → `422` |
-| Oversized secret | > 1 MiB → `413 payload_too_large`; no Redis key written |
+| Oversized secret | > 1 MiB → `413 payload_too_large`; no Redis key written. Applies with or without a `Content-Length` header: the bytes actually read are capped, so a chunked form body cannot allocate past the ceiling |
 | Unknown key | `404`, identical shape to consumed |
 | Rate limit | exceed conceal ceiling → `429` with `Retry-After`; reveal ceiling likewise |
 | Health | Redis up → `200`; stopped Redis → `503` (test with a separate connection stub or compose) |

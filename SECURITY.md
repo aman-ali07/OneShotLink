@@ -4,7 +4,7 @@ This document separates **controls that exist and have been exercised** from **c
 that must still be implemented**. Nothing here is a claim that the system is fully
 production-ready: there is no bundled TLS terminator and simplified accounts intentionally
 omit full-mode features. The secret lifecycle, simple-mode accounts, UI, hardened
-container, and Compose stack are implemented and covered by 113 specs, a live Puma run,
+container, and Compose stack are implemented and covered by 118 specs, a live Puma run,
 two headless-browser journeys, and a container smoke test.
 
 ## 1. Assets and trust boundaries
@@ -42,7 +42,7 @@ inside the trust boundary but are assumed readable by an attacker only together 
 | Redacted request logs | `Web::RequestLogger` | Verified: secret keys absent; only method/path/status/duration/request ID |
 | Bounded Redis timeouts and reconnect | `Store.redis` env config | Verified live: with Redis stopped, `/health` → `503 degraded`, writes → `503` + `Retry-After`, and the instance recovers without a restart |
 | Non-root, read-only container with no secrets | `Dockerfile`, `compose.yaml` | Verified: UID 10001, read-only rootfs, no `.env` in image |
-| Input limits: TTL allowlist, `MAX_SECRET_BYTES` cap, passphrase 1–256; actual body read capped | `ConcealSecret`, `parse_json_body` | Verified: exact boundary accepts N and rejects N+1 (`413`), empty and 1-char passphrase rejected (T-47) |
+| Input limits: TTL allowlist, `MAX_SECRET_BYTES` cap, passphrase 1–256 bytes (an empty string means none); the body actually read is capped on both the JSON and the form path | `ConcealSecret`, `App#read_body_within_limit!` | Verified: exact boundary accepts N and rejects N+1 (`413`); a 1-character passphrase is accepted and enforced (T-47); a chunked form body with no `Content-Length` is refused with `413` and writes nothing (K-37) |
 | Error hygiene: no stack traces/Redis errors, request ID only | `app.rb` error handler | Verified by 404/500 paths. A Redis outage answers `503 service_unavailable` + `Retry-After` on both API versions (never a `500`, never the driver's message) |
 | No auto-reveal on page load, and no GET consumes a secret (link previews are safe) | `RevealView.vue`, `app.rb#peek_payload` | Verified in the browser and over HTTP: `GET /api/v3/guest/secret/:key` answers metadata only, three GETs in a row leave the key intact, and only `POST …/reveal` consumes (K-35 resolved). The v1 GET is still destructive — that contract is frozen (API.md §4) |
 | No plaintext in URL, localStorage, or sessionStorage | SPA state only | Verified: `localStorage === "{}"` after create; URL contains only the key |

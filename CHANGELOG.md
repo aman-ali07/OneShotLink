@@ -9,6 +9,27 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (a chunked request bypassed the body cap, 2026-11-12) — verified
+
+- `POST /api/v1/share` only compared `CONTENT_LENGTH` with `MAX_SECRET_BYTES + 16 KiB`, and a
+  `Transfer-Encoding: chunked` request sends no length. Rack then parsed the entire form body
+  before any validation saw it, so the actual read was unbounded: with `MAX_SECRET_BYTES=16`,
+  a 128 KB form post carrying a 5-byte secret was answered `200`. A deployment could be made
+  to allocate whatever a client sent.
+- The form path now reads through the same capped helper the JSON path uses. A body over the
+  ceiling answers `413 payload_too_large` and writes nothing, whether or not a length was
+  declared; a normal form post and v1 JSON are unchanged (`200`). Status precedence is kept:
+  a declared oversized body is still refused before the rate limiter is asked.
+- Spec written first and watched fail (`200` → `413`, plus "no keys written"). Live through
+  Puma: a 2 MB chunked form post → `413`, a normal form post → `200`. Suite 118 examples.
+
+### Verified (a corrupted record survives a reveal, 2026-11-12) — covered
+
+- The tamper guarantee is now tested over HTTP with real crypto, not a stubbed decrypt: a
+  flipped ciphertext byte in Redis makes the reveal answer `500 internal_error` with no
+  plaintext and the record still present, and putting the original bytes back reveals it
+  once. Confirmed live as well as in the suite.
+
 ### Fixed (a full Redis answers 503 and has a ceiling, 2026-11-12) — verified
 
 - `compose.yaml` never set `--maxmemory`, so `maxmemory` was `0`: `noeviction` had nothing
