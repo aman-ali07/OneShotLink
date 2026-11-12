@@ -26,6 +26,19 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   revealed `200` with full content once `maxmemory` was raised. DEPLOYMENT.md §9 says so,
   including that TTLs keep running while storage is full.
 
+### Verified (the `SECRET` rotation runbook, drilled 2026-11-12)
+
+- `RUNBOOK.md` §1 run verbatim through Compose with two secrets, one passphrase-protected:
+  `bin/ots rotate-key` printed `Re-encrypted 2 secret(s) with the new key.`
+- Restarting with the **old** key — which the documented sequence invites, because the `up`
+  command it shows does not carry `SECRET` — answers `500 {"code":"internal_error",
+  "message":"Stored secret failed integrity verification"}`, and **both records remain in
+  Redis**. That is D-013 doing its job: a half-finished rotation is recoverable, not
+  destructive.
+- With the new key both secrets revealed `200`, and the passphrase gate still held.
+- §1 now puts `SECRET=$NEW` **before** the restart, quotes the CLI's own reminder, and
+  records this drill so the trap is documented rather than discovered.
+
 ### Fixed (the runbook's lockout reset could not work, 2026-11-12) — verified
 
 - `RUNBOOK.md` §4's rate-limit reset was `redis-cli DEL …` with no password: on an

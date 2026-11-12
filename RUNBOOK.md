@@ -46,8 +46,15 @@ audit, accidental commit).
    NEW=$(openssl rand -hex 32)
    # Re-encrypt all stored secrets under the new key, preserving TTLs.
    docker compose exec -e OTS_NEW_SECRET="$NEW" web ruby bin/ots rotate-key
-   # Then set SECRET=$NEW in the environment/secret manager and restart the web service.
-   docker compose up -d --force-recreate web
+   ```
+
+   The CLI prints `Re-encrypted N secret(s) with the new key.` and then reminds you to
+   update `SECRET`. **Do that before restarting** — the rotation is already applied to the
+   data, so a web process still holding the old key cannot read it:
+
+   ```sh
+   # .env (or your secret manager), not the shell alone: `compose up` re-reads the file
+   SECRET=$NEW docker compose up -d --force-recreate web
    ```
 
 3. Anything the old key could already have decrypted stays compromised. Rotation
@@ -56,6 +63,14 @@ audit, accidental commit).
 **Verification that rotation worked:** a secret created before rotation must still
 reveal after restart; and the old key must no longer decrypt
 (`spec/unit/ops_spec.rb` asserts both directions).
+
+**Drilled 2026-11-12** through Compose with two secrets (one passphrase-protected):
+`rotate-key` reported `Re-encrypted 2 secret(s)`. Restarting with the **old** key answers
+`500 {"code":"internal_error","message":"Stored secret failed integrity verification"}`
+and **both records are still in Redis** — the decrypt-before-consume rule (D-013) means a
+half-done rotation costs nothing: set the correct key, restart, and both secrets reveal
+`200` (the passphrase gate still enforced). That is also why skipping the `SECRET` update
+is recoverable rather than destructive.
 
 ---
 
