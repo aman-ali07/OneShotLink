@@ -155,12 +155,26 @@ Lua path, add a failing spec first, and re-run the load test.
 
 **Symptom:** a client gets `429` with `Retry-After`; `X-RateLimit-Remaining: 0`.
 
-**Response:** the fixed-window counter lives at `limiter:<client>:<scope>`. Clear it for
-that client only:
+**Response:** the fixed-window counter lives at `limiter:<client>:<scope>` plus a
+`…:counter` companion. Find the key first — the `<client>` part is the client IP only when
+`TRUST_PROXY=true` and the peer is in `TRUSTED_PROXIES`; otherwise it is the direct peer
+(the proxy or the Docker gateway, e.g. `172.x`):
 
 ```sh
-docker compose exec redis redis-cli DEL "limiter:<client-ip>:reveal" "limiter:<client-ip>:reveal:counter"
+docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning keys "limiter:*"'
 ```
+
+Then clear both keys for that client only (**authentication is required** — an
+unauthenticated `redis-cli` prints `NOAUTH` *and exits 0*, so a script that ignores output
+would think it succeeded):
+
+```sh
+docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning DEL "limiter:<client>:reveal" "limiter:<client>:reveal:counter"'
+```
+
+**Verified 2026-11-12** with `RATE_LIMIT_CONCEAL=2`: two `201`s then a `429`, keys
+`limiter:172.22.0.1:conceal` and `…:conceal:counter`, and after deleting both the next
+request answered `201` again.
 
 Do not raise the global limits for one incident unless the limit itself is wrong; a
 raised ceiling widens the abuse window for everyone. Adjust

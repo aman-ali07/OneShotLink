@@ -26,6 +26,18 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   revealed `200` with full content once `maxmemory` was raised. DEPLOYMENT.md §9 says so,
   including that TTLs keep running while storage is full.
 
+### Fixed (the runbook's lockout reset could not work, 2026-11-12) — verified
+
+- `RUNBOOK.md` §4's rate-limit reset was `redis-cli DEL …` with no password: on an
+  authenticated Redis it prints `NOAUTH Authentication required.` and **exits 0**, so an
+  operator following it mid-incident would have believed the client was unblocked while it
+  was not.
+- It also implied the limiter key contains the client IP. That holds only when
+  `TRUST_PROXY=true` and the peer is trusted; with the proxy untrusted the segment is the
+  direct peer — measured key: `limiter:172.22.0.1:conceal`, the Docker gateway.
+- Drilled end to end with `RATE_LIMIT_CONCEAL=2`: `201`, `201`, `429` with the two counter
+  keys present, then the documented authenticated `DEL` of both, then `201` again.
+
 ### Fixed (the go-live self-test passed for the wrong reason, 2026-11-12) — verified
 
 - `script/preflight_selftest.sh` re-run after the Redis host rule became durable: **4/5**.
