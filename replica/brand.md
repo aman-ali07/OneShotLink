@@ -32,30 +32,35 @@ last rule is the D-012 constraint expressed as naming policy.
 
 ## 2. The checks — run vs. to run
 
-Run on **2026-11-11** from this machine:
+Run on **2026-11-12** from this machine (2026-11-11 rows below were re-verified today):
 
 | Check | Method | Result |
 | --- | --- | --- |
-| `oneshotlink.com` | RDAP (rdap.org → Verisign) | `404` — consistent with unregistered; confirm at a registrar before paying |
-| `oneshotlink.net` | RDAP (Verisign) | `404` — consistent with unregistered |
-| `oneshotlink.app` | RDAP (Google registry) | `404` — consistent with unregistered; `.app` is HSTS-preloaded, which suits this product |
-| `oneshotlink.dev` | RDAP (Google registry) | `404` — consistent with unregistered |
-| `oneshotlink.io` | RDAP | **Inconclusive** — the `.io` registry publishes no RDAP service (`errorCode 404`, "No RDAP service is available"); needs a registrar or whois lookup. `whois` is not installed on this machine. |
+| `oneshotlink.com/.net/.app/.dev/.link` | RDAP via rdap.org (follows to each registry) | `404` "Not Found" from each registry — consistent with unregistered; confirm at a registrar before paying |
+| `oneshotlink.io` | RDAP: the `.io` registry publishes no RDAP service (`errorCode 404`); local DNS | `NXDOMAIN` — consistent with unregistered; confirm at a registrar before paying |
+| all six domains | local DNS resolution (`getent hosts`) | `NXDOMAIN` for every one (a live registration would resolve) |
 | npm package | `registry.npmjs.org/oneshotlink` | `404` — unregistered |
 | PyPI package | `pypi.org/pypi/oneshotlink/json` | `404` — unregistered |
 | RubyGems | `rubygems.org/api/v1/gems/oneshotlink.json` | `404` — unregistered |
-| GitHub handle | `github.com/oneshotlink`, `github.com/OneShotLink` | `404` — no user or org holds it |
+| GitHub handle | `api.github.com/users/oneshotlink`, `/orgs/oneshotlink` | `404` — no user or org holds it |
+| Apple App Store (US) | iTunes Search API `term=OneShotLink&entity=software` | 5 fuzzy results (Flickr, Hunch, Uhale, SayHi, Frameo) — **no exact match named OneShotLink** |
+| Google Play (US) | headless Chrome on the Play Store search | **"No results for OneShotLink"** |
+| USPTO wordmark | headless Chrome on `tmsearch.uspto.gov`, typed query, **control = `verizon` → 177 results** | **"No results found" for `oneshotlink`** — zero live/registered/pending marks in every status filter |
 
-**To run — no result is claimed for any of these:**
+**Still to run — no result is claimed for any of these, and the blocker is named:**
 
-- US trademark, USPTO TESS/TMsearch, classes **9** (software) and **42** (SaaS).
-- EU trademark, EUIPO eSearch, or TMview to cover several offices at once.
-- Canada, ISED trademark database.
-- WIPO Global Brand Database.
-- App Store and Google Play exact-name search (needs a device or store web session).
-- Handles on X, Instagram, TikTok (the GitHub handle is checked above; the others are not).
-- Open web search for `OneShotLink` plus the category. The web-search tool failed twice in
-  this session, so this row is genuinely unrun.
+- **Adjacent US marks** (`oneshot`, `one-shot`, `one shot link` in classes 9/42): not run.
+  After the `oneshotlink` query, `tmsearch.uspto.gov` stopped serving its search box to
+  automated requests (rate-limit/bot wall), so a human should run these in a browser.
+- **EU (EUIPO eSearch / TMview):** TMview rejects requests ("Request Rejected" WAF page);
+  EUIPO eSearch is a JS app that needs a session. Not claimed.
+- **WIPO Global Brand Database:** behind an `altcha` CAPTCHA; not claimed.
+- **Canada (ISED):** JS-only trademark search; not attempted from this machine.
+- **Handles on X, Instagram, TikTok, YouTube, Reddit:** unconfirmed — login walls and `403`
+  from this machine; check in a browser. GitHub is the one handle that is freely checkable
+  and is free (`404`).
+- **Open web search for `OneShotLink` plus the category:** the web-search tool failed again
+  this session (3 attempts, provider error), so the existence/conflict sweep is still unrun.
 
 These are screening checks, not clearance. Before spending money on the name, a trademark
 lawyer should run a proper search. **The `scripts/preflight` go-live gate does not check
