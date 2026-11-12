@@ -135,8 +135,9 @@ exists only so the copy is linted if a wrapper is ever built.
 
 ## 7. Go/no-go
 
-**No go.** Blocking: B2 (legal pages served), B3 (placeholder favicon, no OG image), B4
-(trademark screening), B5 (preflight green on a real host), B6 (firewall). B1 is done.
+**No go.** Blocking: B2 (legal pages served on a domain), B4 (trademark screening — partly
+run 2026-11-12, still open on EU/WIPO/Canada/handles), B5 (preflight green on a real host),
+B6 (firewall). B1 and B3 are done.
 
 When B5 and B6 are done, re-run §1 and paste the outputs here, then ask the user for the go.
 Nothing in this file should be quoted as "deployed" until a live URL is recorded at the top.
