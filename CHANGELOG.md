@@ -32,7 +32,7 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   green for over a day and the same file's resolved row says so. Its status line and the
   spec count (94 → 114) were from the M2 snapshot.
 - `ROADMAP.md` opened with "94 specs, parity 60.6/100 with 10/11 must-haves" and listed the
-  in-repo operational gates as still ahead Although Redis isolation, metrics, scanning,
+  in-repo operational gates as still ahead, although Redis isolation, metrics, scanning,
   rotation, backups and the TLS rehearsal all closed since. It now states 114 specs, the
   parity tool's current 63.0/100 with 11/11 must-haves, and names TLS-on-your-domain as the
   one remaining gate.
