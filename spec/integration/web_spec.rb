@@ -65,6 +65,33 @@ RSpec.describe Onetime::Web::App do
     expect(JSON.parse(last_response.body).dig("error", "code")).to eq("not_found")
   end
 
+  describe "when the datastore drops out mid-request" do
+    before do
+      allow(Onetime::Store.redis).to receive(:set).and_raise(Redis::CannotConnectError, "connection refused")
+      allow(Onetime::Store.redis).to receive(:multi).and_raise(Redis::CannotConnectError, "connection refused")
+      allow(Onetime::Store.redis).to receive(:zadd).and_raise(Redis::CannotConnectError, "connection refused")
+    end
+
+    it "answers v3 with 503 and a retry hint instead of a generic 500" do
+      post "/api/v3/guest/conceal", JSON.generate(secret: "during an outage", ttl: 1800),
+           { "CONTENT_TYPE" => "application/json" }
+
+      expect(last_response.status).to eq(503)
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq("service_unavailable")
+      expect(last_response.headers["Retry-After"]).to match(/\A\d+\z/)
+      expect(last_response.body).not_to include("connection refused")
+      expect(last_response.body).not_to include("during an outage")
+    end
+
+    it "answers v1 in the legacy shape with the same status" do
+      post "/api/v1/share", { secret: "during an outage", ttl: 1800 }
+
+      expect(last_response.status).to eq(503)
+      expect(JSON.parse(last_response.body)).to have_key("message")
+      expect(last_response.headers["Retry-After"]).to match(/\A\d+\z/)
+    end
+  end
+
   it "serves the SPA shell for deep links when the build exists" do
     allow(File).to receive(:file?).and_call_original
     allow(File).to receive(:file?).with(Onetime::Web::App::INDEX_PATH).and_return(true)

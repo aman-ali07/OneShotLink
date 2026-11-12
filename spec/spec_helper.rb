@@ -29,6 +29,17 @@ RSpec.configure do |config|
     unless ENV.fetch("REDIS_URL").end_with?("/15")
       raise "refusing to flush a non-test Redis database: #{ENV['REDIS_URL']}"
     end
+
+    # `flushdb` is the point of no return. If a live server or a second suite is
+    # attached to DB 15, flushing it corrupts their state and can make this run
+    # report fewer examples than it should, without failing. One client (this
+    # process) is expected; more than one means the database is shared.
+    attached = Onetime::Store.redis.client(:list).count { |client| client["db"].to_s == "15" }
+    if attached > 1
+      raise "refusing to run: #{attached} clients are attached to Redis DB 15 " \
+            "(another server or suite is using it). Stop it, or point REDIS_URL at a free DB."
+    end
+
     Onetime::Store.redis.flushdb
   end
 

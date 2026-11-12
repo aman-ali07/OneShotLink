@@ -3,7 +3,7 @@
 Last reviewed: 2026-11-11. Severity: **S1** blocks use / security, **S2** blocks a
 feature, **S3** quality/operability, **S4** documentation/process.
 
-> The core has been executed: 110 backend specs pass in Docker against Redis DB 15, a live
+> The core has been executed: 112 backend specs pass in Docker against Redis DB 15, a live
 > Puma run completed create → reveal → gone (including a four-way reveal race), a
 > headless Chrome journey covered the built UI (including the passphrase path), and the
 > production Compose stack passed a lifecycle smoke test. "Verified"
@@ -33,12 +33,12 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-09 | — | **Resolved 2026-11-11:** removed the unused `Crypto.data_key`; per-record keys derive from `SECRET` + per-record salt via one function (`Crypto.derive`). | `lib/onetime/crypto.rb` | — |
 | K-10 | S3 | `Crypto.secure_compare` raises on non-string input (returns false first, so safe) but `OpenSSL.fixed_length_secure_compare` availability depends on the OpenSSL version | `crypto.rb:77` | Covered by unit spec T-14 on the pinned Ruby image |
 | K-11 | S3 | `Onetime::NotFound#message` ignores any passed message, so route-specific context is lost (intentional for uniformity) | `lib/onetime/errors.rb:21` | Keep uniform; document if per-route messages are ever needed |
-| K-12 | S3 | `Config` reads ENV lazily, so changes made after boot are observed mid-process; tests can leak config between examples | `lib/onetime/config.rb:27` | Snapshot config at boot in `config.ru` |
+| K-12 | S3 | **Accepted 2026-11-12:** `Config` reads ENV lazily. In production the environment is fixed for the life of the process and `config.ru` validates it at boot, so a mid-process change cannot happen; the laziness is what lets the suite reshuffle ENV per example. Snapshotting at boot would buy nothing operationally and would break that test pattern | `lib/onetime/config.rb`, `config.ru` | Revisit only if config ever becomes reloadable at runtime |
 | K-13 | — | **Resolved 2026-11-11:** max payload is enforced, `UI_ENABLED` is consumed, and the unused `CORS_ORIGINS` was removed from the env contract | `config.rb`, `app.rb` | — |
 | K-14 | S3 | Limiter keys are `limiter:<client>:<scope>` and `...:counter`; the brief named `limiter:ID:object`/`limiter:ID:counter`. No functional issue, but docs/ops queries must use the real names | `lib/onetime/limiter.rb:23` | Documented in DATABASE.md §2 |
-| K-15 | S3 | `Retry-After` is now sent, but rejected requests still increment the fixed-window counter (a client that keeps retrying can stay locked out) | `limiter.rb`, `app.rb` | Decide whether rejected hits should count; revisit with T-44 |
+| K-15 | S3 | **Accepted 2026-11-12:** rejected requests do increment the fixed-window counter. That is what makes the window a limiter rather than a counter of successful work: a client cannot buy extra attempts by failing. `Retry-After` tells it when the window resets | `limiter.rb`, `app.rb`, verified live: 29 allowed then `429` with `retry-after: 60` | Keep fixed-window semantics; revisit only if a token bucket is chosen |
 | K-16 | — | **Resolved 2026-11-11:** client IP now comes from `REMOTE_ADDR` unless that peer is in `TRUSTED_PROXIES`; spoofed and trusted-hop cases have integration specs | `app.rb#client_id`, DEPLOYMENT.md §4 | — |
-| K-17 | S3 | `Store` memoizes one Redis client; `Store.reset!` exists but no connection-pool or retry policy is configured | `store.rb:12` | Evaluate at load test; redis-rb is thread-safe |
+| K-17 | — | **Resolved 2026-11-12:** the client is created with `timeout`, `connect_timeout`, `read_timeout`, `write_timeout` and `reconnect_attempts` from config, and redis-rb 5 is thread-safe, so one shared client is correct for a Puma thread pool. Verified under load: 200 secrets / 20 threads, 135.9 creates/s, every secret revealed exactly once, and a Redis outage surfaces as `503` + `Retry-After` (T-82) | `lib/onetime/store.rb`, `script/loadtest.rb` output | Revisit only if a per-thread pool is measured to be faster |
 | K-18 | — | **Resolved 2026-11-11:** explicit `require "json"` plus a single `lib/onetime.rb` entrypoint with ordered requires | `lib/onetime.rb`, `store.rb` | — |
 | K-19 | — | **Resolved 2026-11-11:** removed the swallowing `Config.secret` accessor; callers can only use `secret!` or `validate!` | `config.rb` | — |
 | K-20 | S4 | Docs describe planned endpoints and UI; a reader who skips the banner may assume they exist | API.md, DESIGN_SYSTEM.md | Keep banners; link KNOWN_ISSUES in PR descriptions |

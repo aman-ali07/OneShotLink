@@ -78,4 +78,13 @@ module Onetime
     def code = "not_configured"
     def message = "This feature is not configured in this deployment."
   end
+
+  # The datastore is unreachable. Temporary and ours to fix, so it is a 503 with
+  # a retry hint rather than a 500: clients and load balancers back off instead
+  # of treating it as a bug in their request.
+  class Unavailable < Error
+    def status = 503
+    def code = "service_unavailable"
+    def message = "Storage is temporarily unavailable. Try again shortly."
+  end
 end

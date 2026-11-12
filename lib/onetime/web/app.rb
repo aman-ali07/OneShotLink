@@ -70,6 +70,17 @@ module Onetime
         env["onetime.api_version"] || "v3"
       end
 
+      # Redis connection failures surface as typed 503s, not 500s (see errors.rb).
+      def datastore_error?(error)
+        defined?(Redis::BaseConnectionError) && error.is_a?(Redis::BaseConnectionError)
+      end
+
+      # Retry-After is whole seconds; the Redis timeout is a float and is the
+      # honest ceiling for "how long until we would have given up anyway".
+      def retry_after_unavailable
+        [Config.redis_timeout.to_i, 1].max.to_s
+      end
+
       def health_response
         redis_ok = Store.healthy?
         status = redis_ok ? 200 : 503
@@ -654,12 +665,18 @@ module Onetime
       end
 
       error do |error|
+        # A Redis outage is our failure, not the caller's, and it is temporary.
+        # Report it as 503 with a retry hint instead of a generic 500.
+        error = Onetime::Unavailable.new if datastore_error?(error)
+
         if api_version == "v1"
           response.status = error.respond_to?(:status) ? error.status : 500
           if error.is_a?(Onetime::RateLimited)
             response["Retry-After"] = Config.rate_limit_window.to_s
             scope = error.instance_variable_get(:@scope)
             set_rate_limit_headers_for(scope) if scope
+          elsif error.is_a?(Onetime::Unavailable)
+            response["Retry-After"] = retry_after_unavailable
           end
           message = error.is_a?(Onetime::Error) ? error.message : "An internal error occurred."
           json({ message: message })
@@ -670,6 +687,10 @@ module Onetime
             response["Retry-After"] = Config.rate_limit_window.to_s
             scope = error.instance_variable_get(:@scope)
             set_rate_limit_headers_for(scope) if scope
+            json(error_body(error.code, error.message))
+          when Onetime::Unavailable
+            response.status = 503
+            response["Retry-After"] = retry_after_unavailable
             json(error_body(error.code, error.message))
           when Onetime::Error
             response.status = error.status

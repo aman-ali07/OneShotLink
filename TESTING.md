@@ -1,6 +1,6 @@
 # Testing
 
-> **Status: 94 backend examples, 0 failures (2026-11-11), plus two verified headless
+> **Status: 112 backend examples, 0 failures (2026-11-12), plus two verified headless
 > browser journeys and a Compose smoke test.** Ruby/Bundler are not installed on the
 > host, so backend tests run in the `ots-dev` Docker image against Redis DB 15. Lifecycle,
 > passphrase, TTL, at-rest encryption, concurrency, v1, rate limits, and simple-mode

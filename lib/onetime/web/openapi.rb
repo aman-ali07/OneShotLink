@@ -67,7 +67,9 @@ module Onetime
                 "201" => json_ref("ConcealResponse"),
                 "413" => json_ref("Error"),
                 "422" => json_ref("Error"),
-                "429" => rate_limited
+                "429" => rate_limited,
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -80,7 +82,9 @@ module Onetime
                 "200" => json_ref("RevealResponse"),
                 "401" => json_ref("Error"),
                 "404" => json_ref("Error"),
-                "429" => rate_limited
+                "429" => rate_limited,
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -94,7 +98,9 @@ module Onetime
                 "200" => json_ref("RevealResponse"),
                 "401" => json_ref("Error"),
                 "404" => json_ref("Error"),
-                "429" => rate_limited
+                "429" => rate_limited,
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -108,7 +114,9 @@ module Onetime
                 "201" => json_ref("ConcealResponse"),
                 "401" => json_ref("Error"),
                 "403" => json_ref("Error"),
-                "429" => rate_limited
+                "429" => rate_limited,
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -121,7 +129,9 @@ module Onetime
               responses: {
                 "200" => json_ref("RevealResponse"),
                 "401" => json_ref("Error"),
-                "404" => json_ref("Error")
+                "404" => json_ref("Error"),
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -135,7 +145,9 @@ module Onetime
               responses: {
                 "200" => json_ref("RevealResponse"),
                 "401" => json_ref("Error"),
-                "404" => json_ref("Error")
+                "404" => json_ref("Error"),
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -150,7 +162,9 @@ module Onetime
                 "409" => json_ref("Error"),
                 "422" => json_ref("Error"),
                 "429" => rate_limited,
-                "501" => json_ref("Error")
+                "501" => json_ref("Error"),
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -163,7 +177,9 @@ module Onetime
                 "200" => json_ref("AccountResponse"),
                 "401" => json_ref("Error"),
                 "403" => json_ref("Error"),
-                "429" => rate_limited
+                "429" => rate_limited,
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -172,7 +188,7 @@ module Onetime
               "account",
               "Sign out and destroy the session",
               security: [{ cookie: [] }],
-              responses: { "200" => json_ref("OkResponse") }
+              responses: { "200" => json_ref("OkResponse"), "503" => json_ref("Error") }
             )
           },
           "/api/v3/account/me" => {
@@ -180,7 +196,7 @@ module Onetime
               "account",
               "Current customer",
               security: [{ cookie: [] }],
-              responses: { "200" => json_ref("AccountResponse"), "401" => json_ref("Error") }
+              responses: { "200" => json_ref("AccountResponse"), "401" => json_ref("Error"), "503" => json_ref("Error") }
             )
           },
           "/api/v3/account/receipts" => {
@@ -188,7 +204,7 @@ module Onetime
               "account",
               "Owner receipt list",
               security: [{ cookie: [] }],
-              responses: { "200" => json_ref("ReceiptsResponse"), "401" => json_ref("Error") }
+              responses: { "200" => json_ref("ReceiptsResponse"), "401" => json_ref("Error"), "503" => json_ref("Error") }
             )
           },
           "/api/v3/account/password" => {
@@ -200,7 +216,9 @@ module Onetime
               responses: {
                 "200" => json_ref("OkResponse"),
                 "401" => json_ref("Error"),
-                "422" => json_ref("Error")
+                "422" => json_ref("Error"),
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -213,7 +231,9 @@ module Onetime
               responses: {
                 "200" => json_ref("OkResponse"),
                 "401" => json_ref("Error"),
-                "403" => json_ref("Error")
+                "403" => json_ref("Error"),
+
+                "503" => json_ref("Error")
               }
             )
           },
@@ -222,7 +242,7 @@ module Onetime
               "legacy",
               "Create a secret (v1 legacy shape)",
               body: "ConcealRequest",
-              responses: { "200" => json_ref("LegacyConcealResponse"), "429" => rate_limited }
+              responses: { "200" => json_ref("LegacyConcealResponse"), "429" => rate_limited, "503" => json_ref("Error") }
             )
           },
           "/api/v1/secret/{key}" => {
@@ -230,13 +250,13 @@ module Onetime
               "legacy",
               "Reveal a secret (v1 GET)",
               params: [key_param],
-              responses: { "200" => json_ref("LegacyRevealResponse"), "404" => json_ref("LegacyError") }
+              responses: { "200" => json_ref("LegacyRevealResponse"), "404" => json_ref("LegacyError"), "503" => json_ref("Error") }
             ),
             "post" => op(
               "legacy",
               "Reveal a secret (v1 POST)",
               params: [key_param],
-              responses: { "200" => json_ref("LegacyRevealResponse"), "404" => json_ref("LegacyError") }
+              responses: { "200" => json_ref("LegacyRevealResponse"), "404" => json_ref("LegacyError"), "503" => json_ref("Error") }
             )
           }
         }

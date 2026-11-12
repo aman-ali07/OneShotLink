@@ -1,6 +1,6 @@
 # Production readiness
 
-Status as of 2026-11-11. This file is deliberately stricter than "it runs": every
+Status as of 2026-11-12. This file is deliberately stricter than "it runs": every
 item is either **verified by a command**, **implemented but untested**, or **not done**.
 
 ## Verdict
@@ -46,6 +46,8 @@ no accounts by design.
 | Incident runbook | `RUNBOOK.md` (key compromise, Redis loss, reveal regression, lockout, rollback) |
 | Browser path | committed puppeteer journey (`e2e/journey.mjs`): create → reveal → gone and wrong/correct passphrase; zero console errors |
 | Static delivery | hashed assets `Cache-Control: immutable`; shell and deep links `no-cache`/noindex; HEAD works for `/` and `/health` |
+| Datastore outage is honest | Redis stopped under the running stack: `/health` → `503 {"status":"degraded"}`, writes → `503 service_unavailable` with `Retry-After` on both API versions (v1 keeps its `message` shape), secrets never appear in the error, and the instance recovers without a restart when Redis returns (create → reveal → second reveal `404`) |
+| Spec isolation | the suite refuses to run when another client is attached to Redis DB 15, instead of flushing a database a live server is using |
 
 Commands used for the evidence above:
 

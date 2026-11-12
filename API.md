@@ -39,7 +39,8 @@ requests must send `Content-Type: application/json`. v1 accepts
 | `rate_limited` | 429 | Limit exceeded |
 | `payload_too_large` | 413 | Body over `MAX_SECRET_BYTES` (1 MiB default) |
 | `not_configured` | 501 | `AUTH_MODE=full` route, unimplemented feature |
-| `internal_error` | 500 | Redis down, crypto failure; generic message only |
+| `service_unavailable` | 503 | Redis is unreachable. Temporary; the response carries `Retry-After` and the request can be retried once storage is back |
+| `internal_error` | 500 | Crypto failure or an unexpected bug; generic message only |
 
 ## 2. Public configuration
 

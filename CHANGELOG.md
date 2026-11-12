@@ -9,6 +9,33 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Changed (production hardening pass, 2026-11-12) — verified
+
+- **A datastore outage is now reported honestly.** Redis connection failures map to
+  `503 service_unavailable` with a `Retry-After` hint on both API versions (v1 keeps its
+  `message` shape) instead of a generic `500 internal_error`, so clients and load balancers
+  back off rather than treating it as a bad request. The message is fixed text; the Redis
+  error string and the secret never reach the response body.
+- **The spec suite refuses a shared database.** Before flushing, it counts the clients
+  attached to Redis DB 15 and aborts with an actionable message if another server or a
+  second suite is using it — flushing a live database could otherwise corrupt its state and
+  let a run report fewer examples than it should.
+- **The loop-engineering scaffolding is gone.** `LOOP.md`, `STATE.md`, `loop-budget.md`,
+  `loop-constraints.md`, `loop-run-log.md`, `gate.yaml`, `script/loop-free-pi.sh` and the
+  `.claude/` loop skills/agent are removed, along with every reference to them. The binding
+  rules they carried already live in `AGENTS.md`, `SECURITY.md`, `TESTING.md`, `RUNBOOK.md`
+  and `TECH_STACK.md`.
+
+Verified end to end against the shipped image and Compose stack: `docker compose up --build`
+→ both browser journeys pass → container runs as UID 10001 with a read-only rootfs, `cap_drop:
+ALL` and no published Redis port → Redis stopped: `/health` `503`, writes `503` +
+`Retry-After`, static pages still `200` → Redis restarted: health `ok`, create → reveal →
+second reveal `404` → rate limiter allows 29 then `429` with `retry-after: 60` and
+`X-RateLimit-*` → load test 200 secrets / 20 threads, 135.9 creates/s, every secret revealed
+exactly once → `/metrics` serves `onetime_up`/`onetime_redis_up`/request counters →
+`script/preflight_selftest.sh` 5/5. Backend suite 112 examples / 0 failures; Vitest 11;
+typecheck + Vite build clean; `bundler-audit` and `npm audit` clean.
+
 ### Added (icons and social card, 2026-11-12) — verified
 
 - **A real mark, drawn from the logo brief** (`replica/brand.md` §4): `site/favicon.svg` is
@@ -38,18 +65,17 @@ account and journey browser tests still pass; `script/brand-sweep.sh` exits 0.
 - **The launch sweep now scans what ships instead of the whole checkout.** The replica-brand
   tool walks the filesystem and ignores `.gitignore`, so running it from the repo root also
   scanned prose and local run artifacts; it reported hits for this checkout's own directory
-  name in `LOOP.md`'s cron line and in git-ignored `.loop-runs/` transcripts while every
-  shipped surface was clean. The wrapper copies the tracked, non-prose files (`*.md` and
-  `replica/` excluded, since the original belongs there as a comparison) into a temp tree and
-  sweeps that: 95 files, exit 0. Untracked artifacts can no longer colour the result.
+  name in agent notes and transcripts while every shipped surface was clean. The wrapper
+  copies the tracked, non-prose files (`*.md` and `replica/` excluded, since the original
+  belongs there as a comparison) into a temp tree and sweeps that: 95 files, exit 0.
+  Untracked artifacts can no longer colour the result.
 - Exit codes are `0` clean, `1` hits, `2` tool missing, so it can block a deploy. `AGENTS.md`,
   `TESTING.md` (quality gates), `ROADMAP.md` (M5 gate) and `replica/deploy.md` now name the
   script instead of the raw command.
 
 Verified: exit 0 from the repo root and from another cwd; **negative controls** — planting
 `Onetime Secret` in `site/index.html` gives exit 1 naming `site/index.html:6`, the same
-string in `TASKS.md` or in an untracked `.loop-runs/` file gives exit 0; `SWEEP=/nope`
-gives exit 2. The full-tree `sweep.py .` still reports the 2 loop-doc hits and is unchanged.
+string in `TASKS.md` or in an untracked file gives exit 0; `SWEEP=/nope` gives exit 2.
 
 ### Changed (account deletion is atomic, 2026-11-12) — verified
 

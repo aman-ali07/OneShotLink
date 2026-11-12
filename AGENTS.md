@@ -5,7 +5,7 @@ original one-time secret service.
 **Stack:** Ruby 3.3 + Roda on Rack 3 + Puma, Redis, Vue 3 + TypeScript + Vite + Tailwind.
 **Status:** production-packaged core with optional simple-mode accounts. The Vue SPA and
 APIs support create → link → reveal once → gone, including the passphrase path; account
-signup/signin, owner receipts, and the dashboard are implemented. **110 backend specs pass**,
+signup/signin, owner receipts, and the dashboard are implemented. **112 backend specs pass**,
 two headless browser journeys are verified, and the non-root Compose stack was smoke-tested.
 Operational gates (TLS, Redis auth, backups, metrics, scanning, key rotation) and full mode
 are still open; next milestone is M4 verification after those gates.
@@ -83,9 +83,9 @@ python3 ~/.agents/skills/replica-design/contrast.py replica/design/tokens.json  
 `script/brand-sweep.sh` is the gate, not the raw tool: it runs `sweep.py` over the tracked
 files that ship (code, config, static assets, specs, e2e) and skips prose (`*.md`) and the
 `replica/` planning folder, where the original's name legitimately appears as a comparison.
-It copies those files into a temp tree first, so git-ignored run artifacts such as
-`.loop-runs/` can never turn the gate red. Run `sweep.py` over the whole repo by hand when
-you want to audit prose too.
+It copies those files into a temp tree first, so untracked run artifacts (logs, transcripts,
+anything a tool drops in the working tree) can never turn the gate red. Run `sweep.py` over
+the whole repo by hand when you want to audit prose too.
 
 If the skills are missing (new machine), reinstall them with:
 
