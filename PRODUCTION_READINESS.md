@@ -45,6 +45,7 @@ no accounts by design.
 | Load / single-use invariant | `script/loadtest.rb`: 400 secrets, 40 threads, 8-way race, 0 double reveals (~240 creates/s) |
 | Incident runbook | `RUNBOOK.md` (key compromise, Redis loss, reveal regression, lockout, rollback) |
 | Browser path | committed puppeteer journey (`e2e/journey.mjs`): create → reveal → gone and wrong/correct passphrase; zero console errors |
+| TLS rehearsal | `script/tls-rehearsal.sh`: production stack behind Caddy + throwaway CA → `PREFLIGHT PASSED` on the TLS checks (7 assertions, including cookie flags via a throwaway signup); `--with-redis` fails exactly on the unfixed host rule, which is the negative control |
 | Static delivery | hashed assets `Cache-Control: immutable`; shell and deep links `no-cache`/noindex; HEAD works for `/` and `/health` |
 | Datastore outage is honest | Redis stopped under the running stack: `/health` → `503 {"status":"degraded"}`, writes → `503 service_unavailable` with `Retry-After` on both API versions (v1 keeps its `message` shape), secrets never appear in the error, and the instance recovers without a restart when Redis returns (create → reveal → second reveal `404`) |
 | Spec isolation | the suite refuses to run when another client is attached to Redis DB 15, instead of flushing a database a live server is using |
@@ -74,7 +75,7 @@ HOST=https://your.domain script/preflight.sh   # see --help
 
 | Item | Risk | Owner task |
 |---|---|---|
-| TLS termination + real hostname | The **app side is verified**: behind a TLS terminator with `SSL=true`/`HOST`/`TRUST_PROXY`, HSTS, `Secure`/`HttpOnly`/`SameSite` cookies, HTTPS links, and XFF spoofing protection were all confirmed at runtime (and the negative controls with `SSL=false`). What remains is the operator's real hostname and certificate at the proxy — run the §4.1 checklist on the live domain. | T-70 |
+| TLS termination + real hostname | The **app side is verified twice**: once by driving it directly with `SSL=true`/`HOST`/`TRUST_PROXY`, and now end to end behind a real TLS terminator — `script/tls-rehearsal.sh` boots the production stack behind Caddy with a throwaway CA and runs the real `script/preflight.sh` against it, which passes certificate validation, HSTS, hardening headers, `Secure`/`HttpOnly`/`SameSite` cookies and the plain-HTTP redirect. What remains is the operator's real hostname and certificate at the proxy — run the §4.1 checklist on the live domain. | T-70 |
 | Redis network policy | Redis auth is enforced (`REDIS_PASSWORD`/`--requirepass`, verified) and TLS is available via `rediss://`. **Isolation is now in Compose:** Redis sits on an `internal: true` network with no published port, so it has no egress and is unreachable from other networks (verified). The remaining piece is the host-side rule that stops a host process from routing to the container IP — `AUTH` is enforced there, and DEPLOYMENT.md §4.0 has the nftables/ufw snippet. | T-71 |
 
 Everything else that used to be listed here — backup/restore (T-72), dependency scanning

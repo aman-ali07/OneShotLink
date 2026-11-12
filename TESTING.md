@@ -105,6 +105,28 @@ npm --prefix frontend audit --audit-level=high
 The browser script lives outside the repo for M2; M4 should commit a repeatable
 Playwright/puppeteer test and add Vitest coverage for `lib/api.ts` schemas.
 
+## 3.2 TLS rehearsal (T-70, repeatable)
+
+`script/tls-rehearsal.sh` boots the production Compose stack behind a real TLS
+terminator (Caddy) using a throwaway local CA, then runs `script/preflight.sh` against
+it with the certificate verified. It proves the app side of the TLS gate without owning
+a domain: HSTS under `SSL=true`, hardening headers surviving the proxy, `Secure`/`HttpOnly`/
+`SameSite` cookies, and the plain-HTTP → HTTPS redirect.
+
+```bash
+script/tls-rehearsal.sh                # TLS checks only (fast default)
+script/tls-rehearsal.sh --with-redis   # adds the Redis isolation checks
+```
+
+Expected: `PREFLIGHT PASSED (1 skipped)`, then the reminder that DNS, the real certificate
+chain and the Redis host firewall rule (T-71) remain the operator's to prove. `--with-redis`
+currently ends in `FAIL: host can reach Redis` — that is the unfixed host rule, not a bug,
+and it is the negative control showing the gate can still fail.
+
+The rehearsal is not a substitute for the real run: with no DNS and a local CA it cannot
+check name resolution or a public chain. Ports default to `13457`/`18443`/`18088`
+(`APP_PORT`/`HTTPS_PORT`/`HTTP_PORT`); the stack, CA and proxy container are removed on exit.
+
 ## 4. Required test cases
 
 ### Lifecycle (integration)

@@ -36,6 +36,15 @@ exactly once → `/metrics` serves `onetime_up`/`onetime_redis_up`/request count
 `script/preflight_selftest.sh` 5/5. Backend suite 112 examples / 0 failures; Vitest 11;
 typecheck + Vite build clean; `bundler-audit` and `npm audit` clean.
 
+- **`script/tls-rehearsal.sh` — the TLS gate is now repeatable without a domain.** It boots
+  the production Compose stack behind a real TLS terminator (Caddy) with a throwaway local
+  CA, then runs the real `script/preflight.sh` against it with certificate verification on.
+  Result: 7/7 TLS assertions pass, including `Secure`/`HttpOnly`/`SameSite` on a session
+  cookie obtained through a throwaway signup and the plain-HTTP → HTTPS redirect. With
+  `--with-redis` the gate fails on exactly the one open item (`host can reach Redis`),
+  which is the negative control proving the gate still has teeth. Documented in
+  `TESTING.md` §3.2 and `PRODUCTION_READINESS.md`.
+
 ### Added (icons and social card, 2026-11-12) — verified
 
 - **A real mark, drawn from the logo brief** (`replica/brand.md` §4): `site/favicon.svg` is
