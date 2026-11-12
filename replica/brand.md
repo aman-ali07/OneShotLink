@@ -45,7 +45,7 @@ Run on **2026-11-12** from this machine (2026-11-11 rows below were re-verified 
 | GitHub handle | `api.github.com/users/oneshotlink`, `/orgs/oneshotlink` | `404` — no user or org holds it |
 | Apple App Store (US) | iTunes Search API `term=OneShotLink&entity=software` | 5 fuzzy results (Flickr, Hunch, Uhale, SayHi, Frameo) — **no exact match named OneShotLink** |
 | Google Play (US) | headless Chrome on the Play Store search | **"No results for OneShotLink"** |
-| USPTO wordmark | headless Chrome on `tmsearch.uspto.gov`, typed query, **control = `verizon` → 177 results** | **"No results found" for `oneshotlink`** — zero live/registered/pending marks in every status filter |
+| USPTO wordmark | headless Chrome on `tmsearch.uspto.gov`, typed query, **control = `verizon` → 177 results** | **"No results found" for `oneshotlink`** — the wordmark search returns no marks. (The filter sidebar showed live/registered/dead counts at 0 on the first load; the exact "no results" verdict is from the controlled run.) |
 
 **Still to run — no result is claimed for any of these, and the blocker is named:**
 
