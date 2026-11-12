@@ -165,9 +165,14 @@ nft add rule inet ots out ip daddr "${REDIS_SUBNET:-10.77.13.0/24}" tcp dport 63
 ufw deny out to 10.77.13.0/24 port 6379 proto tcp
 ```
 
-The rule is **runtime-only until it is saved** — on reboot it is gone unless you persist
-it (`nft list ruleset > /etc/nftables.conf` plus `systemctl enable nftables`, or your
-distro's equivalent). To revert: `nft delete table inet ots`.
+Pick the form your host already uses (`systemctl is-active ufw` vs `nftables`). The bare
+`nft add` above is **runtime-only**: on reboot it is gone unless you persist it
+(`nft list ruleset > /etc/nftables.conf` plus `systemctl enable nftables`, or your distro's
+equivalent). On a host that runs **ufw**, prefer the ufw form — ufw owns its ruleset and
+saves it to `/etc/ufw/user.rules`, so it survives reboots without a second unit, and a
+hand-rolled `nft` table can be lost the next time someone flushes or reloads nftables. To
+revert either form: `nft delete table inet ots` or `ufw delete deny out to 10.77.13.0/24
+port 6379 proto tcp`.
 
 Verify it, rather than assuming it: `script/tls-rehearsal.sh --with-redis` runs the real
 `script/preflight.sh` and prints `PASS host cannot reach Redis at 10.77.13.2:6379`. A host
