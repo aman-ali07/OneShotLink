@@ -16,19 +16,27 @@ module Onetime
 
       def call
         customer_id = @customer[:id]
+        owner_index = Models::Secret.owner_index(customer_id)
+        session_index = Models::Session.index_key(customer_id)
 
-        receipts = Store.redis.zrange(Models::Secret.owner_index(customer_id), 0, -1)
-        receipts.each { |objid| Store.redis.del(Models::Secret.receipt_key(objid)) }
-        Store.redis.del(Models::Secret.owner_index(customer_id))
+        # Read first: MULTI only queues commands, so both sets must be known
+        # before the block opens. Everything below is then applied in one EXEC,
+        # so a crash part-way cannot leave a half-deleted account.
+        receipts = Store.redis.zrange(owner_index, 0, -1)
+        session_digests = Store.redis.smembers(session_index)
 
-        sessions = Models::Session.revoke_all(customer_id)
+        Store.redis.multi do |tx|
+          receipts.each { |objid| tx.del(Models::Secret.receipt_key(objid)) }
+          tx.del(owner_index)
+          session_digests.each { |digest| tx.del(Models::Session.digest_key(digest)) }
+          tx.del(session_index)
+          # The index key is looked up by the normalized email hash, so it has to
+          # be removed by the same derivation used when the account was created.
+          tx.del(Models::Customer.index_key(@customer[:email]))
+          tx.del(Models::Customer.key(customer_id))
+        end
 
-        # The index key is looked up by the normalized email hash, so it has to
-        # be removed by the same derivation used when the account was created.
-        Store.redis.del(Models::Customer.index_key(@customer[:email]))
-        Store.redis.del(Models::Customer.key(customer_id))
-
-        { receipts: receipts.size, sessions: sessions }
+        { receipts: receipts.size, sessions: session_digests.size }
       end
     end
   end

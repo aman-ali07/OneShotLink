@@ -3,7 +3,7 @@
 Last reviewed: 2026-11-11. Severity: **S1** blocks use / security, **S2** blocks a
 feature, **S3** quality/operability, **S4** documentation/process.
 
-> The core has been executed: 94 backend specs pass in Docker against Redis DB 15, a live
+> The core has been executed: 110 backend specs pass in Docker against Redis DB 15, a live
 > Puma run completed create → reveal → gone (including a four-way reveal race), a
 > headless Chrome journey covered the built UI (including the passphrase path), and the
 > production Compose stack passed a lifecycle smoke test. "Verified"
@@ -48,7 +48,7 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-24 | S4 | Design tokens were derived from DESIGN_SYSTEM.md, not measured from the original: no screenshot tool/account was available. Contrast passes AA, but spacing/type parity is unverified | `replica/design/tokens.json`, K-22 | Validate against captured screens in M4; do not claim pixel parity |
 | K-25 | — | **Resolved 2026-11-11:** the Vue build is served from `public/app`; `/`, `/assets/*`, and deep links verified over HTTP | `app.rb`, `frontend/` | — |
 | K-26 | — | **Resolved 2026-11-11:** every rate-limited response and every success within a limit carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`; verified live over HTTP and by integration spec. | `lib/onetime/limiter.rb`, `web/app.rb`, API.md §1 | — |
-| K-27 | S4 | The 1 MiB boundary and the 0/1-char passphrase edges are enforced by code but not asserted by an exact-boundary spec; the 413 test shrinks the cap to 5 bytes | integration spec | T-47 |
+| K-27 | — | **Resolved 2026-11-12:** the exact 1 MiB boundary is asserted (`MAX_SECRET_BYTES` = 16: 16 bytes `201`, 17 bytes `413`) and the 0/1-character passphrase edges are covered | `spec/integration/secrets_api_spec.rb` | — |
 | K-28 | — | **Resolved 2026-11-11:** Vitest covers the API client and `e2e/journey.mjs` is a committed puppeteer journey (create → reveal → gone + passphrase); CI runs it against the Compose stack | `frontend/src/lib/api.test.ts`, `e2e/`, `ci.yml` | — |
 | K-29 | — | **Resolved 2026-11-11:** strict CSP, HSTS (under SSL), COOP/CORP, and Permissions-Policy are sent on every response and verified in the browser | `app.rb`, `web_spec.rb` | — |
 | K-30 | S4 | Visual parity is unmeasured: no original screenshots exist (K-22), so token values and layout were not compared | `replica/design/`, K-22 | Capture reference screens with the user present; use `/replica-diff` |

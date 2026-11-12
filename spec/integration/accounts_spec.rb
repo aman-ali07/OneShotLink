@@ -264,6 +264,26 @@ RSpec.describe "Simple-mode accounts" do
       end
     end
 
+    it "removes nothing when the transaction fails" do
+      simple do
+        signup("atomic@example.com")
+        post_json("/api/v3/secret/conceal", { secret: "still here", ttl: 1800 })
+        key = JSON.parse(last_response.body)["secret_key"]
+        session_digest = Onetime::Models::Session.digest(rack_mock_session.cookie_jar["ots_session"])
+
+        # A crash between the first and the last command must leave no partial
+        # state behind: the account, its receipts and its sessions all survive.
+        allow(Onetime::Store.redis).to receive(:multi).and_raise(RuntimeError, "simulated crash")
+        delete_json("/api/v3/account", { password: PASSWORD })
+        allow(Onetime::Store.redis).to receive(:multi).and_call_original
+
+        expect(last_response.status).to eq(500)
+        expect(Onetime::Models::Customer.find_by_email("atomic@example.com")).not_to be_nil
+        expect(Onetime::Store.redis.exists(Onetime::Models::Secret.receipt_key(key))).to be(1)
+        expect(Onetime::Store.redis.exists("session:#{session_digest}")).to be(1)
+      end
+    end
+
     it "refuses without the password and deletes nothing" do
       simple do
         signup

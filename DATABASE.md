@@ -127,6 +127,10 @@ passphrase.
   `EX SESSION_TTL`. The cookie carries the raw token; Redis stores only its digest.
   Sliding expiry refreshes on each authenticated request. Signout deletes the key.
 - Owner receipts are pruned lazily: a listed zset member with no receipt hash is removed.
+- Account deletion reads the receipt zset and the session set, then removes the receipts,
+  the owner index, every session record, the session index, the email index and the
+  customer record in a single `MULTI`/`EXEC` (`Logic::DeleteAccount`). A crash cannot leave
+  a half-deleted account. Secrets still inside their TTL are left to expire.
 
 ## 6. Invariants
 
@@ -136,8 +140,9 @@ passphrase.
    outlive the secret. Both are written in one `MULTI`.
 4. A reveal deletes the secret key and the receipt; a failed passphrase deletes nothing.
 5. `GET`+`DEL` for a reveal is prohibited — only `Store.consume` (Lua compare-and-delete).
-6. Data written under one `SECRET` is undecryptable under another; rotation is not
-   supported yet (T-65).
+6. Data written under one `SECRET` is undecryptable under another; `bin/ots rotate-key`
+   re-encrypts existing records under a new key and preserves their TTL (T-65).
+7. Account deletion is one transaction: either every account key is gone or none is (§5).
 
 ## 7. Expiry, memory, and operations
 

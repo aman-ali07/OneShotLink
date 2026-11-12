@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   concealSecret,
+  deleteAccount,
   errorMessage,
   getConfig,
   revealSecret,
@@ -91,6 +92,36 @@ describe("revealSecret", () => {
       name: "ApiError",
       status: 401,
       code: "invalid_passphrase",
+    });
+  });
+});
+
+describe("deleteAccount", () => {
+  it("sends DELETE with the password and same-origin credentials", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await deleteAccount({ password: "correct horse battery" });
+
+    expect(result).toEqual({ ok: true });
+    const [path, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(path).toBe("/api/v3/account");
+    expect(init.method).toBe("DELETE");
+    expect(JSON.parse(String(init.body))).toEqual({ password: "correct horse battery" });
+    expect(init.credentials).toBe("same-origin");
+  });
+
+  it("surfaces a rejected password as a typed error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({ error: { code: "invalid_credentials", message: "That password is not correct." } }, 401),
+      ),
+    );
+
+    await expect(deleteAccount({ password: "wrong" })).rejects.toMatchObject({
+      status: 401,
+      code: "invalid_credentials",
     });
   });
 });

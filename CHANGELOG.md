@@ -9,6 +9,22 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Changed (account deletion is atomic, 2026-11-12) — verified
+
+- **`DeleteAccount` runs as one Redis `MULTI`/`EXEC` instead of a chain of single commands.**
+  Receipts, the owner index, every session record, the session index and the customer keys
+  are queued after the two set reads and applied together, so a crash part-way through can
+  no longer leave a half-deleted account (some receipts gone, the account still signed in).
+  `Models::Session.digest_key` now owns the `session:<digest>` key shape so the deletion path
+  and `Session.revoke_all` cannot drift apart.
+- Account deletion is covered on all three levels it was missing: a new integration spec
+  proves nothing is removed when the transaction fails, two Vitest cases pin the client call
+  (`DELETE` + password body + `same-origin`) and the typed `401`, and the committed browser
+  journey now deletes the account and checks `/api/v3/account/me` returns `401` afterwards.
+
+Verified: `bundle exec rspec` → 110 examples, 0 failures; `npm --prefix frontend test` →
+11 passing; `node e2e/accounts.mjs` and `node e2e/journey.mjs` against a live Puma `ok`.
+
 ### Added (account deletion, 2026-11-11) — verified
 
 - **`DELETE /api/v3/account`** deletes the signed-in account: it asks for the password again

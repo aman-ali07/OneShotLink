@@ -83,6 +83,35 @@ try {
 
   const storage = await page.evaluate(() => JSON.stringify(localStorage));
   assert(storage === "{}", `localStorage should stay empty, got ${storage}`);
+
+  // Account deletion is the last step: it ends the session for good.
+  await page.waitForSelector("#delete-password");
+  await page.type("#delete-password", password);
+  const deleteButton = await page
+    .$$("button")
+    .then(async (buttons) =>
+      Promise.all(
+        buttons.map(async (button) => ({ button, text: await button.evaluate((el) => el.textContent.trim()) })),
+      ),
+    )
+    .then((items) => items.find((item) => item.text === "Delete my account")?.button);
+  assert(deleteButton, "delete account button not found");
+  await deleteButton.click();
+  await page.waitForFunction(() => location.pathname === "/", { timeout: 10000 });
+
+  const meStatus = await page.evaluate(async () => (await fetch("/api/v3/account/me")).status);
+  assert(meStatus === 401, `deleted account still resolves, me returned ${meStatus}`);
+
+  await page.goto(`${base}/signin`, { waitUntil: "networkidle0" });
+  await page.type("#email", email);
+  await page.type("#password", password);
+  await page.click("button[type=submit]");
+  await page.waitForSelector("main");
+  assert(
+    (await page.evaluate(() => location.pathname)) === "/signin",
+    "signed in after the account was deleted",
+  );
+
   assert(errors.length === 0, `browser errors: ${errors.join("; ")}`);
   console.log("accounts journey ok");
 } finally {

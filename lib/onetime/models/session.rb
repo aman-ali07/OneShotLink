@@ -22,7 +22,13 @@ module Onetime
       end
 
       def key(token)
-        "#{PREFIX}#{digest(token)}"
+        digest_key(digest(token))
+      end
+
+      # The hash record is keyed by the digest, so revocation paths that already
+      # hold digests (the customer's session index) can address it directly.
+      def digest_key(digest)
+        "#{PREFIX}#{digest}"
       end
 
       def index_key(customer_id)
@@ -73,7 +79,7 @@ module Onetime
         digests = Store.redis.smembers(index_key(customer_id))
         doomed = digests.reject { |d| d == keep }
         Store.redis.srem(index_key(customer_id), doomed) unless doomed.empty?
-        doomed.each { |d| Store.redis.del("#{PREFIX}#{d}") } unless doomed.empty?
+        doomed.each { |d| Store.redis.del(digest_key(d)) } unless doomed.empty?
         doomed.length
       end
     end

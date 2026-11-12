@@ -7,7 +7,7 @@ Keep this file current when planning or landing work. IDs are stable; do not ren
 
 Checkpoint date: 2026-11-11. **M0–M3, production packaging, and the in-repo production-hardening gates are complete.**
 Ruby/Bundler are not installed on the host, so every Ruby check runs in Docker
-(`ruby:3.3-slim` + build tools); **92 specs pass** against Redis DB 15. The app runs in a
+(`ruby:3.3-slim` + build tools); **110 specs pass** against Redis DB 15. The app runs in a
 non-root production image with a two-worker Puma cluster (Puma 7.2.1), Redis persistence,
 hardened headers, trusted-proxy handling, redacted logs, audit stream, Compose packaging,
 CI, and dependency scanning. A headless-Chrome journey completed create → copy link →
@@ -36,7 +36,7 @@ customer management. **92 backend specs pass.** Remaining items are infrastructu
 | T-24 | API v1 (`/api/v1/share`, `/api/v1/secret/:key`) | DONE | `spec/integration/secrets_api_spec.rb` | Legacy shape; form **and** JSON create; GET/POST reveal; second call `404` |
 | T-25 | API v3 guest routes (conceal/reveal) | DONE | `spec/integration/secrets_api_spec.rb` | `201` create / `200` reveal; passphrase flow; owner aliases fail closed until sessions (M3) |
 | T-26 | Rate limits on conceal/reveal with `Retry-After` | DONE | `lib/onetime/web/app.rb`, integration spec | `429` + `Retry-After` on v1 and v3; rejected reveals do not consume; client IP honors `TRUSTED_PROXIES` (K-16 closed) |
-| T-27 | Integration specs: lifecycle, TTL, encryption-at-rest, concurrent reveal | DONE | `spec/integration/secrets_api_spec.rb` | Create/reveal/gone, expiry, ciphertext-only Redis, 8-way race → exactly one `200`; 94 specs total today |
+| T-27 | Integration specs: lifecycle, TTL, encryption-at-rest, concurrent reveal | DONE | `spec/integration/secrets_api_spec.rb` | Create/reveal/gone, expiry, ciphertext-only Redis, 8-way race → exactly one `200`; 110 specs total today |
 | T-42 | `/api/v3/config` endpoint (TTL options, auth mode, UI flags) | DONE | `lib/onetime/web/app.rb`, `spec/integration/web_spec.rb` | Response verified live; UI can render options without duplication |
 | T-48 | Decide passphrase-model parity | DONE | `docs/DECISIONS.md` D-012, `SECURITY.md`, `KNOWN_ISSUES.md` K-21 | Keep instance-key encryption + Argon2 gate; no zero-knowledge claim; deliberate parity gap |
 | T-45 | Security headers (CSP, HSTS when SSL, nosniff, frame deny) | DONE | `lib/onetime/web/app.rb`, `spec/integration/web_spec.rb` | CSP/COOP/CORP/Permissions-Policy on every response; HSTS only under `SSL=true`; verified live |
@@ -45,7 +45,7 @@ customer management. **92 backend specs pass.** Remaining items are infrastructu
 | T-51 | Minimal Compose stack (web + Redis 7, AOF, healthchecks) | DONE | `compose.yaml` | Two workers; Redis AOF/noeviction; lifecycle verified through the container |
 | T-52 | `.env.example` + DEPLOYMENT env contract | DONE | `.env.example`, `DEPLOYMENT.md` | Proxy, Redis timeout, Puma, and SSL semantics documented |
 | T-54 | CI: rspec, frontend tests/typecheck/build, container smoke | DONE | `.github/workflows/ci.yml` | Redis DB 15 service; Vitest; Compose lifecycle + committed browser E2E; not yet executed on GitHub |
-| T-79 | Account deletion (launch blocker B1) | DONE | `lib/onetime/logic/delete_account.rb`, `web/app.rb`, `DashboardView.vue`, `spec/integration/accounts_spec.rb` | `DELETE /api/v3/account` re-authenticates, then removes record + email index + sessions + receipts and clears the cookie; live secrets expire on their own TTL. 5 specs; Roda has no `r.delete`, so the route uses `r.is(method: "DELETE")` |
+| T-79 | Account deletion (launch blocker B1) | DONE | `lib/onetime/logic/delete_account.rb`, `web/app.rb`, `DashboardView.vue`, `spec/integration/accounts_spec.rb`, `frontend/src/lib/api.test.ts`, `e2e/accounts.mjs` | `DELETE /api/v3/account` re-authenticates, then removes record + email index + sessions + receipts and clears the cookie; live secrets expire on their own TTL. 6 specs incl. an all-or-nothing failure case, 2 Vitest cases, and an E2E delete step; Roda has no `r.delete`, so the route uses `r.is(method: "DELETE")` |
 | T-75 | Committed frontend unit/E2E tests | DONE | `frontend/src/lib/api.test.ts`, `e2e/journey.mjs` | 9 Vitest tests; puppeteer journey covers create/reveal/gone and wrong/correct passphrase; verified locally |
 | T-78 | Build the landing page from `replica/launch/landing.md` | DONE (site; not deployed) | `site/index.html`, `site/privacy.html`, `site/terms.html`, `site/styles.css`, `site/favicon.svg` | Static site, not a Vue route (the instance is the product). Verified with headless Chrome at 1280/375px: all files 200, no page overflow, even 55–56px section gaps, rendered contrast 16.74:1 / 7.30:1 / 5.47:1, only decorative hairline rule below 3:1. No third-party requests |
 | T-30 | Vite 6 + Vue 3 + TS + Tailwind 4 scaffold; dev proxy | DONE | `frontend/`, `vite.config.ts`, `package-lock.json` | `npm run build` passes typecheck and emits `../public/app`; dev proxies `/api` |
@@ -70,13 +70,13 @@ order; each reads the previous output. See AGENTS.md for the clean-room rules.
 | R-02 | architect | DONE | `replica/architecture.md` | Stack fixed to the brief; Redis schema referenced; build order starts with the vertical slice |
 | R-03 | design | DONE | `replica/design/tokens.json`, `tokens.css`, `components.md` | 12 contrast pairs, 0 AA failures; no original assets/fonts; primitives land in M2 (`frontend/`) |
 | R-04 | build | DONE | API + Vue vertical slice; headless browser journey verified | Create → link → reveal → gone works end to end before other screens |
-| R-05 | backend | IN PROGRESS | Limits/health/atomic reveal done; sessions are M3 | Auth/session/rate-limit wiring; security checklist in SECURITY.md satisfied |
-| R-06 | test | IN PROGRESS | Lifecycle/v1/v3/race/expiry covered by 12 integration specs; browser E2E is M2/M4 | F01/F02 happy paths + reveal race, wrong passphrase, expiry covered |
-| R-07 | diff | IN PROGRESS | `replica/parity.md`: baseline 5.8, M1 54.8 (9/11), M2 60.6 (10/11), R-08 63.0 (11/11); re-score after M3 | Baseline recorded at 5.8/100 with 0/11 must-haves; re-run after each milestone |
+| R-05 | backend | DONE | Limits/health/atomic reveal done; sessions shipped in M3 | Auth/session/rate-limit wiring; security checklist in SECURITY.md satisfied |
+| R-06 | test | DONE | Lifecycle/v1/v3/race/expiry covered by integration specs; two committed browser journeys exercise create/reveal/gone and signup/receipt/signout/signin/delete | F01/F02 happy paths + reveal race, wrong passphrase, expiry covered |
+| R-07 | diff | DONE | `replica/parity.md`: baseline 5.8, M1 54.8 (9/11), M2 60.6 (10/11), R-08 63.0 (11/11) | Baseline recorded at 5.8/100 with 0/11 must-haves; re-run after each milestone |
 | R-08 | entrepreneur | DONE | `replica/fixes.md`, `replica/reviews.csv`, `replica/feedback.md`, `replica/themes-secrets.json` | 20 real linked records from 3 reachable sources (HN 17, Security SE 2, SO 1); Reddit 403 and no mobile app stated as unreachable; every theme flagged thin where <3 reviews or 1 source |
 | R-09 | brand | DONE | `replica/brand.md`, `replica/brand.json`, rename across code/docs | Name **OneShotLink**; palette re-measured (12 pairs, 0 AA failures); sweep exits 0. Domains/registries/GitHub checked; trademark, store and social-handle checks are listed as **to run** in brand.md §2 and are not claimed done |
 | R-10 | launch | DONE (docs) | `replica/launch/landing.md`, `pricing.md`, `listing.json`, `launch-plan.md` | Angle A from `fixes.md`; pricing read from the original's public page + Bitwarden on 2026-11-11 (no billing complaints in the 20-record sample — stated as a gap, not a green light); `listing.py` exits 0. The landing page itself is built as a static site in `site/` (T-78), not as an app route; managed tier is unsellable until the preflight gate passes on a real host |
-| R-11 | deploy | IN PROGRESS | `replica/deploy.md` (filled checklist). No go: **B1** no account deletion, **B2** legal pages written but no domain, **B3** placeholder favicon / no OG image, **B4** trademark screening unrun, **B5** preflight not yet green on a real host, **B6** host firewall rule unapplied. Nothing deployed; no live keys | Preflight green, user approval recorded, no live keys committed |
+| R-11 | deploy | IN PROGRESS | `replica/deploy.md` (filled checklist). No go: **B2** legal pages written but no domain, **B3** placeholder favicon / no OG image, **B4** trademark screening unrun, **B5** preflight not yet green on a real host, **B6** host firewall rule unapplied (B1 account deletion landed with T-79). Nothing deployed; no live keys | Preflight green, user approval recorded, no live keys committed |
 
 Recon limits to keep in mind: no screenshot capture tool and no account access were
 available, so 16 of 20 screens are inferred and marked as such. Do not upgrade their
@@ -157,5 +157,6 @@ lifecycle create → reveal → gone verified through Compose; OpenAPI served at
 `/api/v3/openapi.json`; key rotation verified live (21 secrets, old key fails, new key
 reads); backup/restore verified live (deleted secret 404 → restored → decrypts); load test
 verified 400 secrets × 8-way race with 0 double reveals; `bundler-audit` and `npm audit`
-report 0 vulnerabilities. Backend suite: `92 examples, 0 failures`; frontend: 9 Vitest
-tests; account E2E passes.
+report 0 vulnerabilities. Backend suite: `110 examples, 0 failures`; frontend: 11 Vitest
+tests; both committed browser journeys (create/reveal/gone and
+signup/receipt/signout/signin/delete) pass against a live Puma on Redis DB 15.
