@@ -32,7 +32,9 @@ last rule is the D-012 constraint expressed as naming policy.
 
 ## 2. The checks — run vs. to run
 
-Run on **2026-11-12** from this machine (2026-11-11 rows below were re-verified today):
+Run on **2026-11-12** from this machine (2026-11-11 rows below were re-verified today).
+Every zero result was paired with a control query, because two of this session's searches
+looked clean while the search box was silently ignoring the query.
 
 | Check | Method | Result |
 | --- | --- | --- |
@@ -46,19 +48,26 @@ Run on **2026-11-12** from this machine (2026-11-11 rows below were re-verified 
 | Apple App Store (US) | iTunes Search API `term=OneShotLink&entity=software` | 5 fuzzy results (Flickr, Hunch, Uhale, SayHi, Frameo) — **no exact match named OneShotLink** |
 | Google Play (US) | headless Chrome on the Play Store search | **"No results for OneShotLink"** |
 | USPTO wordmark | headless Chrome on `tmsearch.uspto.gov`, typed query, **control = `verizon` → 177 results** | **"No results found" for `oneshotlink`** — the wordmark search returns no marks. (The filter sidebar showed live/registered/dead counts at 0 on the first load; the exact "no results" verdict is from the controlled run.) |
+| EUIPO eSearch (EU trade marks) | headless Chrome, hash-route query, **control = `verizon` → Trade marks (27)** | **Trade marks (0)**, "no results were found using the criteria introduced" |
+| TMview (multi-office) | headless Chrome, results route, **control = `verizon` → 71 results** | **"No rows found"** for `oneshotlink`. Office coverage of the zero result is **not** established, so it is not read as covering Canada or WIPO |
+| CIPO (Canada) — **owner name** field | headless Chrome, form submit, **control = `verizon` → Results found: 50** | **Results found: 0** for `oneshotlink`. This is an owner-name search, not a trade-mark-name search |
 
-**Still to run — no result is claimed for any of these, and the blocker is named:**
+**Still to run — no result is claimed for any of these, and the blocker is named.**
+[`screening-checklist.md`](screening-checklist.md) turns this list into paste-and-record steps
+with the URLs, the class numbers to look for, and what to write down.
 
 - **Adjacent US marks** (`oneshot`, `one-shot`, `one shot link` in classes 9/42): not run.
   After the `oneshotlink` query, `tmsearch.uspto.gov` stopped serving its search box to
   automated requests (rate-limit/bot wall), so a human should run these in a browser.
-- **EU (EUIPO eSearch / TMview):** TMview rejects requests ("Request Rejected" WAF page);
-  EUIPO eSearch is a JS app that needs a session. Not claimed.
+- **Canada trade-mark name field:** only the *owner name* field was searched (0 results); the
+  trade-mark-name query is unrun because the field value could not be confirmed and CIPO
+  then refused automated requests.
 - **WIPO Global Brand Database:** behind an `altcha` CAPTCHA; not claimed.
-- **Canada (ISED):** JS-only trademark search; not attempted from this machine.
-- **Handles on X, Instagram, TikTok, YouTube, Reddit:** unconfirmed — login walls and `403`
-  from this machine; check in a browser. GitHub is the one handle that is freely checkable
-  and is free (`404`).
+- **TMview office coverage:** the zero result stands, but which offices TMview covers for
+  this query was not established, so it is not treated as covering Canada or WIPO.
+- **Handles on X, Instagram, TikTok, YouTube, Reddit:** unconfirmed — `200`/`403` behind
+  login walls from this machine; check in a browser. GitHub is the one handle that is freely
+  checkable and is free (`404`).
 - **Open web search for `OneShotLink` plus the category:** the web-search tool failed again
   this session (3 attempts, provider error), so the existence/conflict sweep is still unrun.
 
