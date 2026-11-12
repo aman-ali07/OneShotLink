@@ -69,6 +69,18 @@ export REDIS_PASSWORD="${REDIS_PASSWORD:-$(openssl rand -hex 24)}"
 export APP_PORT=3000 HOST="$DOMAIN" SSL=true AUTH_MODE=simple
 export TRUST_PROXY=true TRUSTED_PROXIES=172.16.0.0/12
 
+# The "reachable Redis must FAIL" case below can only work if the host can actually
+# reach the container IP. On a hardened host the DEPLOYMENT 4.0 rule denies the
+# production subnet (REDIS_SUBNET, default 10.77.13.0/24) for every host process, so
+# a stack on that subnet makes the negative control vacuous: preflight passes and the
+# self-test reports a failure it did not find. Give the self-test stack its own
+# subnet, outside the rule, so the case tests the gate rather than the host firewall.
+export REDIS_SUBNET="${PF_REDIS_SUBNET:-172.30.99.0/24}"
+if [ "$REDIS_SUBNET" = "10.77.13.0/24" ]; then
+  echo "PF_REDIS_SUBNET must differ from the production subnet" >&2
+  exit 2
+fi
+
 docker compose up -d >/dev/null 2>&1 || { echo "compose up failed" >&2; exit 1; }
 
 healthy=0
@@ -120,8 +132,9 @@ expect() { # expect <wanted: pass|fail> <label> <cmd...>
 }
 
 # --- cases --------------------------------------------------------------------
-# The Redis reachability check is skipped in these cases: this host can reach the
-# container IP, so asserting it here would only test the machine's firewall.
+# The TLS cases skip the Redis checks (--skip-redis): they are about the certificate,
+# the headers and the redirect. Redis isolation gets its own case below, on a subnet
+# the host's production firewall rule does not cover.
 info "case: healthy config must PASS"
 check_good() { define_preflight --skip-redis >/dev/null; }
 expect pass "TLS, headers, cookie and redirect all green" check_good

@@ -26,6 +26,21 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   revealed `200` with full content once `maxmemory` was raised. DEPLOYMENT.md §9 says so,
   including that TTLs keep running while storage is full.
 
+### Fixed (the go-live self-test passed for the wrong reason, 2026-11-12) — verified
+
+- `script/preflight_selftest.sh` re-run after the Redis host rule became durable: **4/5**.
+  The "reachable Redis must FAIL the isolation check" case reported *"wanted fail, got exit
+  0"* — because the self-test's own stack used the production subnet, which the host
+  firewall now denies to every host process, so a reachable Redis could not be created and
+  the case had nothing to catch.
+- The self-test stack now gets its own subnet (`PF_REDIS_SUBNET`, default
+  `172.30.99.0/24`) and refuses the production subnet outright. Re-run: **5/5 PASSED**, so
+  the gate is still proven to fail on a bad certificate, a plain-HTTP 200, and a reachable
+  Redis — not merely to print PASS.
+- Also re-verified afterwards: the self-test leaves no containers, networks or volumes; the
+  `AUTH_MODE=simple` browser journey is green; `/metrics` answers `404` while
+  `METRICS_ENABLED` is off.
+
 ### Fixed (a link preview can no longer burn a secret through the API, 2026-11-12) — verified
 
 - `GET /api/v3/guest/secret/:key` **consumed** the secret. The share link was always safe —

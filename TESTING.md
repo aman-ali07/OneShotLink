@@ -225,7 +225,11 @@ passphrase. It fails on any page/console error, plaintext in the URL, or localSt
 `typecheck`, `build`; container job builds the image, boots Compose for a
 create → reveal → gone smoke test, runs the committed browser E2E, runs the load test,
 then runs `script/preflight_selftest.sh` so the go-live gate keeps failing on bad
-configs. CI runs on every push (K-32 closed; the first real run found the load-test env
+configs. The self-test proves the gate both ways: it passes on a good stack and fails on a
+bad certificate, a plain-HTTP 200, and a host-reachable Redis. That last case needs a
+reachable Redis, so the self-test stack gets its own subnet (`PF_REDIS_SUBNET`, default
+`172.30.99.0/24`) — on a hardened host the production subnet is denied to every host
+process, which would otherwise make the case pass for the wrong reason. CI runs on every push (K-32 closed; the first real run found the load-test env
 bug). Tests must not require network access beyond gem/npm installs and image pulls.
 Fail the build on any unhandled promise rejection or Ruby warning promoted by `.rspec`
 (`--warnings` once clean).
