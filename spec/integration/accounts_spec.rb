@@ -155,7 +155,7 @@ RSpec.describe "Simple-mode accounts" do
         expect(receipts.map { |r| r["identifier"] }).to eq([key])
         expect(receipts.first["secret_url"]).to eq("/secret/#{key}")
 
-        get "/api/v3/guest/secret/#{key}"
+        post_json("/api/v3/guest/secret/#{key}/reveal", {})
         expect(last_response.status).to eq(200)
 
         get "/api/v3/account/receipts"
@@ -258,7 +258,7 @@ RSpec.describe "Simple-mode accounts" do
         expect(Onetime::Store.redis.exists(Onetime::Models::Secret.receipt_key(key))).to be(0)
 
         clear_cookies
-        get "/api/v3/guest/secret/#{key}"
+        post_json("/api/v3/guest/secret/#{key}/reveal", {})
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["secret_value"]).to eq("already sent")
       end

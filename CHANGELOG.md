@@ -26,6 +26,26 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   revealed `200` with full content once `maxmemory` was raised. DEPLOYMENT.md §9 says so,
   including that TTLs keep running while storage is full.
 
+### Fixed (a link preview can no longer burn a secret through the API, 2026-11-12) — verified
+
+- `GET /api/v3/guest/secret/:key` **consumed** the secret. The share link was always safe —
+  the SPA reveals only on an explicit confirm — but anyone pasting an API URL into Slack or
+  Teams had it destroyed by the unfurl before the recipient clicked (K-35).
+- GET now returns metadata and never touches the record: `{"passphrase_required": …,
+  "metadata": {kind, filename, created_at, ttl}}`. **`POST …/reveal` is the only route that
+  spends a secret.** Nothing is decrypted on a peek, so a rotated `SECRET` answers `200`
+  instead of turning a status check into a `500`.
+- The SPA already revealed via POST, so the UI is unchanged; API clients that relied on GET
+  must switch to `POST …/reveal`. The frozen v1 contract is untouched — `GET
+  /api/v1/secret/:key` still consumes, and API.md §4 says link the UI, not a v1 API URL.
+- Verified through the production image: three GETs in a row → `200` metadata
+  each time with the key intact, `POST` → `200` with the value, next `GET` → `404`; a
+  protected secret → `passphrase_required: true` with no content, `POST {}` → `401
+  passphrase_required`, correct passphrase → `200`.
+- `script/loadtest.rb` raced GETs for its single-use invariant, which would have counted 8
+  winners per key after this change; it races `POST …/reveal` now — 100/100 revealed exactly
+  once. Browser journey green. Specs 116.
+
 ### Verified (the deployment path still holds after the ceiling change, 2026-11-12)
 
 - `script/tls-rehearsal.sh --with-redis` → **`PREFLIGHT PASSED` (0 skipped)**, exit 0: 7 TLS

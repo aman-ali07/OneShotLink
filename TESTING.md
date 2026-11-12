@@ -142,6 +142,7 @@ check name resolution or a public chain. Ports default to `13457`/`18443`/`18088
 | --- | --- |
 | Create → reveal | `201` then `200` with the exact plaintext |
 | Reveal twice | second call `404`, body has `not_found`, no plaintext |
+| GET never consumes | `GET …/secret/:key` twice → both `200` metadata, no `secret_value`; `POST …/reveal` → `200`; then `GET` → `404` (K-35) |
 | Expiry | create with `ttl=1`, sleep past it, reveal `404`; Redis `TTL` was positive before |
 | Concurrent reveal | N=2..10 parallel requests → exactly one `200`, rest `404`; Redis key gone |
 | Wrong passphrase | `401 invalid_passphrase`; record still present; correct passphrase then succeeds |

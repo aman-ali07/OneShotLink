@@ -20,7 +20,8 @@ configurable TTL.
 
 - Vue 3 SPA: conceal form, config-driven TTL, optional passphrase, one-time link with
   copy, reveal confirmation, passphrase prompt, and destroyed state.
-- No auto-reveal on page load (link previews cannot burn a secret).
+- No auto-reveal on page load and no consuming GET: link previews cannot burn a secret,
+  through the UI or the v3 API.
 - `POST /api/v3/guest/conceal` and `GET|POST /api/v3/guest/secret/:key[/reveal]`.
 - Legacy `POST /api/v1/share` and `GET|POST /api/v1/secret/:key` (form or JSON).
 - Encryption at rest with AES-256-GCM; plaintext never enters Redis.

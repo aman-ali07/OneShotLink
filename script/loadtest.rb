@@ -84,10 +84,11 @@ workers = Array.new(THREADS) do
         break
       end
       ok = 0
-      # N concurrent attempts at the same key; exactly one may win.
+      # N concurrent attempts at the same key; exactly one may win. Revealing is
+      # POST .../reveal — a GET only describes the key and never consumes it.
       8.times.map do
         Thread.new do
-          res = get("/api/v3/guest/secret/#{key}")
+          res = post("/api/v3/guest/secret/#{key}/reveal", {})
           result_mutex.synchronize { ok += 1 if res.code.to_i == 200 }
         end
       end.each(&:join)

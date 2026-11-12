@@ -10,13 +10,15 @@ RSpec.describe "Secret lifecycle API" do
     JSON.parse(last_response.body)
   end
 
+  # Revealing is always POST: a GET must never consume a secret, or a link
+  # preview in a chat client would burn it (K-35).
   def reveal_v3(key, passphrase: nil)
-    if passphrase.nil?
-      get "/api/v3/guest/secret/#{key}"
-    else
-      post "/api/v3/guest/secret/#{key}/reveal",
-           JSON.generate(passphrase: passphrase), JSON_HEADERS
-    end
+    body = passphrase.nil? ? {} : { passphrase: passphrase }
+    post "/api/v3/guest/secret/#{key}/reveal", JSON.generate(body), JSON_HEADERS
+  end
+
+  def peek_v3(key)
+    get "/api/v3/guest/secret/#{key}"
   end
 
   def with_env(vars)
@@ -28,6 +30,46 @@ RSpec.describe "Secret lifecycle API" do
   end
 
   describe "v3 guest conceal/reveal" do
+    it "never consumes a secret on GET, so a link preview cannot burn it" do
+      key = create_v3(secret: "preview-safe", ttl: 1800)["secret_key"]
+
+      peek_v3(key)
+      expect(last_response.status).to eq(200)
+      peek_body = JSON.parse(last_response.body)
+      expect(peek_body).not_to have_key("secret_value")
+      expect(peek_body["passphrase_required"]).to be(false)
+      expect(peek_body.dig("metadata", "kind")).to eq("text")
+
+      # A second preview still finds it: the key was not spent.
+      peek_v3(key)
+      expect(last_response.status).to eq(200)
+
+      reveal_v3(key)
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["secret_value"]).to eq("preview-safe")
+
+      peek_v3(key)
+      expect(last_response.status).to eq(404)
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq("not_found")
+    end
+
+    it "reports a protected secret as gated without revealing or consuming it" do
+      key = create_v3(secret: "gated", ttl: 1800, passphrase: "hunter2-long")["secret_key"]
+
+      peek_v3(key)
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["passphrase_required"]).to be(true)
+      expect(last_response.body).not_to include("gated")
+
+      post "/api/v3/guest/secret/#{key}/reveal", JSON.generate({}), JSON_HEADERS
+      expect(last_response.status).to eq(401)
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq("passphrase_required")
+
+      post "/api/v3/guest/secret/#{key}/reveal", JSON.generate(passphrase: "hunter2-long"), JSON_HEADERS
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["secret_value"]).to eq("gated")
+    end
+
     it "creates a secret and reveals it exactly once" do
       created = create_v3(secret: "s3cr3t-value")
       key = created["secret_key"]
@@ -197,7 +239,7 @@ RSpec.describe "Secret lifecycle API" do
       post "/api/v3/guest/conceal", JSON.generate(secret: "p0", ttl: 1800, passphrase: ""), JSON_HEADERS
       expect(last_response.status).to eq(201)
       key = JSON.parse(last_response.body)["secret_key"]
-      get "/api/v3/guest/secret/#{key}"
+      reveal_v3(key)
       expect(last_response.status).to eq(200)
 
       # A single character is a real passphrase and must be enforced.

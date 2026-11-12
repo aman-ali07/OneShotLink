@@ -173,11 +173,24 @@ must never degrade quietly.
 
 ### 5.2 Reveal
 
-`GET /api/v3/guest/secret/:key` — no body; a protected secret returns
-`401 passphrase_required`.
-`POST /api/v3/guest/secret/:key/reveal` — JSON body `{"passphrase": "..."}` (`{}` is
-valid for unprotected secrets).
-Authenticated equivalents: `/api/v3/secret/:key` and `/api/v3/secret/:key/reveal`.
+`POST /api/v3/guest/secret/:key/reveal` is the **only** route that spends a secret. JSON
+body `{"passphrase": "..."}` (`{}` is valid for unprotected secrets). Authenticated
+equivalent: `POST /api/v3/secret/:key/reveal`.
+
+`GET /api/v3/guest/secret/:key` **describes** the secret and never touches it, so a chat
+client's link preview cannot burn it:
+
+```json
+{
+  "passphrase_required": false,
+  "metadata": { "kind": "text", "filename": null, "created_at": 1762819200, "ttl": 86400 }
+}
+```
+
+`404 not_found` (unknown/expired/consumed) and `429 rate_limited` apply to both. The
+authenticated `GET /api/v3/secret/:key` behaves the same way but requires a session.
+The frozen v1 contract is different: `GET /api/v1/secret/:key` **does** consume (§4) —
+link the UI, not a v1 API URL.
 
 The passphrase is an **access gate**, not a second encryption key (D-012): content is
 encrypted with the instance `SECRET`, and the Argon2id hash is verified before the
@@ -192,7 +205,7 @@ atomic delete. Do not describe this as zero-knowledge.
 }
 ```
 
-Errors:
+Errors (on the `reveal` POST):
 
 - `401 passphrase_required` — no passphrase sent; the secret still exists.
 - `401 invalid_passphrase` — wrong passphrase; the secret still exists.

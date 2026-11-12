@@ -72,9 +72,10 @@ the host gates close**.
   is not a second encryption key, and we do not call this zero-knowledge because it is not.
   If the server cannot read it, don't put it on a server you don't control — that is the
   self-host argument, not a feature.
-- **Will a chat preview burn my link?** Not through the share link — the secret is consumed
-  only when the recipient confirms. A direct `GET /api/v3/guest/secret/:key` does consume;
-  treat the API as a reveal, not a status check.
+- **Will a chat preview burn my link?** No, on either path. The share link is consumed only
+  when the recipient confirms, and the v3 API's `GET /api/v3/guest/secret/:key` now returns
+  metadata only — `POST …/reveal` is the one route that spends the secret. (The frozen v1
+  contract still consumes on GET, so link the UI, not a v1 API URL.)
 - **Do I need an account?** No, on either end. Accounts add receipts and a dashboard, and
   they are optional.
 - **How long does a secret live?** You pick from a TTL allowlist when you create it; the

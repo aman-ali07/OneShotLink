@@ -260,6 +260,28 @@ module Onetime
         raise e
       end
 
+      # A GET describes the key and never touches it. Chat clients unfurl links, and
+      # a preview that consumed the record would hand the recipient a dead link; the
+      # irreversible step belongs to an explicit POST .../reveal (K-35). The record is
+      # not decrypted here either, so a rotated SECRET still answers 200 instead of 500.
+      def peek_payload(key)
+        pair = Models::Secret.fetch(key)
+        raise NotFound unless pair
+
+        record, = pair
+        json(
+          {
+            passphrase_required: record.key?("passphrase_hash"),
+            metadata: {
+              kind: record["kind"],
+              filename: record["filename"],
+              created_at: record["created_at"].to_i,
+              ttl: record["ttl"].to_i
+            }
+          }
+        )
+      end
+
       def cookies
         @cookies ||= Rack::Utils.parse_cookies(env)
       end
@@ -611,7 +633,7 @@ module Onetime
 
                 r.get true do
                   enforce_rate_limit!(:reveal)
-                  reveal_payload(key)
+                  peek_payload(key)
                 end
 
                 r.get(/.*/) { v3_not_found }
@@ -642,7 +664,7 @@ module Onetime
                 r.get true do
                   require_session!
                   enforce_rate_limit!(:reveal)
-                  reveal_payload(key)
+                  peek_payload(key)
                 end
 
                 r.get(/.*/) { v3_not_found }

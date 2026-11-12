@@ -76,11 +76,10 @@ module Onetime
           "/api/v3/guest/secret/{key}" => {
             "get" => op(
               "guest",
-              "Reveal a secret exactly once",
+              "Describe a secret without consuming it (link previews are safe; reveal is POST)",
               params: [key_param],
               responses: {
-                "200" => json_ref("RevealResponse"),
-                "401" => json_ref("Error"),
+                "200" => json_ref("PeekResponse"),
                 "404" => json_ref("Error"),
                 "429" => rate_limited,
 
@@ -91,7 +90,7 @@ module Onetime
           "/api/v3/guest/secret/{key}/reveal" => {
             "post" => op(
               "guest",
-              "Reveal a passphrase-protected secret",
+              "Reveal a secret exactly once (the only route that consumes it)",
               params: [key_param],
               body: "RevealRequest",
               responses: {
@@ -123,11 +122,11 @@ module Onetime
           "/api/v3/secret/{key}" => {
             "get" => op(
               "owner",
-              "Reveal a secret as the signed-in owner",
+              "Describe a secret as the signed-in owner without consuming it",
               params: [key_param],
               security: [{ cookie: [] }],
               responses: {
-                "200" => json_ref("RevealResponse"),
+                "200" => json_ref("PeekResponse"),
                 "401" => json_ref("Error"),
                 "404" => json_ref("Error"),
 
@@ -138,7 +137,7 @@ module Onetime
           "/api/v3/secret/{key}/reveal" => {
             "post" => op(
               "owner",
-              "Reveal a passphrase-protected secret as the signed-in owner",
+              "Reveal a secret exactly once as the signed-in owner",
               params: [key_param],
               body: "RevealRequest",
               security: [{ cookie: [] }],
@@ -389,6 +388,21 @@ module Onetime
               "type" => "object",
               "properties" => {
                 "secret_value" => { "type" => "string" },
+                "metadata" => {
+                  "type" => "object",
+                  "properties" => {
+                    "kind" => { "type" => "string" },
+                    "filename" => { "type" => %w[string null] },
+                    "created_at" => { "type" => "integer" },
+                    "ttl" => { "type" => "integer" }
+                  }
+                }
+              }
+            },
+            "PeekResponse" => {
+              "type" => "object",
+              "properties" => {
+                "passphrase_required" => { "type" => "boolean" },
                 "metadata" => {
                   "type" => "object",
                   "properties" => {
