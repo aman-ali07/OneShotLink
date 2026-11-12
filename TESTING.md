@@ -1,6 +1,6 @@
 # Testing
 
-> **Status: 113 backend examples, 0 failures (2026-11-12), plus two verified headless
+> **Status: 114 backend examples, 0 failures (2026-11-12), plus two verified headless
 > browser journeys and a Compose smoke test.** Ruby/Bundler are not installed on the
 > host, so backend tests run in the `ots-dev` Docker image against Redis DB 15. Lifecycle,
 > passphrase, TTL, at-rest encryption, concurrency, v1, rate limits, and simple-mode
@@ -76,7 +76,7 @@ server or a second suite can neither be flushed nor make a run under-report. Nev
 | `spec/unit/ops_spec.rb` | 8 | audit events/redaction, key rotation (re-encrypt, old key fails, TTL preserved), backup export/restore, sessions excluded |
 | `spec/unit/metrics_spec.rb` | 7 | exposition format, counters by family/status, duration, Redis up + memory ratio, `METRICS_ENABLED` gate |
 | `spec/unit/request_logger_spec.rb` | 3 | request fields, secret-key redaction, asset skip |
-| `spec/integration/web_spec.rb` | 11 | health + Redis-down 503, datastore-outage 503 on both API versions, config, CSP/HSTS, typed 404, SPA shell, HEAD |
+| `spec/integration/web_spec.rb` | 12 | health + Redis-down 503, datastore-outage 503 on both API versions (including a full Redis, not just a dropped one), config, CSP/HSTS, typed 404, SPA shell, HEAD |
 | `spec/integration/secrets_api_spec.rb` | 19 | v3 create/reveal/gone, at-rest, passphrase, race, expiry, undecryptable record survives, v1 form+JSON, validation, 413, exact-size boundary, empty/1-char passphrase, 429, proxy trust, auth-disabled fail-closed, full-mode 501 |
 | `spec/integration/accounts_spec.rb` | 23 | signup/cookie/at-rest, duplicate email, validation, signin/401, session TTL/deletion, signout, CSRF, owner isolation, password change, other-session revocation, atomic account deletion, audit trail, disabled/full gates |
 | `spec/integration/metrics_spec.rb` | 3 | `/metrics` off by default (`404`), text exposition when enabled, no secrets in the output |
@@ -85,7 +85,7 @@ server or a second suite can neither be flushed nor make a run under-report. Nev
 | `e2e/journey.mjs` | 1 journey | create → reveal → gone, wrong/correct passphrase, no console errors |
 | `e2e/accounts.mjs` | 1 journey | signup → owner receipt → reload → signout → signed-out prompt → signin → delete account |
 
-Backend total: **113 examples, 0 failures**; frontend: **11 Vitest tests, 0 failures**.
+Backend total: **114 examples, 0 failures**; frontend: **11 Vitest tests, 0 failures**.
 Not yet covered: tamper-through-HTTP (unit only — the integration spec stubs the decrypt).
 The exact size boundary is covered.
 

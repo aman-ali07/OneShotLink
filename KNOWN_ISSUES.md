@@ -1,9 +1,9 @@
 # Known issues and gaps
 
-Last reviewed: 2026-11-11. Severity: **S1** blocks use / security, **S2** blocks a
+Last reviewed: 2026-11-12. Severity: **S1** blocks use / security, **S2** blocks a
 feature, **S3** quality/operability, **S4** documentation/process.
 
-> The core has been executed: 113 backend specs pass in Docker against Redis DB 15, a live
+> The core has been executed: 114 backend specs pass in Docker against Redis DB 15, a live
 > Puma run completed create → reveal → gone (including a four-way reveal race), a
 > headless Chrome journey covered the built UI (including the passphrase path), and the
 > production Compose stack passed a lifecycle smoke test. "Verified"
@@ -20,7 +20,7 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-04 | — | **Resolved (M3):** simple-mode accounts, sessions, owner receipts, dashboard, and CLI create/reset are implemented | `spec/integration/accounts_spec.rb`, `e2e/accounts.mjs` | — |
 | K-33 | — | **Resolved 2026-11-11:** `bin/ots` supports create/reset-password/list/show/set-role/health/backup/restore/rotate-key/version, ships in the image, and was executed in the production container | `bin/ots`, `Dockerfile` | — |
 | K-34 | — | **Resolved 2026-11-11:** sessions are now indexed per customer (`customer:sessions:<id>`); changing a password calls `Session.revoke_all(keeping the caller)`, so every other live session is deleted. Verified live in the production container (other device → 401, caller → 200) and by `spec/unit/session_spec.rb`. Auth audit trail remains open (tracked separately). | `models/session.rb`, `web/app.rb`, `spec/unit/session_spec.rb` | — |
-| K-35 | S4 | The marketing claim "a link preview cannot burn your secret" is true of the **share link** (the SPA consumes only on an explicit confirm) but **not** of the v3 API: `GET /api/v3/guest/secret/:key` consumes the secret. Anyone pasting an API URL into a chat client will lose it | `lib/onetime/web/app.rb:570-573`, `RevealView.vue` | Landing/FAQ copy states the API caveat (`replica/launch/landing.md` §6); revisit if an API status endpoint or preview-safe GET is added |
+| K-35 | S4 | The marketing claim "a link preview cannot burn your secret" is true of the **share link** (the SPA consumes only on an explicit confirm) but **not** of the v3 API: `GET /api/v3/guest/secret/:key` and `GET /api/v3/secret/:key` consume the secret. Anyone pasting an API URL into a chat client will lose it | the `r.get true` handlers under `r.on "secret"` in `lib/onetime/web/app.rb`, `RevealView.vue` | Landing/FAQ copy states the API caveat (`replica/launch/landing.md` §6); revisit if an API status endpoint or preview-safe GET is added |
 | K-05 | — | **Resolved:** the repository is a git repo with history on `main`, an `origin` remote, and a `.gitignore` covering `.env` and build output | `git status`, `.gitignore` | — |
 | K-06 | — | **Resolved:** `LICENSE` exists, is MIT ("Copyright (c) 2026 Aman Ali"), and is tracked | `git ls-files LICENSE` | — |
 
@@ -52,14 +52,17 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-28 | — | **Resolved 2026-11-11:** Vitest covers the API client and `e2e/journey.mjs` is a committed puppeteer journey (create → reveal → gone + passphrase); CI runs it against the Compose stack | `frontend/src/lib/api.test.ts`, `e2e/`, `ci.yml` | — |
 | K-29 | — | **Resolved 2026-11-11:** strict CSP, HSTS (under SSL), COOP/CORP, and Permissions-Policy are sent on every response and verified in the browser | `app.rb`, `web_spec.rb` | — |
 | K-30 | S4 | Visual parity is unmeasured: no original screenshots exist (K-22), so token values and layout were not compared | `replica/design/`, K-22 | Capture reference screens with the user present; use `/replica-diff` |
-| K-31 | S2 | Operational controls mostly closed: backup/restore, dependency scanning, key rotation, audit trail, and Redis auth are done and verified. Remaining: bundled **TLS termination** (operator/host, T-70) and **metrics/tracing** (T-73) | `PRODUCTION_READINESS.md`, `RUNBOOK.md` | T-70, T-73 |
+| K-31 | S2 | Operational controls mostly closed: backup/restore, dependency scanning, key rotation, audit trail, Redis auth, `/metrics` (T-73), and the Redis host firewall (T-71) are done and verified. Remaining: **TLS termination on the real domain** (operator/host action, T-70 — the app side is rehearsed by `script/tls-rehearsal.sh`) and distributed tracing, which is not implemented | `PRODUCTION_READINESS.md`, `RUNBOOK.md` | T-70 |
+| K-36 | — | **Resolved 2026-11-12:** a Redis at its memory ceiling reported `500 internal_error` and, because `compose.yaml` never set `--maxmemory`, `noeviction` enforced nothing and `onetime_redis_memory_used_ratio` was never exported. Now the OOM condition is a `503` + `Retry-After` like any other datastore outage, and Compose sets `--maxmemory` (`REDIS_MAXMEMORY`, default `256mb`). Measured on a 6 MB stack: the crossing write got `503`, and earlier secrets revealed intact once the ceiling was raised | `lib/onetime/web/app.rb#datastore_error?`, `compose.yaml`, `spec/integration/web_spec.rb`, DEPLOYMENT.md §9 | — |
 | K-32 | — | **Resolved 2026-11-11:** CI executed on GitHub across all four jobs. The first run failed in the container job: the load-test step ran a bare `docker compose down -v` with no env, and Compose interpolates `${SECRET}`/`${REDIS_PASSWORD}` on `down` too, so it aborted before restarting the stack. Fixed by hoisting the CI values to job level; the rerun (43060570677) is green and the load test reports 100/100 secrets revealed exactly once. | `.github/workflows/ci.yml` | — |
 
 ## Missing product behavior (planned, not bugs)
 
-Accounts (simple mode), dashboard, organizations, custom domains, file secrets, email
-jobs, MFA / WebAuthn / SSO, i18n locales, OpenAPI generation, admin CLI, Docker packaging,
-CI.
+Accounts (simple mode), the dashboard, the admin CLI, OpenAPI generation, Docker packaging,
+and CI **shipped** — see the resolved rows above; they were listed here long after they
+existed. What is still missing: organizations, custom domains, file secrets, email jobs
+(password reset, receipt notifications), MFA / WebAuthn / SSO, i18n locales, API v2, and
+`AUTH_MODE=full` (D-003).
 
 ## Unanswered questions
 

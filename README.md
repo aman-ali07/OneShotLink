@@ -8,9 +8,11 @@ configurable TTL.
 > **Project status: production-packaged core with optional simple-mode accounts,
 > pre-alpha product.** The anonymous create → one-time reveal flow and optional accounts
 > run in a hardened non-root container with Redis persistence, CI, and redacted logs.
-> **113 backend specs pass**; the TypeScript/Vite build, a headless-Chrome secret journey,
+> **114 backend specs pass**; the TypeScript/Vite build, a headless-Chrome secret journey,
 > and a browser signup → receipt → signout → signin journey were verified. Operational
-> controls (TLS, Redis auth, backups, metrics, scanning, key rotation) are still open: see
+> controls are closed in the repository (Redis auth, backups, metrics, dependency scanning,
+> key rotation, Redis isolation); what is left is **TLS on the operator's own host and
+> domain**, which no commit can provide: see
 > [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md),
 > and [TASKS.md](TASKS.md).
 
@@ -39,15 +41,18 @@ configurable TTL.
 - Multi-stage production image, Compose stack with Redis AOF, read-only non-root web
   container, health checks, and CI smoke test.
 
-Not built yet: colonel/admin API, OpenAPI document, file secrets, organizations, i18n.
+Also implemented: the OpenAPI 3.1 document at `/api/v3/openapi.json`, `bin/ots` for
+operator tasks (customers, health, backup/restore, rotate-key), `/metrics`, and the `bin/ots`
+audit stream. Not built yet: the colonel/admin **API** (the CLI covers it), file secrets,
+organizations, custom domains, email jobs, MFA/WebAuthn/SSO, and i18n.
 `AUTH_MODE=full` intentionally returns `501` rather than silently degrading; account
 routes return `403` when auth is disabled.
-Production gaps that are *not* features (TLS, Redis auth, backups, metrics, dependency
-scanning, key rotation) are listed in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
+Remaining production gaps are infrastructure, not features: TLS on your domain and the
+host-side Redis firewall rule — see [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
 
 ## Stack
 
-Ruby 3.3 · Roda 3 on Rack 3 · Puma 6 · Redis 7+ · Vue 3 + TypeScript · Vite 6 ·
+Ruby 3.3 · Roda 3 on Rack 3 · Puma 7 · Redis 7+ · Vue 3 + TypeScript · Vite 6 ·
 Tailwind CSS 4. Details: [TECH_STACK.md](TECH_STACK.md).
 
 ## Repository layout (current)
@@ -80,7 +85,7 @@ lib/onetime/
 replica/                 # recon, feature matrix, architecture, design tokens, parity
 bin/ots                  # CLI: customers, health, backup/restore, rotate-key
 script/loadtest.rb       # single-use invariant under concurrency
-spec/                    # 113 unit + integration examples (Redis DB 15)
+spec/                    # 114 unit + integration examples (Redis DB 15)
 e2e/journey.mjs          # committed create → reveal → gone browser test
 e2e/accounts.mjs         # committed signup → receipt → signout → signin journey
 Dockerfile               # multi-stage UI build + non-root Ruby runtime
@@ -102,13 +107,14 @@ curl -fsS localhost:3000/health
 ```
 
 Open `http://localhost:3000/`. The stack runs the web container as UID 10001 with a
-read-only root filesystem and a persistent Redis volume. Set `APP_PORT`, `APP_BIND`,
-`HOST`, `SSL`, `TRUST_PROXY`, `TRUSTED_PROXIES`, and `WEB_CONCURRENCY` in the environment; see
+read-only root filesystem and a persistent Redis volume with a memory ceiling
+(`REDIS_MAXMEMORY`). Set `APP_PORT`, `APP_BIND`, `HOST`, `SSL`, `TRUST_PROXY`,
+`TRUSTED_PROXIES`, and `WEB_CONCURRENCY` in the environment; see
 [.env.example](.env.example) and [DEPLOYMENT.md](DEPLOYMENT.md). Going live on a real
 hostname? [DEPLOYMENT.md](DEPLOYMENT.md) §4.2 is the deploy-day sequence, and
 `script/tls-rehearsal.sh` rehearses it on a scratch box first.
 
-Smoke test (verified 2026-11-11 through Compose):
+Smoke test (verified through Compose; the shapes below are live responses):
 
 ```bash
 curl -s localhost:3000/health
@@ -155,7 +161,7 @@ docker run --rm --network=host \
   ots-dev bundle exec rspec
 ```
 
-Expected: `113 examples, 0 failures`. The suite only touches Redis DB 15 and calls
+Expected: `114 examples, 0 failures`. The suite only touches Redis DB 15 and calls
 `FLUSHDB` there, never `FLUSHALL`.
 
 Frontend checks:
@@ -210,4 +216,3 @@ Read [AGENTS.md](AGENTS.md) before clone work.
 ## License
 
 MIT. See [LICENSE](LICENSE).
-# OneShotLink

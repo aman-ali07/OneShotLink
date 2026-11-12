@@ -34,7 +34,7 @@ no accounts by design.
 | Redis bounded | connect/read/write timeout + reconnect attempts from env; health endpoint checks `PING` |
 | Multi-process safe | Puma cluster mode; Redis socket reset after fork; lifecycle verified with 2 workers |
 | Container hardened | non-root UID 10001, read-only rootfs, `no-new-privileges`, only `/tmp` writable, no secrets in image |
-| Data survives restart | Redis AOF `appendfsync everysec`, `maxmemory-policy noeviction`, named volume |
+| Data survives restart | Redis AOF `appendfsync everysec`, named volume, and a real memory ceiling (`--maxmemory ${REDIS_MAXMEMORY:-256mb}`) so `noeviction` enforces something instead of letting the kernel OOM-kill Redis |
 | CI gate | backend specs, Vitest + typecheck/build, container build, Compose lifecycle smoke, committed browser E2E |
 | Dependency scanning | `bundler-audit` + `npm audit --audit-level=high` in the `security` CI job; both report 0 vulnerabilities. Fixed the findings: Puma 6.6.1→7.2.1 (2 high CVEs), zod 3→4.6.7 (1 high advisory) |
 | OpenAPI published | `/api/v3/openapi.json` served; spec asserts every documented path is mounted and every `$ref` resolves |
@@ -48,6 +48,7 @@ no accounts by design.
 | TLS rehearsal | `script/tls-rehearsal.sh`: production stack behind Caddy + throwaway CA → `PREFLIGHT PASSED` on the TLS checks (7 assertions, including cookie flags via a throwaway signup); `--with-redis` fails exactly on the unfixed host rule, which is the negative control |
 | Static delivery | hashed assets `Cache-Control: immutable`; shell and deep links `no-cache`/noindex; HEAD works for `/` and `/health` |
 | Datastore outage is honest | Redis stopped under the running stack: `/health` → `503 {"status":"degraded"}`, writes → `503 service_unavailable` with `Retry-After` on both API versions (v1 keeps its `message` shape), secrets never appear in the error, and the instance recovers without a restart when Redis returns (create → reveal → second reveal `404`) |
+| A full datastore is honest | At the memory ceiling every write **and** every reveal answers `503 service_unavailable` + `Retry-After` (the atomic consume is a Lua `EVAL`, which Redis refuses when full), never a generic `500`. Measured on a 6 MB stack: the crossing write got `503`, and secrets stored before the ceiling revealed intact once `maxmemory` was raised — nothing was lost, though TTLs keep running while storage is full (DEPLOYMENT.md §9) |
 | Spec isolation | the suite refuses to run when another client is attached to Redis DB 15, instead of flushing a database a live server is using |
 
 Commands used for the evidence above:
@@ -98,8 +99,10 @@ table above.
    `TRUST_PROXY=true` plus the proxy CIDRs in `TRUSTED_PROXIES`.
 3. Keep Redis private, enable auth/TLS where the platform supports it, and back up the
    `redis-data` volume.
-4. Set `WEB_CONCURRENCY` and `PUMA_MAX_THREADS` to the host's capacity; leave Redis
-   `maxmemory-policy noeviction` so secrets are never evicted early.
+4. Set `WEB_CONCURRENCY` and `PUMA_MAX_THREADS` to the host's capacity; keep Redis
+   `maxmemory-policy noeviction` and set `REDIS_MAXMEMORY` above your expected working set
+   so secrets are never evicted early — at the ceiling, writes and reveals fail with `503`
+   rather than discarding live secrets.
 5. Configure log collection; confirm no `secret`/`passphrase`/`ciphertext`/key appears.
 6. Run the lifecycle smoke test in CI or by hand after every deploy.
 7. Record an explicit decision about D-012 and the open items above before calling the

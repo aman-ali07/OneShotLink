@@ -26,6 +26,22 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   revealed `200` with full content once `maxmemory` was raised. DEPLOYMENT.md §9 says so,
   including that TTLs keep running while storage is full.
 
+### Docs (status files no longer contradict the code, 2026-11-12) — verified
+
+- `KNOWN_ISSUES.md` still listed accounts, the dashboard, the admin CLI, OpenAPI
+  generation, Docker packaging and CI as "missing product behaviour" — all shipped, and
+  K-31 still called metrics open. The list now names only what is genuinely absent
+  (organizations, file secrets, email jobs, MFA, i18n, v2, full mode), and K-36 records the
+  Redis-ceiling `500` → `503` fix.
+- `README.md`'s status banner said TLS, Redis auth, backups, metrics, scanning and key
+  rotation were "still open" (only TLS-on-your-host is), its "not built yet" list included
+  the OpenAPI document (served at `/api/v3/openapi.json`), and it named Puma 6 (7.2.1). The
+  stray duplicated `# OneShotLink` heading at EOF is gone.
+- `PRODUCTION_READINESS.md` gained the memory-ceiling gate and now tells operators to set
+  `REDIS_MAXMEMORY` above their working set.
+- Example counts synchronised to **114** in `AGENTS.md`, `API.md`, `TESTING.md`, `README.md`
+  and `TASKS.md`, and TESTING's per-file table updated.
+
 ### Docs (TESTING.md recounted from the suite, 2026-11-12) — verified
 
 - The coverage table was stale and incomplete: **94** backend examples (really 113), **9**
