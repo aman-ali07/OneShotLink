@@ -34,7 +34,8 @@ are the code defaults; `SECRET` has no default and is required.
 | `WEB_CONCURRENCY` | no | `0` (image sets `2`) | Puma workers; 0 runs a single process |
 | `PUMA_MIN_THREADS` / `PUMA_MAX_THREADS` | no | `1` / `5` | Per-worker thread pool |
 | `LOG_LEVEL` | no | `info` | `debug`\|`info`\|`warn`\|`error` |
-| `PORT` | no | `3000` | Puma bind port (`config/puma.rb`) |
+| `PUMA_WORKER_TIMEOUT` | no | `60` | Seconds a worker may take to boot before Puma stops it (`config/puma.rb`) |
+| `PORT` | no | `3000` | Puma bind port inside the container (`config/puma.rb`); Compose publishes `APP_PORT` |
 | `RACK_ENV` | no | `development` | `production` in the image |
 
 ## Accounts and the CLI
