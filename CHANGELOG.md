@@ -65,6 +65,22 @@ typecheck + Vite build clean; `bundler-audit` and `npm audit` clean.
   which is the negative control proving the gate still has teeth. Documented in
   `TESTING.md` §3.2 and `PRODUCTION_READINESS.md`.
 
+### Changed (the rules that mattered outlived the kit, 2026-11-12) — verified
+
+- **`AGENTS.md` now carries the operating rules as its own section.** Deleting the
+  automation kit also deleted the only written home of several rules that still bind a
+  person or agent here: tell the human before pushing / no auto-merge / draft PR, verify by
+  running rather than trusting a claim, never disable or weaken a test to get a green run,
+  one change at a time, human review for the crypto/password/session/`web/app.rb`/infra
+  paths, never edit `.env*`, the D-012 copy rules, status-of-record duties, dependency
+  approval, and "report, do not deploy". They are in `AGENTS.md` §Operating rules, and the
+  Docker-shaped test command is spelled out in §Required coding workflow. Loop-only
+  mechanics (budget caps, pause-all, worktrees, ledgers, cron cadence, MCP connectors) were
+  not carried over — they have no meaning without a loop.
+- Audited after the change: 16 of 16 binding rules resolve to a live doc (`AGENTS.md`,
+  `TESTING.md`, `SECURITY.md`, `docs/DECISIONS.md`, `TASKS.md`, `RUNBOOK.md`), and no
+  tracked file references the kit except this changelog's history entries.
+
 ### Added (icons and social card, 2026-11-12) — verified
 
 - **A real mark, drawn from the logo brief** (`replica/brand.md` §4): `site/favicon.svg` is

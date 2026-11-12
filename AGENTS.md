@@ -118,6 +118,40 @@ On a clone milestone, run the pack's own tests before trusting its tooling:
 8. **Keep secrets out of the repo.** `.env` is git-ignored; document variables in
    `.env.example` with placeholders only.
 
+## Operating rules (binding)
+
+These bind any agent or human working in this repo. They are the rules that used to sit in
+a separate automation kit; the automation is gone, the rules are not.
+
+1. **Tell the human before you act, and before you push.** Do not push, open a PR, or merge
+   without saying so first. Never auto-merge to `main`. Open a draft PR and let a human mark
+   it ready.
+2. **Tests decide, not prose.** Run the checks before proposing a fix, and run them yourself
+   rather than trusting a report that they passed. Never disable, skip, or weaken a test to
+   get a green run. If the same failure appears twice, stop retrying and read the code, the
+   docs, or the full error instead.
+3. **One change at a time.** No unrelated refactors, no drive-by cleanups, no second fix
+   bundled into the first. If a fix needs more than a few attempts, escalate to the human
+   instead of thrashing.
+4. **Some paths need human review before you touch them:** `lib/onetime/crypto.rb`,
+   `lib/onetime/password.rb`, `lib/onetime/models/session.rb`, `lib/onetime/web/app.rb`,
+   `compose.yaml`, `Dockerfile`, `config.ru`, `config/puma.rb`, `.github/workflows/`,
+   `script/preflight*.sh`, and anything under `auth/`, `payments/`, `secrets/`, credentials,
+   or any `*.pem` / `*.key`. Ask; do not assume.
+5. **Never edit `.env` or `.env.*`.** Document variables in `.env.example` with placeholders.
+6. **Copy rules (D-012, [SECURITY.md](SECURITY.md)):** never write "zero-knowledge" or "the
+   server cannot decrypt" — the passphrase is an access gate, not a second key. Never write
+   "production ready" while T-70 (TLS on a real host) or T-71 (Redis host firewall) are open
+   in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
+7. **Status of record:** [TASKS.md](TASKS.md) (IDs are stable — never renumber) and the
+   `clone` column of [replica/features.csv](replica/features.csv). Update them in the same
+   change that earns it.
+8. **No new gem or npm package** without a line in [docs/DECISIONS.md](docs/DECISIONS.md) and
+   a check that it is canonical per [TECH_STACK.md](TECH_STACK.md).
+9. **Report, do not deploy.** An agent run does not `docker compose up` on a public host,
+   does not rotate `SECRET`, and does not restore a backup. Those are human actions with a
+   defined sequence: [DEPLOYMENT.md](DEPLOYMENT.md) §4.2 and [RUNBOOK.md](RUNBOOK.md).
+
 ## Required coding workflow
 
 1. Read this file, then the doc(s) for the area you will touch.
@@ -130,9 +164,10 @@ On a clone milestone, run the pack's own tests before trusting its tooling:
    relevant contract docs.
 6. Run the checks that apply: `bundle exec rspec`, `npm --prefix frontend run typecheck`,
    `npm --prefix frontend run build`, `docker build -t ots-prod .`, and
-   `SECRET=... docker compose config`. If a tool is not installed, use the documented
-   Docker fallback in [TESTING.md](TESTING.md); never claim a check passed without
-   command output.
+   `SECRET=... docker compose config`. **Ruby is not installed on this host**, so the
+   backend suite runs in Docker —
+   `docker run --rm --network=host -v "$PWD":/app -v ots-bundle:/bundle -e BUNDLE_PATH=/bundle -w /app ots-dev bundle exec rspec`
+   ([TESTING.md](TESTING.md) §2). Never claim a check passed without command output.
 7. Fix regressions and manually exercise the changed behavior (curl/browser) where the
    test suite does not cover it.
 8. Update the docs the change invalidates: API.md for routes/payloads, DATABASE.md for
