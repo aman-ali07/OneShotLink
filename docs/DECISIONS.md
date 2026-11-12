@@ -71,13 +71,14 @@ a reveal.
 **Context.** Consuming first and then verifying would destroy the secret on a typo. A
 naive "read, verify, delete" re-opens the double-reveal race.
 
-**Decision.** Read, verify the Argon2id hash, then atomically compare-and-delete, then
-decrypt. A failed passphrase never reaches the delete step.
+**Decision.** Read, verify the Argon2id hash, decrypt, then atomically compare-and-delete.
+A failed passphrase never reaches the delete step.
 
 **Consequences.** A wrong passphrase does not burn the record (good UX, mild
-passphrase-guessing exposure, bounded by the reveal rate limit). Decryption failure after
-consume (tampering/rotation) loses the record and returns a generic 500 — the fail-closed
-choice.
+passphrase-guessing exposure, bounded by the reveal rate limit). **Amended 2026-11-12
+(see D-013):** decryption also runs before the consume, so a rotated `SECRET` or a corrupt
+record no longer destroys the secret — the reveal answers `500` and the record stays
+readable once the key is right.
 
 ## D-006 — Serve the SPA from Rack; no separate web server
 
@@ -174,7 +175,7 @@ passphrase before consuming (a wrong attempt must not burn the secret), and let 
 manage receipts/dashboards server-side. It also makes a lost passphrase unrecoverable.
 
 **Decision.** Keep instance-key encryption plus the Argon2id gate for v1. Ordering is
-verify → atomic consume → decrypt. UI and docs describe the passphrase as an extra access
+verify → decrypt → atomic consume (D-013). UI and docs describe the passphrase as an extra access
 check, never as "zero-knowledge" or "the server cannot decrypt". Revisit only as an
 opt-in client-side-encryption mode (v2), with its own UX and recovery trade-offs.
 
@@ -182,3 +183,26 @@ opt-in client-side-encryption mode (v2), with its own UX and recovery trade-offs
 Passphrase guessing is bounded only by the per-IP reveal limiter (no per-secret budget),
 and a leaked `SECRET` plus a leaked record still exposes content without the passphrase.
 T-48 is closed; future copy must not overclaim.
+
+## D-013 — Decrypt before the atomic consume
+
+**Status:** accepted (amends the ordering half of D-005)
+
+**Context.** D-005 put the atomic compare-and-delete before `Crypto.decrypt` and accepted
+the loss: "decryption failure after consume loses the record and returns a generic 500 —
+the fail-closed choice". In practice that choice has a sharp edge. A `SECRET` rotation, a
+stale key left in an environment, or a corrupt record means the reveal deletes the
+ciphertext and *then* fails — so an operator fixing the key finds the secret already gone,
+and the reader is told it never existed. The destructive step was being taken on data the
+server had just proven it could not read.
+
+**Decision.** Run the pure checks first and the irreversible one last: read, verify the
+passphrase, decrypt, then compare-and-delete. A decryption failure answers `500` and leaves
+the record untouched.
+
+**Consequences.** Operator key mistakes become recoverable (rotate back, or finish the
+rotation) instead of permanent; the reveal path reports a genuine server fault rather than
+silently consuming. Nothing is lost on the double-reveal invariant: two racers still both
+read and decrypt, exactly one wins the compare-and-delete, and the loser gets `404` without
+ever seeing plaintext. Cost: a losing racer does the decryption work for nothing, which is
+measured in microseconds and already covered by the concurrency load test.

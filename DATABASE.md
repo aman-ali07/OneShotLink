@@ -83,7 +83,8 @@ record.
 - The JSON is serialized once by the model and reused verbatim for the compare-and-delete
   step.
 - On reveal the model deletes the receipt and removes the owner-index entry **after** the
-  atomic consume succeeds. A failed passphrase deletes nothing.
+  atomic consume succeeds. Neither a failed passphrase nor a failed decryption deletes
+  anything: both run before the consume.
 
 **Never** add the plaintext, passphrase, decrypted length, or any derived plaintext
 fingerprint to this record.
@@ -138,7 +139,8 @@ passphrase.
 2. Every user-visible key is ≥128 bits of CSPRNG output; no sequential IDs.
 3. `secret:object:*` and its receipt share the same TTL (±1 s) so metadata does not
    outlive the secret. Both are written in one `MULTI`.
-4. A reveal deletes the secret key and the receipt; a failed passphrase deletes nothing.
+4. A reveal deletes the secret key and the receipt; a failed passphrase **or a record that
+   cannot be decrypted** deletes nothing (decrypt runs before the consume — D-013).
 5. `GET`+`DEL` for a reveal is prohibited — only `Store.consume` (Lua compare-and-delete).
 6. Data written under one `SECRET` is undecryptable under another; `bin/ots rotate-key`
    re-encrypts existing records under a new key and preserves their TTL (T-65).

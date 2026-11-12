@@ -9,6 +9,18 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Docs (reconciled with the code, 2026-11-12) — verified
+
+- `ARCHITECTURE.md` and `DATABASE.md` claimed things that were not true any more: a folder
+  tree with `apps/api/v1.rb`, separate v1/v3 modules, organization/custom-domain models and
+  a `docker-compose.full.yml` (none exist — both API versions are routes in
+  `lib/onetime/web/app.rb`); creation described as "not transactional… crash windows can
+  leave orphaned receipts" (it is one `MULTI`/`EXEC`); reveal documented as
+  verify → consume → decrypt; Redis outages documented as `500`; rotation documented as
+  "no re-encryption tool"; and the 1 MiB boundary marked pending. All of it now matches the
+  code, and D-005 was amended with a new D-013 recording why decryption moved ahead of the
+  consume.
+
 ### Fixed (a rotated key no longer eats secrets, 2026-11-12) — verified
 
 - **Reveal decrypts before it consumes.** `Logic::RevealSecret` consumed the record and then

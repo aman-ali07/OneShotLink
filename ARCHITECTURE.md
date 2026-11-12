@@ -1,8 +1,9 @@
 # Architecture
 
-Status: v1 architecture with M1 (secret lifecycle), M2 (Vue vertical slice), and
-production packaging implemented. Pieces not marked "implemented" remain planned. Cross-check [DATABASE.md](DATABASE.md),
-[API.md](API.md), and [docs/DECISIONS.md](docs/DECISIONS.md).
+Status: v1 architecture implemented — secret lifecycle, simple-mode accounts, the Vue
+vertical slice and production packaging. Where this file and the code disagree, the code
+wins and this file gets fixed. Cross-check [DATABASE.md](DATABASE.md), [API.md](API.md) and
+[docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## 1. Shape
 
@@ -13,12 +14,12 @@ Browser (Vue 3 SPA)
 Puma ── Rack 3 ── HeadRequests ── RequestLogger ── Roda app
    │                ├─ static UI (public/app)
    │                ├─ API v1 + v3 (one Roda class; split only if it grows)
-   │                └─ health + config (OpenAPI planned)
+   │                └─ health, config, metrics, /api/v3/openapi.json
    │
-   ├── Logic objects (lib/onetime/logic/*): ConcealSecret, RevealSecret,
-   │   SignUp, SignIn, CreateOrganization, ...
+   ├── Logic objects (lib/onetime/logic/*): ConcealSecret, RevealSecret, SignUp,
+   │   SignIn, DeleteAccount, RotateKey
    │
-   ├── Models (lib/onetime/models/*): Secret, Receipt, Customer, Organization
+   ├── Models (lib/onetime/models/*): Secret (record + receipt), Customer, Session
    │      └── Onetime::Store (redis-rb 5)  ── Redis (secrets, sessions, limits)
    │
    └── Crypto (AES-256-GCM), Limiter (Lua), Password (Argon2id)
@@ -56,44 +57,49 @@ A future full mode adds PostgreSQL + RabbitMQ behind the same logic objects.
 | `frontend/` | Vue SPA (see §6) | Implemented (M2) |
 | `Dockerfile`, `compose.yaml`, `.github/workflows/ci.yml` | Self-host packaging and CI | Implemented + smoke-tested |
 
-## 3. Target folder layout
+## 3. Folder layout (as built)
 
 ```
-config.ru
+config.ru                   # boots Config.validate! then the Roda app
+config/puma.rb              # PORT, workers, threads, worker timeout
 Gemfile / Gemfile.lock
-Rakefile
-apps/
-  api/v1.rb
-  api/v3.rb
-lib/
-  onetime.rb                # requires everything; single entrypoint
-  onetime/
-    config.rb crypto.rb errors.rb ids.rb limiter.rb password.rb store.rb
-    models/{secret,receipt,customer,organization,custom_domain}.rb
-    logic/{conceal_secret,reveal_secret,sign_up,sign_in,...}.rb
-    web/{app,helpers,security_headers}.rb
-    openapi.rb
-    version.rb
-  tasks/                    # rake tasks
-bin/ots
+lib/onetime.rb              # single entrypoint: requires everything
+lib/onetime/
+  audit.rb backup.rb config.rb crypto.rb errors.rb ids.rb limiter.rb
+  metrics.rb password.rb store.rb version.rb
+  logic/                    # one class per use case
+    conceal_secret.rb reveal_secret.rb sign_up.rb sign_in.rb
+    delete_account.rb rotate_key.rb
+  models/                   # Redis shapes; key builders live here
+    secret.rb customer.rb session.rb
+  web/
+    app.rb                  # all Roda routes, for both API versions
+    openapi.rb              # /api/v3/openapi.json, asserted against the routes
+    head_requests.rb request_logger.rb
+bin/ots                     # operator CLI: health, backup, restore, rotate-key, customers
 frontend/
   index.html vite.config.ts tsconfig.json package.json
-  src/{main.ts,App.vue,router.ts}
-  src/apps/{secret,workspace,colonel,session}/
-  src/components/{base,forms,layout}/
-  src/{composables,schemas,services,stores}/
+  src/main.ts App.vue router.ts
+  src/views/                # ConcealView RevealView DashboardView SignInView SignUpView NotFoundView
+  src/components/           # AppHeader AppFooter AppButton AppAlert CopyButton
+  src/lib/api.ts api.test.ts
   src/assets/styles.css
 public/app/                 # Vite build output, served by Rack (git-ignored)
 spec/
-  spec_helper.rb
-  integration/{secrets_api_spec.rb,health_spec.rb,auth_spec.rb}
-  unit/{crypto_spec.rb,limiter_spec.rb,password_spec.rb,ids_spec.rb}
-  support/{app_helper.rb,redis_helper.rb}
-docs/
-  DECISIONS.md openapi.json
-Dockerfile docker-compose.yml docker-compose.full.yml
-.env.example .dockerignore .gitignore
+  spec_helper.rb            # DB 15 guard: refuses a shared Redis
+  integration/              # web, secrets_api, accounts, metrics, openapi
+  unit/                     # crypto, password, ids, limiter, store, session, config,
+                            # metrics, ops, request_logger
+site/                       # static marketing/legal pages + generated icons and og.png
+script/                     # brand-sweep, build-assets, preflight, tls-rehearsal, loadtest
+docs/DECISIONS.md
+Dockerfile compose.yaml .env.example
 ```
+
+`apps/api/v1.rb`, separate v1/v3 modules, `organization`/`custom_domain` models and a
+`docker-compose.full.yml` were planned and are **not** in the tree: both API versions are
+routes in `lib/onetime/web/app.rb`, organizations and custom domains are out of scope
+(P2 in `TASKS.md`), and full mode is unimplemented by decision (D-012).
 
 **Deviation from the original brief:** Otto 2 and Familia v2 are not publicly available
 as documented for this stack, and bringing them in would couple the app to unavailable
@@ -124,15 +130,17 @@ internals. The project uses plain Roda on Rack 3 and a small explicit Redis mapp
    callers cannot enumerate).
 4. If `passphrase_hash` is present: verify with `Password.verify`. Failure → `401`, and
    **no deletion**.
-5. `Store.consume(key, serialized_record)` runs the Lua compare-and-delete. If it
+5. Decrypt with the instance `SECRET`. A tampered record or a rotated key makes this
+   raise → `500` with a generic message and only the record ID logged; **nothing is
+   deleted**, so rotating the key back makes the secret readable again.
+6. `Store.consume(key, serialized_record)` runs the Lua compare-and-delete. If it
    returns 0, another request already consumed the record → `404`.
-6. Decrypt with the instance `SECRET`; delete receipt/index; return plaintext once.
-7. If decryption fails after consuming (tampered record/key rotation), return `500` with
-   a generic message and log only the record ID.
+7. Delete the receipt and the owner-index entry; return the plaintext once.
 
-The order (verify → consume → decrypt) is deliberate: a wrong passphrase must not burn
-the secret, and the decrypt happens on data we have already won the race for. See
-D-005.
+The order (verify → decrypt → consume) is deliberate: the two checks that can fail are
+pure, so they run before the one irreversible step. A wrong passphrase, a wrong `SECRET`
+or a corrupt record therefore costs nothing, while the atomic consume still guarantees
+exactly one winner. See D-005.
 
 ### Expiry
 
@@ -144,9 +152,10 @@ pruned lazily when the dashboard lists receipts (missing records are dropped). N
 - **One writer wins:** the Lua script in `Store.consume` compares the full serialized
   value and deletes only on an exact match. Any concurrent mutation (not expected)
   also loses, which is the safe direction.
-- **Multi-key updates are not transactional.** Creation writes the secret, receipt, and
-  owner index in sequence. Crash windows can leave orphaned receipts; they expire with
-  the same TTL and are ignored when the secret is gone. Documented, accepted.
+- **Creation is transactional.** `Secret.write` queues the encrypted record, its receipt
+  and the owner-index entry in one `MULTI`/`EXEC`, so a crash cannot leave a receipt without
+  its secret. Account deletion is transactional for the same reason
+  (`Logic::DeleteAccount`). Owner-index pruning on the dashboard is still lazy.
 - **Sessions:** opaque random token in an `HttpOnly`, `SameSite=Lax` cookie (`Secure`
   under SSL); Redis stores only `session:<sha256(token)>` with a sliding TTL. No signed
   cookies, no JWT. Account routes fail closed (`403` when disabled, `501` in full mode).
@@ -180,19 +189,20 @@ pruned lazily when the dashboard lists receipts (missing records are dropped). N
 - HTTP only behind a TLS-terminating proxy; `SSL=true` makes cookies `Secure` and
   generates `https://` links.
 - The app is stateless apart from Redis; any instance can serve any request.
-- `SECRET` is instance-wide: rotating it invalidates existing secrets (no re-encryption
-  tool yet). Documented in DEPLOYMENT.md.
+- `SECRET` is instance-wide. Rotation is non-destructive: `bin/ots rotate-key` re-encrypts
+  existing records under the new key and preserves TTLs (T-65, D-013). Deleting and
+  regenerating `SECRET` instead would invalidate everything — don't.
 - No plaintext ever crosses the Redis boundary; logs carry IDs only.
 
 ## 8. Failure modes
 
 | Failure | Behavior |
 | --- | --- |
-| Redis down | `/health` 503; API returns 500 `internal_error`; no partial writes |
+| Redis down | `/health` 503 `degraded`; writes answer 503 `service_unavailable` with `Retry-After` on both API versions; no partial writes; recovers without a restart when Redis returns |
 | Missing/invalid `SECRET` | Boot fails fast in `config.ru` (verified) |
 | Wrong passphrase | 401, record preserved |
-| Tampered ciphertext | Consume wins, decrypt fails, 500 generic, record gone |
+| Tampered ciphertext | Decrypt fails **before** the consume: 500 generic and the record is left in place (D-013) |
 | Duplicate reveal | One 200, others 404 |
 | `AUTH_MODE=full` | 501 `not_configured` on auth-dependent routes |
-| Oversized secret | 413 `payload_too_large` (verified; exact 1 MiB edge pending) |
+| Oversized secret | 413 `payload_too_large`, exact boundary verified (accepts N, rejects N+1) |
 | Rate limit exceeded | 429 `rate_limited` with `Retry-After` (verified) |
