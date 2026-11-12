@@ -3,7 +3,7 @@
 Last reviewed: 2026-11-12. Severity: **S1** blocks use / security, **S2** blocks a
 feature, **S3** quality/operability, **S4** documentation/process.
 
-> The core has been executed: 118 backend specs pass in Docker against Redis DB 15, a live
+> The core has been executed: 119 backend specs pass in Docker against Redis DB 15, a live
 > Puma run completed create → reveal → gone (including a four-way reveal race), a
 > headless Chrome journey covered the built UI (including the passphrase path), and the
 > production Compose stack passed a lifecycle smoke test. "Verified"

@@ -308,6 +308,18 @@ RSpec.describe "Secret lifecycle API" do
       expect(last_response.status).to eq(200)
     end
 
+    it "still opens a record whose passphrase predates the 8-byte floor" do
+      # The floor is a create-time rule (D-014). Records written before it must
+      # keep working: the reveal path must not grow a length check of its own.
+      objid, = Onetime::Models::Secret.create(
+        plaintext: "legacy-short-passphrase", ttl: 1800, passphrase: "x"
+      )
+
+      post "/api/v3/guest/secret/#{objid}/reveal", JSON.generate(passphrase: "x"), JSON_HEADERS
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["secret_value"]).to eq("legacy-short-passphrase")
+    end
+
     it "rate limits conceal with Retry-After" do
       with_env("RATE_LIMIT_CONCEAL" => "1", "RATE_LIMIT_WINDOW" => "60") do
         create_v3(secret: "one")

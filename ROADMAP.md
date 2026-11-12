@@ -12,7 +12,7 @@ slice. Packaging: hardened non-root container, Compose with persistent Redis, CI
 logs. M3: signup/signin/signout, sessions, owner receipts, dashboard, password change, CLI
 create/reset, and two browser journeys. Operations: Redis auth + internal network + host
 firewall rule, `/metrics`, dependency scanning, key rotation, backup/restore, audit
-stream, TLS rehearsal. **118 specs** green; parity **63.0/100 with 11/11 must-haves**
+stream, TLS rehearsal. **119 specs** green; parity **63.0/100 with 11/11 must-haves**
 (the remaining parity gaps are should/could items such as email verification and i18n).
 Next: **TLS on the operator's own domain** (T-70, the only open gate), then M4
 verification.

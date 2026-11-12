@@ -21,7 +21,7 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   D-014.
 - UI: the passphrase field has `minlength`, mirrors the check before sending, and says
   "8 characters minimum"; the OpenAPI document carries `minLength: 8`. Spec rewritten and
-  watched fail (`201` → `422`); suite 118 examples, 11 Vitest, build clean.
+  watched fail (`201` → `422`); suite 119 examples, 11 Vitest, build clean.
 
 ### Fixed (a chunked request bypassed the body cap, 2026-11-12) — verified
 

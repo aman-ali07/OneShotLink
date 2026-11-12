@@ -4,7 +4,7 @@ This document separates **controls that exist and have been exercised** from **c
 that must still be implemented**. Nothing here is a claim that the system is fully
 production-ready: there is no bundled TLS terminator and simplified accounts intentionally
 omit full-mode features. The secret lifecycle, simple-mode accounts, UI, hardened
-container, and Compose stack are implemented and covered by 118 specs, a live Puma run,
+container, and Compose stack are implemented and covered by 119 specs, a live Puma run,
 two headless-browser journeys, and a container smoke test.
 
 ## 1. Assets and trust boundaries

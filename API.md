@@ -286,4 +286,4 @@ curl -sX POST http://localhost:3000/api/v1/secret/<key>
 Verified 2026-11-12 against the production image through Compose (Redis DB 15 for the
 specs): create `201`, first reveal `200`, second reveal `404`; four parallel reveals
 produced one `200` and three `404`; the v1 shapes above were copied from live responses.
-`bundle exec rspec` → 118 examples, 0 failures.
+`bundle exec rspec` → 119 examples, 0 failures.
