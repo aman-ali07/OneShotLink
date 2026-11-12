@@ -6,17 +6,18 @@ original one-time secret service.
 **Status:** production-packaged core with optional simple-mode accounts. The Vue SPA and
 APIs support create → link → reveal once → gone, including the passphrase path; account
 signup/signin, owner receipts, and the dashboard are implemented. **112 backend specs pass**,
-two headless browser journeys are verified, and the non-root Compose stack was smoke-tested.
-Operational gates (TLS, Redis auth, backups, metrics, scanning, key rotation) and full mode
-are still open; next milestone is M4 verification after those gates.
+two headless browser journeys are verified, and the non-root Compose stack is smoke-tested.
+Every in-repo gate is closed (Redis auth, network isolation, backups, metrics, dependency
+scanning, key rotation, load test). Still open: **TLS on a real hostname** (T-70 — operator
+infrastructure; the app side is rehearsed by `script/tls-rehearsal.sh`) and `AUTH_MODE=full`,
+which is deliberately unimplemented and answers 501.
 Read [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) and
 [KNOWN_ISSUES.md](KNOWN_ISSUES.md) before assuming anything is production-ready.
 
-## How OpenCode should use these docs
+## How to use these docs
 
-OpenCode (verified against v2.2.7 on this machine) discovers this file by walking up from
-the project directory, and also loads `~/.config/opencode/AGENTS.md` (global). It does **not** read every Markdown file
-automatically. Read the relevant file before working in that area:
+Coding agents discover this file by walking up from the project directory, but none of them
+read every Markdown file automatically. Read the relevant file before working in that area:
 
 | Area | Read first |
 | --- | --- |
@@ -37,9 +38,10 @@ automatically. Read the relevant file before working in that area:
 | Clone map + feature matrix | [replica/recon.md](replica/recon.md), [replica/features.csv](replica/features.csv) |
 | Clone stack, schema, build order | [replica/architecture.md](replica/architecture.md) |
 
-There is no `opencode.json`/`opencode.jsonc` in this repo. Do not add one unless a
-concrete need appears (MCP server, permissions, custom agent). No nested `AGENTS.md`
-files are needed until a subtree genuinely needs different rules.
+This repo has no agent-specific config file and needs none: the instructions live here.
+Do not add a tool-specific rules file unless a concrete need appears (MCP server, custom
+permissions, a sub-agent). No nested `AGENTS.md` files until a subtree genuinely needs
+different rules.
 
 ## Replica clone workflow (mandatory)
 
@@ -77,7 +79,7 @@ Useful commands (tools are stdlib Python; run them from the repo root):
 python3 ~/.agents/skills/replica-diff/parity.py replica/features.csv
 script/brand-sweep.sh                                   # rebrand gate over shipped files
 script/build-assets.sh                                  # icons + og.png from their SVG/HTML sources
-python3 ~/.agents/skills/replica-design/contrast.py replica/design/tokens.json   # once tokens exist
+python3 ~/.agents/skills/replica-design/contrast.py replica/design/tokens.json   # WCAG contrast
 ```
 
 `script/brand-sweep.sh` is the gate, not the raw tool: it runs `sweep.py` over the tracked
@@ -104,8 +106,8 @@ On a clone milestone, run the pack's own tests before trusting its tooling:
 2. **Evidence before claims.** Inspect the code; never describe planned behavior as
    implemented. `KNOWN_ISSUES.md` and the status banners are the source of truth.
 3. **Match existing style.** Standard Ruby (double-quoted strings are already used),
-   frozen string literals, `module_function` for stateless modules. Frontend style is
-   set in [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) once it exists.
+   frozen string literals, `module_function` for stateless modules. Frontend style is set in
+   [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) (tokens: [replica/design/tokens.json](replica/design/tokens.json)).
 4. **Reuse before building.** Grep `lib/onetime/` for an existing helper — e.g. use
    `Onetime::Crypto.secure_compare`, `Onetime::Ids.extid`, `Onetime::Limiter.check!`
    instead of new equivalents.
@@ -117,6 +119,10 @@ On a clone milestone, run the pack's own tests before trusting its tooling:
    cookie values in logs, errors, specs output, or docs.
 8. **Keep secrets out of the repo.** `.env` is git-ignored; document variables in
    `.env.example` with placeholders only.
+9. **Say your assumptions; do not pick silently.** If two readings of a request exist, name
+   both. If something is unclear, stop and ask rather than guessing at intent.
+10. **Clean up only your own mess.** Remove imports, variables and helpers *your* change
+   orphaned. Leave unrelated dead code alone — mention it instead of deleting it.
 
 ## Operating rules (binding)
 
@@ -209,68 +215,3 @@ a separate automation kit; the automation is gone, the rules are not.
 - Destructive operations on shared data (Redis `FLUSHALL`, dropping databases, deleting
   volumes) without explicit human approval. Tests may only use database 15.
 - Editing files outside this repository without approval.
-
-
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
-
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
