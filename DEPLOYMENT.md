@@ -148,27 +148,35 @@ port is unreachable, `nc` to `1.1.1.1:443` fails, and DNS does not resolve — w
 app still creates, reveals, and restores secrets normally.
 
 **Residual risk the host must close.** Docker attaches the host to every bridge it
-creates, so a process *on the host* can still route to the container IP
-(`172.x.y.z:6379`). Redis still requires `AUTH` there (`NOAUTH Authentication required`
-without the password), which is defence in depth, but the host should block the path:
+creates, so a process *on the host* can still route to the container IP. Redis still
+requires `AUTH` there (`NOAUTH Authentication required` without the password), which is
+defence in depth, but the host must block the path. The backend subnet is **fixed in
+`compose.yaml`** (`REDIS_SUBNET`, default `10.77.13.0/24`) rather than auto-assigned, so
+this rule keeps matching across redeploys; it sits outside Docker's default
+`172.17.0.0/16`–`172.31.0.0/16` pool, so a dynamic network cannot take it.
 
 ```bash
-# Find the backend subnet for this project
-SUBNET=$(docker network inspect oneshotlink_backend \
-  --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}')
-
-# nftables: drop host -> backend:6379
+# nftables: drop host -> backend Redis only (one narrow rule, no other traffic)
 nft add table inet ots
-nft add chain inet ots out '{ type filter hook output priority 0; policy accept; }'
-nft add rule inet ots out ip daddr "$SUBNET" tcp dport 6379 drop
+nft add chain inet ots out '{ type filter hook output priority 0 ; policy accept ; }'
+nft add rule inet ots out ip daddr "${REDIS_SUBNET:-10.77.13.0/24}" tcp dport 6379 drop
 
-# ufw equivalent, if you use ufw
-ufw deny out to "$SUBNET" port 6379 proto tcp
+# ufw equivalent, if you use ufw instead of nftables
+ufw deny out to 10.77.13.0/24 port 6379 proto tcp
 ```
 
-If your cloud/provider uses a network policy (Kubernetes NetworkPolicy, a VPC
-security group for the Docker bridge subnet), use that instead — the goal is the same:
-only the `web` container may open `redis:6379`.
+The rule is **runtime-only until it is saved** — on reboot it is gone unless you persist
+it (`nft list ruleset > /etc/nftables.conf` plus `systemctl enable nftables`, or your
+distro's equivalent). To revert: `nft delete table inet ots`.
+
+Verify it, rather than assuming it: `script/tls-rehearsal.sh --with-redis` runs the real
+`script/preflight.sh` and prints `PASS host cannot reach Redis at 10.77.13.2:6379`. A host
+process must still fail to connect (`nc -zv 10.77.13.2 6379` times out) while the app
+keeps working (create → reveal → gone).
+
+If a cloud/provider network policy (Kubernetes NetworkPolicy, a VPC security group for the
+Docker bridge subnet) is available, use that instead — the goal is the same: only the
+`web` container may open `redis:6379`.
 
 ### 4.1 Verify TLS on the live domain (T-70)
 

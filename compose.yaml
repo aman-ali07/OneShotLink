@@ -97,5 +97,12 @@ networks:
   # Public-facing plane (the only one with a route off the host).
   frontend:
   # Internal plane: no gateway, so no egress and no ingress from outside.
+  # The subnet is fixed rather than auto-assigned so the host-side firewall
+  # rule (T-71, DEPLOYMENT.md 4.0) keeps matching across redeploys. It sits
+  # outside Docker's default 172.17-172.31 pool, so a dynamic network cannot
+  # take it; if the host already routes it, `up` fails loudly instead.
   backend:
     internal: true
+    ipam:
+      config:
+        - subnet: ${REDIS_SUBNET:-10.77.13.0/24}

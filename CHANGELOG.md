@@ -36,6 +36,13 @@ exactly once → `/metrics` serves `onetime_up`/`onetime_redis_up`/request count
 `script/preflight_selftest.sh` 5/5. Backend suite 112 examples / 0 failures; Vitest 11;
 typecheck + Vite build clean; `bundler-audit` and `npm audit` clean.
 
+- **The Redis plane has a stable subnet, and the host rule is proven.** `compose.yaml`
+  pins the internal backend network to `10.77.13.0/24` (`REDIS_SUBNET`) instead of letting
+  Docker assign one per project, so a host firewall rule keeps matching across redeploys
+  and cannot be silently bypassed by a new random subnet. The documented `nft` OUTPUT rule
+  was applied and verified: a host connection to `10.77.13.2:6379` now times out while the
+  app still creates and reveals secrets, published test Redis on `:6399` is unaffected, and
+  the full preflight ends **green with 0 skips** (`host cannot reach Redis` PASS).
 - **`script/tls-rehearsal.sh` — the TLS gate is now repeatable without a domain.** It boots
   the production Compose stack behind a real TLS terminator (Caddy) with a throwaway local
   CA, then runs the real `script/preflight.sh` against it with certificate verification on.

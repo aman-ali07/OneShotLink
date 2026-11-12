@@ -132,8 +132,13 @@ status=$?
 
 if [ "$status" -eq 0 ]; then
   echo
-  echo "Rehearsal passed: the app side of the TLS gate holds behind a real terminator."
-  echo "Still the operator's to prove on the real hostname: DNS, the real certificate"
-  echo "chain, and the Redis host firewall rule (T-71)."
+  echo "Rehearsal passed: the TLS gate holds behind a real terminator."
+  if [ "$WITH_REDIS" = "1" ]; then
+    echo "Redis isolation passed too, so the host rule is in effect for this subnet."
+  else
+    echo "Redis isolation was skipped; add --with-redis to include it (T-71)."
+  fi
+  echo "Still the operator's to prove on the real hostname: DNS and the real certificate"
+  echo "chain. The nft rule is runtime-only until it is saved (DEPLOYMENT.md 4.0)."
 fi
 exit "$status"
