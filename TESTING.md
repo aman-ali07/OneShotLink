@@ -82,7 +82,7 @@ server or a second suite can neither be flushed nor make a run under-report. Nev
 | `spec/integration/metrics_spec.rb` | 3 | `/metrics` off by default (`404`), text exposition when enabled, no secrets in the output |
 | `spec/integration/openapi_spec.rb` | 4 | valid 3.1 doc, `$ref`s resolve, documented paths are mounted, cookie scheme on owner/account routes |
 | `frontend/src/lib/api.test.ts` | 11 | conceal/reveal payloads, typed errors, malformed responses, network failure, delete-account |
-| `e2e/journey.mjs` | 1 journey | create → reveal → gone, wrong/correct passphrase, no console errors |
+| `e2e/journey.mjs` | 1 journey | create → reveal → gone, wrong/correct passphrase, 5-byte passphrase refused in the field and by the API (D-014), no console errors |
 | `e2e/accounts.mjs` | 1 journey | signup → owner receipt → reload → signout → signed-out prompt → signin → delete account |
 
 Backend total: **119 examples, 0 failures**; frontend: **11 Vitest tests, 0 failures**.
@@ -107,7 +107,9 @@ npm --prefix frontend audit --audit-level=high
   → the SPA shell; unknown API paths remain JSON `404`.
 - Headless Chrome (puppeteer-core) completed: conceal → link → reveal → reload → gone,
   with `localStorage === "{}"` and no plaintext in the URL. The passphrase path was
-  exercised with a wrong attempt (secret preserved) then the correct one.
+  exercised with a wrong attempt (secret preserved) then the correct one, and a 5-byte
+  passphrase was refused twice: the field reports `tooShort` and no link appears, while a
+  direct `fetch` of the conceal route answers `422 validation_error` (D-014).
 - Responsive DOM audit: no horizontal overflow at 375, 768, or 1280 px.
 
 Both journeys are committed (`e2e/journey.mjs`, `e2e/accounts.mjs`, puppeteer-core) and

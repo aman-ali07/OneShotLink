@@ -30,7 +30,10 @@ try {
   page.on("console", (message) => {
     if (
       message.type() === "error" &&
-      !/Failed to load resource: the server responded with a status of (401|404)/.test(message.text())
+      // 422 is deliberate too: the short-passphrase probe below is refused.
+      !/Failed to load resource: the server responded with a status of (401|404|422)/.test(
+        message.text()
+      )
     ) {
       errors.push(`console:${message.text()}`);
     }
@@ -81,11 +84,41 @@ try {
   await page.waitForSelector("#revealed-heading", { timeout: 10000 });
   const guardedRevealed = await page.$eval("pre", (element) => element.textContent);
 
+  // D-014: a passphrase under 8 bytes must never create a secret, and the
+  // server must refuse it even if a client skips the field's own validation.
+  await page.goto(`${base}/`, { waitUntil: "networkidle0" });
+  await page.waitForSelector("#secret");
+  await page.type("#secret", "short-pass-guard");
+  await page.type("#passphrase", "short");
+  const passphraseField = await page.$eval("#passphrase", (element) => ({
+    minLength: element.minLength,
+    tooShort: element.validity.tooShort,
+  }));
+  await page.click("button[type=submit]");
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const createdWithShortPassphrase = await page.$("#result-heading");
+  const shortPassphraseResponse = await page.evaluate(async () => {
+    const response = await fetch("/api/v3/guest/conceal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret: "short-pass-direct", ttl: 1800, passphrase: "short" }),
+    });
+    return { status: response.status, body: await response.json() };
+  });
+
   assert(link.includes("/secret/"), "result link is not a /secret/ URL");
   assert(!link.includes(secret), "plaintext leaked into the link");
   assert(revealed === secret, "revealed value did not match");
   assert(storageAfterCreate === "{}", "secret data was written to localStorage");
   assert(guardedRevealed === guarded, "guarded reveal did not match");
+  assert(passphraseField.minLength === 8, `passphrase minlength is ${passphraseField.minLength}`);
+  assert(passphraseField.tooShort, "a 5-byte passphrase was not flagged as too short");
+  assert(createdWithShortPassphrase === null, "a 5-byte passphrase created a secret");
+  assert(shortPassphraseResponse.status === 422, "the server accepted a 5-byte passphrase");
+  assert(
+    shortPassphraseResponse.body?.error?.code === "validation_error",
+    "short passphrase was refused with the wrong code"
+  );
   assert(/not correct/i.test(wrongMessage), "wrong-passphrase message missing");
   assert(errors.length === 0, `browser errors: ${errors.join(" | ")}`);
 

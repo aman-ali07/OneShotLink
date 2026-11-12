@@ -22,6 +22,9 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 - UI: the passphrase field has `minlength`, mirrors the check before sending, and says
   "8 characters minimum"; the OpenAPI document carries `minLength: 8`. Spec rewritten and
   watched fail (`201` → `422`); suite 119 examples, 11 Vitest, build clean.
+- The committed browser journey covers it too: typing a 5-byte passphrase leaves the field
+  flagged `tooShort` with no link created, and a direct `fetch` of the conceal route answers
+  `422 validation_error`. Both journeys re-run against a live Puma + Redis DB 15.
 
 ### Fixed (a chunked request bypassed the body cap, 2026-11-12) — verified
 
