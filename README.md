@@ -188,8 +188,10 @@ backend → test → diff → entrepreneur → brand → launch → deploy. Curr
 - [replica/features.csv](replica/features.csv) — 27-feature matrix
 - [replica/architecture.md](replica/architecture.md) — v1 architecture
 - [replica/design/tokens.json](replica/design/tokens.json) — AA-checked tokens, applied by the SPA
-- [replica/parity.md](replica/parity.md) — M2 **60.6/100** (10/11 must-haves); the last
-  is the deliberate D-012 passphrase divergence
+- [replica/parity.md](replica/parity.md) — parity history; current score **63.0/100 with
+  11/11 must-haves** (`python3 ~/.agents/skills/replica-diff/parity.py replica/features.csv`).
+  The remaining gaps are should/could items, and the passphrase is still an access gate,
+  not a second key (D-012)
 
 The original's name, logo, copy, screenshots, and fonts are never copied. A rebrand is
 mandatory before launch; the brand sweep still reports the HKDF salt (K-23) and must pass

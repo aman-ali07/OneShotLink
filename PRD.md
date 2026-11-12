@@ -4,8 +4,8 @@ The brand is OneShotLink (R-09, `replica/brand.md`); this document still describ
 clean-room clone of the original one-time secret service and keeps that provenance.
 
 Status: **M2 + production packaging implemented.** The secret lifecycle, browser
-vertical slice, hardened image, and Compose stack are live; the "Impl." column below is
-updated to the 2026-11-11 state. Evidence lives in `lib/onetime/`, `frontend/`, the
+vertical slice, hardened image, simple-mode accounts, and the Compose stack are live; the
+"Impl." column below is updated to the 2026-11-12 state. Evidence lives in `lib/onetime/`, `frontend/`, the
 integration specs, a headless browser journey, and a Compose smoke test; unbuilt areas
 are called out explicitly.
 
@@ -158,11 +158,12 @@ As a small-team operator, I can enable accounts without PostgreSQL.
 4. ✅ Concurrent reveal proven by 8 parallel requests with exactly one success.
 5. ✅ `docker compose up --build` serves the UI and `/health` on port 3000.
 6. ✅ `bundle exec rspec` and `npm --prefix frontend run build` pass locally/Docker; the
-   same steps are wired into CI, which has not yet run on GitHub (K-32).
+   same steps run in CI, which is green on GitHub (K-32 closed).
 7. ✅ Simple-mode signup → owner receipt → signout → signin verified in a browser;
    dashboard contains no secret plaintext.
 
-Criteria 1–4 were verified on 2026-11-11 (94 specs, 0 failures) plus a live Puma run.
+Criteria 1–4 were verified on 2026-11-11 (94 specs at the time; the suite is now 114, 0
+failures) plus a live Puma run.
 The browser vertical slice, headless journey, and the production Compose stack also
 passed. Strict production status still depends on the operational items in
 [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md); see [KNOWN_ISSUES.md](KNOWN_ISSUES.md).

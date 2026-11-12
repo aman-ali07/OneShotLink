@@ -26,6 +26,19 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   revealed `200` with full content once `maxmemory` was raised. DEPLOYMENT.md §9 says so,
   including that TTLs keep running while storage is full.
 
+### Docs (milestone documents unfrozen from the M2 snapshot, 2026-11-12) — verified
+
+- `PRD.md` acceptance item 6 still said CI "has not yet run on GitHub (K-32)" — CI has been
+  green for over a day and the same file's resolved row says so. Its status line and the
+  spec count (94 → 114) were from the M2 snapshot.
+- `ROADMAP.md` opened with "94 specs, parity 60.6/100 with 10/11 must-haves" and listed the
+  in-repo operational gates as still ahead Although Redis isolation, metrics, scanning,
+  rotation, backups and the TLS rehearsal all closed since. It now states 114 specs, the
+  parity tool's current 63.0/100 with 11/11 must-haves, and names TLS-on-your-domain as the
+  one remaining gate.
+- `README.md` pointed readers at `replica/parity.md` for a 60.6 figure; it now gives the
+  current score and the command that produces it.
+
 ### Docs (TECH_STACK versions and an incident command that lied, 2026-11-12) — verified
 
 - `TECH_STACK.md` listed Puma `~> 6.6`, Roda `~> 3.87` and Zod `^3.24.1`, and called the

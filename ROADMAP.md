@@ -5,14 +5,17 @@ Dates are **indicative**, not commitments: they assume ~1 working day per "day" 
 no external review bottleneck, and the stack in [TECH_STACK.md](TECH_STACK.md). Every
 milestone ends with an evidence gate; a milestone is not "done" because code exists.
 
-At 2026-11-11: docs, recon, architect, and design complete; **M0, M1, M2, the
-production-packaging gate, and M3 simple-mode accounts are complete.** M0: app boots and
-26 specs pass. M1: full secret lifecycle. M2: Vue vertical slice. Packaging: hardened
-non-root container, Compose with persistent Redis, CI, redacted logs. M3: signup/signin/
-signout, sessions, owner receipts, dashboard, password change, CLI create/reset, and two
-browser journeys. **94 specs** green; parity **60.6/100 with 10/11 must-haves** (the last
-is the deliberate D-012 passphrase divergence). Next: close operational gates in
-`PRODUCTION_READINESS.md`, then M4 verification.
+At 2026-11-12: docs, recon, architect, and design complete; **M0, M1, M2, the
+production-packaging gate, M3 simple-mode accounts, and all in-repo operational gates are
+complete.** M0: app boots and 26 specs pass. M1: full secret lifecycle. M2: Vue vertical
+slice. Packaging: hardened non-root container, Compose with persistent Redis, CI, redacted
+logs. M3: signup/signin/signout, sessions, owner receipts, dashboard, password change, CLI
+create/reset, and two browser journeys. Operations: Redis auth + internal network + host
+firewall rule, `/metrics`, dependency scanning, key rotation, backup/restore, audit
+stream, TLS rehearsal. **114 specs** green; parity **63.0/100 with 11/11 must-haves**
+(the remaining parity gaps are should/could items such as email verification and i18n).
+Next: **TLS on the operator's own domain** (T-70, the only open gate), then M4
+verification.
 
 ## Order, and why
 
