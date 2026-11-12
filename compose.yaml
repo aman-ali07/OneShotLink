@@ -9,6 +9,11 @@ services:
       - "yes"
       - --appendfsync
       - everysec
+      # A ceiling, so `noeviction` actually means something: without it Redis grows
+      # until the kernel OOM-kills it and every unexpired secret is gone. At the
+      # ceiling writes fail loudly (503) instead of silently evicting live secrets.
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
       - --maxmemory-policy
       - noeviction
       - --requirepass

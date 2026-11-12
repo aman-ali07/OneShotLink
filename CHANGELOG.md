@@ -9,6 +9,23 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (a full Redis answers 503 and has a ceiling, 2026-11-12) — verified
+
+- `compose.yaml` never set `--maxmemory`, so `maxmemory` was `0`: `noeviction` had nothing
+  to act on and `onetime_redis_memory_used_ratio` was not exported at all, which made the
+  alert documented in DEPLOYMENT.md §5.1 impossible to satisfy. Compose now sets
+  `--maxmemory ${REDIS_MAXMEMORY:-256mb}`, and the gauge appears
+  (`onetime_redis_memory_max_bytes 268435456`, ratio `0.003898` on a fresh stack).
+- With Redis at the ceiling, a write was reported as **`500 internal_error`**. It is a
+  datastore condition that clears itself, so it is now `503 service_unavailable` with
+  `Retry-After`: `datastore_error?` matches Redis's `OOM command not allowed` as well as
+  connection failures (failing spec first, 500 → 503).
+- Reveals also answer `503` at the ceiling — the atomic consume is a Lua `EVAL`, which Redis
+  refuses to run when out of memory — and **nothing is lost**: on a 6 MB stack the write
+  that crossed the ceiling got `503` + `Retry-After: 5`, and the secrets stored before it
+  revealed `200` with full content once `maxmemory` was raised. DEPLOYMENT.md §9 says so,
+  including that TTLs keep running while storage is full.
+
 ### Docs (TESTING.md recounted from the suite, 2026-11-12) — verified
 
 - The coverage table was stale and incomplete: **94** backend examples (really 113), **9**

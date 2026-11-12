@@ -70,9 +70,15 @@ module Onetime
         env["onetime.api_version"] || "v3"
       end
 
-      # Redis connection failures surface as typed 503s, not 500s (see errors.rb).
+      # Redis being unreachable or out of memory surfaces as a typed 503, not a 500
+      # (see errors.rb). A full Redis keeps answering PING, so it is not a
+      # connection failure — but with `noeviction` every write fails until an
+      # operator intervenes, which is the same "try again later" for the caller.
       def datastore_error?(error)
-        defined?(Redis::BaseConnectionError) && error.is_a?(Redis::BaseConnectionError)
+        return true if defined?(Redis::BaseConnectionError) && error.is_a?(Redis::BaseConnectionError)
+
+        defined?(Redis::CommandError) && error.is_a?(Redis::CommandError) &&
+          error.message.start_with?("OOM command not allowed")
       end
 
       # Retry-After is whole seconds; the Redis timeout is a float and is the

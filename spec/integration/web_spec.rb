@@ -92,6 +92,27 @@ RSpec.describe Onetime::Web::App do
     end
   end
 
+  describe "when Redis is full" do
+    before do
+      # maxmemory + noeviction: Redis rejects the write with an OOM error while
+      # the connection itself is fine. PING still succeeds, so this is not a
+      # connection failure and must not be reported as one.
+      allow(Onetime::Store.redis).to receive(:multi)
+        .and_raise(Redis::CommandError, "OOM command not allowed when used memory > 'maxmemory'.")
+    end
+
+    it "answers 503 with a retry hint instead of a generic 500" do
+      post "/api/v3/guest/conceal", JSON.generate(secret: "written into a full Redis", ttl: 1800),
+           { "CONTENT_TYPE" => "application/json" }
+
+      expect(last_response.status).to eq(503)
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq("service_unavailable")
+      expect(last_response.headers["Retry-After"]).to match(/\A\d+\z/)
+      expect(last_response.body).not_to include("OOM")
+      expect(last_response.body).not_to include("written into a full Redis")
+    end
+  end
+
   it "serves the SPA shell for deep links when the build exists" do
     allow(File).to receive(:file?).and_call_original
     allow(File).to receive(:file?).with(Onetime::Web::App::INDEX_PATH).and_return(true)

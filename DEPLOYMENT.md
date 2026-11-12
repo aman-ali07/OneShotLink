@@ -37,6 +37,15 @@ are the code defaults; `SECRET` has no default and is required.
 | `PUMA_WORKER_TIMEOUT` | no | `60` | Seconds a worker may take to boot before Puma stops it (`config/puma.rb`) |
 | `PORT` | no | `3000` | Puma bind port inside the container (`config/puma.rb`); Compose publishes `APP_PORT` |
 | `RACK_ENV` | no | `development` | `production` in the image |
+| `METRICS_ENABLED` | no | `false` | Serve `/metrics` (Prometheus text); `404` when off |
+
+Two Compose-only variables are read by `compose.yaml`, not by `Config`:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `APP_PORT` | `3000` | Host port published by Compose |
+| `APP_BIND` | `0.0.0.0` | Host interface the port is published on. Use `127.0.0.1` when the TLS proxy runs on the same host, so the app port is not reachable from the internet |
+| `REDIS_MAXMEMORY` | `256mb` | Redis memory ceiling. It is what gives `maxmemory-policy noeviction` meaning, and it is required for `onetime_redis_memory_used_ratio` to exist at all |
 
 ## Accounts and the CLI
 
@@ -71,8 +80,6 @@ A password change from the UI **also revokes every other live session** and keep
 caller signed in (verified); `reset-password` revokes all of them. The Redis session TTL
 slides on activity; the browser cookie has a fixed `SESSION_TTL` max-age (default 14
 days) and is `Secure` only when `SSL=true`.
-| `APP_PORT` | no | `3000` | Host port published by Compose |
-| `APP_BIND` | no | `0.0.0.0` | Host interface the port is published on. Use `127.0.0.1` when the TLS proxy runs on the same host, so the app port is not reachable from the internet |
 
 `.env.example` contains placeholder values only. Never commit `.env`.
 
@@ -112,8 +119,10 @@ docker compose down          # keeps the redis-data volume
 docker compose down -v       # deletes secrets and receipts — destructive
 ```
 
-The Compose project is named `oneshotlink`, so its volumes and networks are prefixed
-`oneshotlink_` (`oneshotlink_redis-data`, `oneshotlink_backend`, `oneshotlink_frontend`).
+The Compose project is named `oneshotlink`, so every resource it creates is prefixed
+`oneshotlink_`: the volumes `oneshotlink_redis-data` (Redis AOF) and `oneshotlink_backup-data`
+(mounted at `/backups` for `bin/ots backup`), and the networks `oneshotlink_frontend`
+(public plane) and `oneshotlink_backend` (internal, no gateway).
 The project was renamed from its pre-R-09 working title (see `git log -p compose.yaml`); an
 instance started before that rename keeps its data only if you address it by the old
 project name (`docker compose --project-name <old-name> ...`). No data has been migrated by
@@ -196,7 +205,12 @@ HOST=https://secrets.example.com script/preflight.sh
 
 It encodes every check in this section plus the Redis isolation checks, prints
 `PREFLIGHT PASSED` and exits `0` only when all pass, and exits non-zero otherwise
-(see `--help` for `--cacert`, `--resolve`, and `--skip-redis`). Set
+(see `--help` for `--cacert`, `--resolve`, and `--skip-redis`).
+
+> Two different `HOST`s: `script/preflight.sh` takes a **URL** (`https://secrets.example.com`),
+> while the app's `HOST` in `.env` is **host:port with no scheme** — `Config.base_url`
+> prepends it. Setting the app's `HOST` to a URL produces `https://https://…` links and a
+> broken session cookie, so keep the two forms apart. Set
 `PREFLIGHT_ALLOW_SIGNUP=1` to include the session-cookie check. The commands below
 are kept as reference for what it checks:
 
@@ -388,6 +402,12 @@ Suggested alert thresholds:
 `api_v3`, `other`), never a secret key, so cardinality stays bounded. Distributed
 tracing is not included.
 
+`onetime_redis_memory_used_ratio` is only exported when Redis has a `maxmemory` set
+(`maxmemory_bytes` is otherwise `0` and the gauge is omitted, which would make the
+docstring's alert silently unmatchable). Compose sets it via `REDIS_MAXMEMORY`; if you
+run Redis outside Compose, set `maxmemory` there or alert on
+`onetime_redis_memory_used_bytes` against the host's RAM instead.
+
 ## 6. Persistence and backup
 
 - Redis AOF (`appendonly yes`, `everysec`) is the system of record; Compose mounts the
@@ -461,8 +481,17 @@ Redis is the system of record, so it must not be reachable unauthenticated.
 - The app is stateless; scale horizontally behind the proxy. All instances must share one
   Redis (sessions and secrets are not replicated).
 - Rate limits are per Redis, not per instance — good.
-- A single Redis is a single point of failure. Sentinel/Cluster is out of scope; document
-  the outage behaviour (503 health, 500 API) for operators.
+- A single Redis is a single point of failure. Sentinel/Cluster is out of scope. The
+  outage behaviour is: `/health` and every Redis-backed route answer `503
+  service_unavailable` with `Retry-After`, and they recover without a restart — an outage
+  is never reported as a generic `500`.
+- **When Redis reaches `maxmemory`** (with `noeviction`) every write is rejected with the
+  same `503`, and so is every reveal — the atomic consume is a Lua `EVAL`, which Redis
+  refuses to run at the ceiling. Nothing is lost: measured on a 6 MB stack, the write that
+  crossed the ceiling got `503` + `Retry-After: 5`, and the earlier secrets revealed
+  normally once `maxmemory` was raised. Note that TTLs keep running while storage is full,
+  so a secret can expire before the operator frees space — alert on the ratio below 0.8 to
+  make that window unreachable in practice.
 - Long secrets and high TTLs dominate memory; cap `MAX_SECRET_BYTES` and `TTL_OPTIONS`.
 
 ## 10. `SECRET` rotation
