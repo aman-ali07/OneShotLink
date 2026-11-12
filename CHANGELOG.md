@@ -26,6 +26,16 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
   revealed `200` with full content once `maxmemory` was raised. DEPLOYMENT.md §9 says so,
   including that TTLs keep running while storage is full.
 
+### Verified (the deployment path still holds after the ceiling change, 2026-11-12)
+
+- `script/tls-rehearsal.sh --with-redis` → **`PREFLIGHT PASSED` (0 skipped)**, exit 0: 7 TLS
+  assertions (chain, HSTS, hardening headers, `Secure`/`HttpOnly`/`SameSite` cookie via a
+  throwaway signup, HTTP→HTTPS 301) plus 2 Redis-isolation assertions. Adding `--maxmemory`
+  to Compose did not disturb the production path.
+- `script/loadtest.rb 200 20` against that stack: 200 secrets, 161.1 creates/s, **200/200
+  revealed exactly once**, and Redis used 1.36 MB of the 256 MB ceiling. DEPLOYMENT.md §9 now
+  carries that measurement as the sizing guide (~7 KB per small secret ≈ 35k live secrets).
+
 ### Docs (milestone documents unfrozen from the M2 snapshot, 2026-11-12) — verified
 
 - `PRD.md` acceptance item 6 still said CI "has not yet run on GitHub (K-32)" — CI has been

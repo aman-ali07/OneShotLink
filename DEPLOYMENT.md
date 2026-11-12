@@ -492,6 +492,11 @@ Redis is the system of record, so it must not be reachable unauthenticated.
   normally once `maxmemory` was raised. Note that TTLs keep running while storage is full,
   so a secret can expire before the operator frees space — alert on the ratio below 0.8 to
   make that window unreachable in practice. Runbook: [RUNBOOK.md](RUNBOOK.md) §2b.
+- **Sizing the ceiling.** Measured on the default 256 MB: a 200-secret load test (161
+  creates/s) left Redis at 1.36 MB, i.e. ~7 KB per small secret, so 256 MB holds roughly
+  35,000 live secrets. Secrets approach the 1 MiB cap when they are large, so size it as
+  `expected live secrets × typical size`, and re-check on the real host rather than trusting
+  this ratio.
 - Long secrets and high TTLs dominate memory; cap `MAX_SECRET_BYTES` and `TTL_OPTIONS`.
 
 ## 10. `SECRET` rotation
