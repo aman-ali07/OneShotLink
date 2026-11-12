@@ -7,14 +7,14 @@ Keep this file current when planning or landing work. IDs are stable; do not ren
 
 Checkpoint date: 2026-11-11. **M0–M3, production packaging, and the in-repo production-hardening gates are complete.**
 Ruby/Bundler are not installed on the host, so every Ruby check runs in Docker
-(`ruby:3.3-slim` + build tools); **112 specs pass** against Redis DB 15. The app runs in a
+(`ruby:3.3-slim` + build tools); **113 specs pass** against Redis DB 15. The app runs in a
 non-root production image with a two-worker Puma cluster (Puma 7.2.1), Redis persistence,
 hardened headers, trusted-proxy handling, redacted logs, audit stream, Compose packaging,
 CI, and dependency scanning. A headless-Chrome journey completed create → copy link →
 reveal once → gone, including the passphrase path, with no plaintext in the URL or
 localStorage. A second browser journey covers signup → owner receipt → signout → signin.
 The CLI (`bin/ots`) ships in the image with health, backup/restore, key rotation, and
-customer management. **112 backend specs pass.** Remaining items are infrastructure
+customer management. **113 backend specs pass.** Remaining items are infrastructure
 (TLS, Redis auth) that cannot be closed from the repository; see `PRODUCTION_READINESS.md`.
 
 ## Completed (code present)
@@ -36,7 +36,7 @@ customer management. **112 backend specs pass.** Remaining items are infrastruct
 | T-24 | API v1 (`/api/v1/share`, `/api/v1/secret/:key`) | DONE | `spec/integration/secrets_api_spec.rb` | Legacy shape; form **and** JSON create; GET/POST reveal; second call `404` |
 | T-25 | API v3 guest routes (conceal/reveal) | DONE | `spec/integration/secrets_api_spec.rb` | `201` create / `200` reveal; passphrase flow; owner aliases fail closed until sessions (M3) |
 | T-26 | Rate limits on conceal/reveal with `Retry-After` | DONE | `lib/onetime/web/app.rb`, integration spec | `429` + `Retry-After` on v1 and v3; rejected reveals do not consume; client IP honors `TRUSTED_PROXIES` (K-16 closed) |
-| T-27 | Integration specs: lifecycle, TTL, encryption-at-rest, concurrent reveal | DONE | `spec/integration/secrets_api_spec.rb` | Create/reveal/gone, expiry, ciphertext-only Redis, 8-way race → exactly one `200`; 112 specs total today |
+| T-27 | Integration specs: lifecycle, TTL, encryption-at-rest, concurrent reveal | DONE | `spec/integration/secrets_api_spec.rb` | Create/reveal/gone, expiry, ciphertext-only Redis, 8-way race → exactly one `200`; 113 specs total today |
 | T-42 | `/api/v3/config` endpoint (TTL options, auth mode, UI flags) | DONE | `lib/onetime/web/app.rb`, `spec/integration/web_spec.rb` | Response verified live; UI can render options without duplication |
 | T-48 | Decide passphrase-model parity | DONE | `docs/DECISIONS.md` D-012, `SECURITY.md`, `KNOWN_ISSUES.md` K-21 | Keep instance-key encryption + Argon2 gate; no zero-knowledge claim; deliberate parity gap |
 | T-45 | Security headers (CSP, HSTS when SSL, nosniff, frame deny) | DONE | `lib/onetime/web/app.rb`, `spec/integration/web_spec.rb` | CSP/COOP/CORP/Permissions-Policy on every response; HSTS only under `SSL=true`; verified live |
@@ -47,9 +47,10 @@ customer management. **112 backend specs pass.** Remaining items are infrastruct
 | T-54 | CI: rspec, frontend tests/typecheck/build, container smoke | DONE | `.github/workflows/ci.yml` | Redis DB 15 service; Vitest; Compose lifecycle + committed browser E2E; not yet executed on GitHub |
 | T-80 | Icon set and social card from the logo brief (launch blocker B3) | DONE | `site/favicon.svg`, `site/app-icon.svg`, `site/og-card.html`, `script/build-assets.sh`, assets in `site/` and `frontend/public/` | Mark is one stroke in one colour with both seam gaps; generated set is favicon 16/32 + SVG, `apple-touch-icon.png` 180, `icon-512.png`, opaque `app-icon-1024.png`, `og.png` 1200×630; linked from all four HTML heads |
 | T-82 | Datastore outage answers `503`, not `500` | DONE | `lib/onetime/errors.rb` (`Unavailable`), `web/app.rb` (`datastore_error?`), `spec/integration/web_spec.rb` | Redis connection errors map to `503 service_unavailable` with `Retry-After` on both API versions; v1 keeps its `message` shape; verified live by stopping Redis under the running Compose stack, then recovering without a restart |
-| T-83 | Spec suite refuses a shared Redis DB | DONE | `spec/spec_helper.rb` | Before flushing, the suite counts clients attached to DB 15 and aborts with a clear message if another server or suite is using it; verified by attaching a second client (refused) and detaching it (110 → now 112 examples pass) |
+| T-83 | Spec suite refuses a shared Redis DB | DONE | `spec/spec_helper.rb` | Before flushing, the suite counts clients attached to DB 15 and aborts with a clear message if another server or suite is using it; verified by attaching a second client (refused) and detaching it (110 → now 113 examples pass) |
 | T-84 | Repeatable TLS rehearsal in front of the real preflight gate | DONE | `script/tls-rehearsal.sh`, `TESTING.md` §3.2 | Boots the production stack behind Caddy with a throwaway CA, then runs `script/preflight.sh --cacert` against it: 7 TLS assertions pass including `Secure`/`HttpOnly`/`SameSite` via a throwaway signup. `--with-redis` fails only on the unfixed host rule (T-71), which doubles as the negative control. Cleans up its stack, CA and proxy on exit |
-| T-85 | Redis isolation on the host: fixed subnet + firewall rule | DONE (rule is per-host) | `compose.yaml` (`REDIS_SUBNET`), `DEPLOYMENT.md` §4.0, `script/tls-rehearsal.sh --with-redis` | Backend network pinned to `10.77.13.0/24` (outside Docker's default pool) so the rule survives redeploys; one narrow `nft` OUTPUT rule drops host→backend:6379. Verified: host connection times out, app create → reveal works, published test Redis on `:6399` unaffected, full preflight green with 0 skips (112 specs still pass). Rule is runtime-only until persisted; re-apply per deployment host |
+| T-85 | Redis isolation on the host: fixed subnet + firewall rule | DONE (rule is per-host) | `compose.yaml` (`REDIS_SUBNET`), `DEPLOYMENT.md` §4.0, `script/tls-rehearsal.sh --with-redis` | Backend network pinned to `10.77.13.0/24` (outside Docker's default pool) so the rule survives redeploys; one narrow `nft` OUTPUT rule drops host→backend:6379. Verified: host connection times out, app create → reveal works, published test Redis on `:6399` unaffected, full preflight green with 0 skips (113 specs still pass). The durable form is ufw's `deny out to 10.77.13.0/24 port 6379`, persisted in `/etc/ufw/user.rules`; re-apply per deployment host |
+| T-86 | A decryption failure must not destroy the secret | DONE | `lib/onetime/logic/reveal_secret.rb`, `spec/integration/secrets_api_spec.rb` | Decrypt now runs before the atomic consume, so a rotated/wrong `SECRET` or a corrupt record answers `500` and leaves the record intact instead of deleting it. Failing spec first (`404` on the second attempt), then verified live: old key live → `500`, `EXISTS` = 1, switch to the new key → the same secret reveals. Suite 113 examples |
 | T-79 | Account deletion (launch blocker B1) | DONE | `lib/onetime/logic/delete_account.rb`, `web/app.rb`, `DashboardView.vue`, `spec/integration/accounts_spec.rb`, `frontend/src/lib/api.test.ts`, `e2e/accounts.mjs` | `DELETE /api/v3/account` re-authenticates, then removes record + email index + sessions + receipts and clears the cookie; live secrets expire on their own TTL. 6 specs incl. an all-or-nothing failure case, 2 Vitest cases, and an E2E delete step; Roda has no `r.delete`, so the route uses `r.is(method: "DELETE")` |
 | T-75 | Committed frontend unit/E2E tests | DONE | `frontend/src/lib/api.test.ts`, `e2e/journey.mjs` | 9 Vitest tests; puppeteer journey covers create/reveal/gone and wrong/correct passphrase; verified locally |
 | T-78 | Build the landing page from `replica/launch/landing.md` | DONE (site; not deployed) | `site/index.html`, `site/privacy.html`, `site/terms.html`, `site/styles.css`, `site/favicon.svg` | Static site, not a Vue route (the instance is the product). Verified with headless Chrome at 1280/375px: all files 200, no page overflow, even 55–56px section gaps, rendered contrast 16.74:1 / 7.30:1 / 5.47:1, only decorative hairline rule below 3:1. No third-party requests |
@@ -162,6 +163,6 @@ lifecycle create → reveal → gone verified through Compose; OpenAPI served at
 `/api/v3/openapi.json`; key rotation verified live (21 secrets, old key fails, new key
 reads); backup/restore verified live (deleted secret 404 → restored → decrypts); load test
 verified 400 secrets × 8-way race with 0 double reveals; `bundler-audit` and `npm audit`
-report 0 vulnerabilities. Backend suite: `112 examples, 0 failures`; frontend: 11 Vitest
+report 0 vulnerabilities. Backend suite: `113 examples, 0 failures`; frontend: 11 Vitest
 tests; both committed browser journeys (create/reveal/gone and
 signup/receipt/signout/signin/delete) pass against a live Puma on Redis DB 15.

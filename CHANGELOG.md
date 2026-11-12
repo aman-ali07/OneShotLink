@@ -9,6 +9,18 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (a rotated key no longer eats secrets, 2026-11-12) — verified
+
+- **Reveal decrypts before it consumes.** `Logic::RevealSecret` consumed the record and then
+  decrypted it, so a record it could not read — a rotated `SECRET`, a wrong key in the
+  environment, a corrupt entry — was deleted before the failure surfaced. The expensive,
+  pure checks now run first and the one irreversible step last, which matches the rule the
+  passphrase gate already followed: nothing is destroyed until the reveal can succeed.
+  A failing spec came first (`404` on the retry, because the record was gone), then the fix;
+  then the live drill: with the old key still configured the reveal answers `500` and
+  `EXISTS secret:object:<key>` stays `1`, and after switching to the new key and restarting,
+  the same secret reveals normally. Suite 113 examples, 0 failures.
+
 ### Changed (production hardening pass, 2026-11-12) — verified
 
 - **A datastore outage is now reported honestly.** Redis connection failures map to

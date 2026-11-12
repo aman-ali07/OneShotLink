@@ -5,7 +5,7 @@ original one-time secret service.
 **Stack:** Ruby 3.3 + Roda on Rack 3 + Puma, Redis, Vue 3 + TypeScript + Vite + Tailwind.
 **Status:** production-packaged core with optional simple-mode accounts. The Vue SPA and
 APIs support create → link → reveal once → gone, including the passphrase path; account
-signup/signin, owner receipts, and the dashboard are implemented. **112 backend specs pass**,
+signup/signin, owner receipts, and the dashboard are implemented. **113 backend specs pass**,
 two headless browser journeys are verified, and the non-root Compose stack is smoke-tested.
 Every in-repo gate is closed (Redis auth, network isolation, backups, metrics, dependency
 scanning, key rotation, load test). Still open: **TLS on a real hostname** (T-70 — operator
@@ -199,7 +199,10 @@ a separate automation kit; the automation is gone, the rules are not.
   are modules with explicit key builders (see [DATABASE.md](DATABASE.md)).
 - **One-time reveal is a security invariant.** The consume must stay atomic
   (compare-and-delete Lua). Never replace it with read-then-delete in Ruby.
-- **Passphrase failures must not consume the secret.** Verify first, then consume.
+- **Nothing irreversible before the work succeeds.** Both the passphrase check and the
+  decryption run *before* `Store.consume`: a wrong passphrase, a rotated `SECRET` or a
+  corrupt record leaves the secret readable instead of destroying it. Do not move
+  `Crypto.decrypt` after the consume.
 - **Record encoding is constrained:** `Onetime::Store.consume` compares a single string
   value with `GET`, so secret records must remain JSON strings, not Redis hashes.
 - **API versions are contracts.** v1 shapes must not change; v3 is native JSON.

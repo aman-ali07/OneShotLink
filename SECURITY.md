@@ -4,7 +4,7 @@ This document separates **controls that exist and have been exercised** from **c
 that must still be implemented**. Nothing here is a claim that the system is fully
 production-ready: there is no bundled TLS terminator and simplified accounts intentionally
 omit full-mode features. The secret lifecycle, simple-mode accounts, UI, hardened
-container, and Compose stack are implemented and covered by 94 specs, a live Puma run,
+container, and Compose stack are implemented and covered by 113 specs, a live Puma run,
 two headless-browser journeys, and a container smoke test.
 
 ## 1. Assets and trust boundaries
@@ -40,11 +40,11 @@ inside the trust boundary but are assumed readable by an attacker only together 
 | Boot validation fails closed | `Config.validate!`, `config.ru` | Verified: missing/short `SECRET`, bad TTL/auth/proxy config exit 1 |
 | Trusted-proxy-only `X-Forwarded-For` | `App#client_id`, `TRUSTED_PROXIES` | Verified by integration specs (spoof ignored, trusted hop honored) |
 | Redacted request logs | `Web::RequestLogger` | Verified: secret keys absent; only method/path/status/duration/request ID |
-| Bounded Redis timeouts and reconnect | `Store.redis` env config | Configured in `Config`; health check reports Redis reachability |
+| Bounded Redis timeouts and reconnect | `Store.redis` env config | Verified live: with Redis stopped, `/health` → `503 degraded`, writes → `503` + `Retry-After`, and the instance recovers without a restart |
 | Non-root, read-only container with no secrets | `Dockerfile`, `compose.yaml` | Verified: UID 10001, read-only rootfs, no `.env` in image |
-| Input limits: TTL allowlist, 1 MiB cap, passphrase 1–256; actual body read capped | `ConcealSecret`, `parse_json_body` | Verified (exact 1 MiB boundary still T-47) |
-| Error hygiene: no stack traces/Redis errors, request ID only | `app.rb` error handler | Verified by 404/500 paths |
-| No auto-reveal on page load (link previews cannot consume) | `RevealView.vue` | Verified by browser journey |
+| Input limits: TTL allowlist, `MAX_SECRET_BYTES` cap, passphrase 1–256; actual body read capped | `ConcealSecret`, `parse_json_body` | Verified: exact boundary accepts N and rejects N+1 (`413`), empty and 1-char passphrase rejected (T-47) |
+| Error hygiene: no stack traces/Redis errors, request ID only | `app.rb` error handler | Verified by 404/500 paths. A Redis outage answers `503 service_unavailable` + `Retry-After` on both API versions (never a `500`, never the driver's message) |
+| No auto-reveal on page load (link previews cannot consume the **share link**) | `RevealView.vue` | Verified by browser journey. Caveat: the v3 **API** `GET /api/v3/guest/secret/:key` does consume, so an API URL pasted into a chat client burns the secret (K-35) |
 | No plaintext in URL, localStorage, or sessionStorage | SPA state only | Verified: `localStorage === "{}"` after create; URL contains only the key |
 | No `v-html` for user content | SPA templates | Code review; CSP now blocks inline/third-party scripts |
 | Argon2id customer passwords (bcrypt legacy verify then rehash) | `Models::Customer`, `Password` | Verified: no plaintext password in Redis; duplicate email cannot race |
@@ -62,14 +62,14 @@ zero-knowledge or "the server cannot decrypt".
 
 | Area | Status |
 | --- | --- |
-| Transport | HSTS emitted when `SSL=true`; **TLS termination + real hostname is the operator's host (T-70), not bundled** |
+| Transport | HSTS emitted when `SSL=true`; the app port stays private with `APP_BIND=127.0.0.1` when the proxy runs on the same host (verified: LAN address refused, loopback answers). **TLS termination + real hostname is the operator's host (T-70), not bundled** — rehearsed end to end by `script/tls-rehearsal.sh` |
 | Passphrase guessing | Per-IP reveal limiter is the v1 control; no per-secret lockout (D-012, accepted) |
-| Redis auth/TLS | **Implemented:** `--requirepass` + `REDIS_PASSWORD` (verified `NOAUTH` without it), `rediss://` for TLS. Host network policy is the operator's (T-71) |
+| Redis auth/TLS | **Implemented:** `--requirepass` + `REDIS_PASSWORD` (verified `NOAUTH` without it), `rediss://` for TLS. Host path to the container is closed by one narrow firewall rule against the fixed backend subnet (T-71, applied and proven: the real preflight passes with 0 skips) |
 | Key rotation | **Implemented:** `bin/ots rotate-key` re-encrypts in place (T-65, verified) |
 | Dependencies | **Implemented:** `bundler-audit` + `npm audit` in CI; 0 vulnerabilities (T-74) |
 | Backups | **Implemented:** `bin/ots backup`/`restore`, ciphertext-only, TTLs preserved; RPO/RTO documented (T-72, verified) |
 | Audit logging | **Implemented:** append-only `audit:events` stream for account and reveal events; plus redacted, correlated request logs (K-34) |
-| Metrics/tracing | **Open:** structured logs only; no latency/error metrics pipeline (T-73) |
+| Metrics/tracing | **Implemented (metrics):** Prometheus text at `/metrics` behind `METRICS_ENABLED` — request/error counters, duration, Redis up + memory ratio (T-73, verified live). **Open:** distributed tracing |
 
 ## 4. Invariants that must not regress
 
@@ -82,6 +82,11 @@ zero-knowledge or "the server cannot decrypt".
 7. **Fail closed.** Missing `SECRET`, Redis outage, or `AUTH_MODE=full` must error, not
    silently degrade.
 8. **Unknown = 404.** Do not distinguish expired vs consumed vs never-existed.
+9. **Nothing irreversible happens before the work succeeds.** The passphrase check and the
+   decryption both run *before* `Store.consume`. A wrong passphrase, a rotated `SECRET`, or
+   a corrupt record must leave the record readable, never silently destroy it (verified: with
+   a rotated key the reveal answers `500` and `EXISTS` stays `1`; after switching to the new
+   key the same secret reveals).
 
 ## 5. Threat model (v1)
 
@@ -97,7 +102,7 @@ zero-knowledge or "the server cannot decrypt".
 | XSS in UI | No `v-html` for user content, no plaintext in storage, strict CSP, same-origin scripts only | CSP did not break the verified browser journey |
 | CSRF | SameSite=Lax + JSON-only + origin checks | Legacy browser behavior |
 | Enumeration | Uniform 404s, opaque IDs | Timing differences (not measured) |
-| `SECRET` rotation | Documented as destructive | No re-encryption tool (T-65) |
+| `SECRET` rotation | Non-destructive in-place re-encryption: `bin/ots rotate-key` rewrites every record under `OTS_NEW_SECRET` and the old key stops working (T-65, verified live) | Rotation is operator-driven and needs a restart with the new `SECRET`; until it is done a leaked `SECRET` opens everything |
 | Insider with host access | Out of scope (env + memory readable) | Operator trust assumed |
 
 Explicit non-goals: protection from a compromised client, screenshots, recipient
@@ -118,8 +123,17 @@ copy/paste, or an attacker who already has the link and the passphrase.
 
 - `SECRET` is generated with `openssl rand -hex 32` and supplied via the environment
   (Compose `.env`, secret manager, or orchestrator secret).
-- Rotating `SECRET` makes every existing secret undecryptable. There is no re-encryption
-  path. Announce rotation, drain TTLs first, or add T-65 before rotating.
+- **Rotation is non-destructive (T-65, verified live):** `bin/ots rotate-key` re-encrypts
+  every secret, receipt and customer record under `OTS_NEW_SECRET`, preserving each record's
+  remaining TTL, then you set `SECRET` to the new value and restart the web process. After
+  that the old key fails and the new one reads everything (verified: 21 secrets rotated, a
+  pre-rotation secret still decrypts, the old key errors).
+  While the web process still holds the *old* key, reveals of rotated records answer `500`
+  and the record survives (`EXISTS` is still `1`) — so the rotation window is recoverable
+  rather than destructive. Switch `SECRET` and restart immediately after rotating.
+- Rotating *without* that tool — deleting and regenerating `SECRET` — makes every existing
+  secret undecryptable. Do not do it; the CLI path exists. Run it from a host you trust with
+  the new key, and keep the old `SECRET` nowhere afterwards (`RUNBOOK.md` §1).
 - Never commit `.env`; it is git-ignored. Use `.env.example` with placeholders.
 - Do not reuse the web session signing material: sessions are opaque Redis tokens, not
   signed with `SECRET`.

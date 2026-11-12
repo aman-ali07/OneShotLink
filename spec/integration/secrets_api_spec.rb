@@ -114,6 +114,23 @@ RSpec.describe "Secret lifecycle API" do
         expect(JSON.parse(last_response.body).dig("error", "code")).to eq("not_found")
       end
     end
+
+    it "does not destroy the secret when it cannot be decrypted" do
+      # A rotated or wrong SECRET makes decryption impossible. That is an
+      # operator fault, not a reveal: the record must survive so the operator
+      # can rotate back and the reader can still get the secret.
+      key = create_v3(secret: "unreadable-under-this-key")["secret_key"]
+
+      allow(Onetime::Crypto).to receive(:decrypt).and_raise(Onetime::Error, "Stored secret could not be decrypted")
+      reveal_v3(key)
+      expect(last_response.status).to eq(500)
+      expect(last_response.body).not_to include("unreadable-under-this-key")
+
+      allow(Onetime::Crypto).to receive(:decrypt).and_call_original
+      reveal_v3(key)
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["secret_value"]).to eq("unreadable-under-this-key")
+    end
   end
 
   describe "v1 compatibility" do
