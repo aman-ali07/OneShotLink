@@ -9,6 +9,25 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Docs (API contract audited against the routes, 2026-11-12) — verified
+
+- `API.md` documented a **`colonel` admin API that does not exist**. `GET
+  /api/v3/colonel/stats` answers `404`; there are no colonel routes, models or specs. It is
+  now listed with the deferred endpoints, with `bin/ots customers …` named as what operators
+  use today.
+- v1 reveal metadata was documented as `{ttl, kind}`; the live response is
+  `{kind, filename, created_at, ttl}`. `API.md` promises v1 shapes must not change, so the
+  doc was wrong, not the endpoint.
+- `AUTH_MODE=full` was described as "not reachable yet"; it answers `501 not_configured` and
+  two specs assert it.
+- The OpenAPI section pointed at a planned file (`lib/onetime/openapi.rb`, "planned T-44")
+  and claimed a generated copy lives in `docs/openapi.json` — that file has never existed.
+  It now names `lib/onetime/web/openapi.rb`, explains that the served document is the source
+  of truth, and states that every Redis-backed route documents `503`.
+- Reveal is documented as consuming only after the passphrase check and the decryption
+  succeed (D-013), and the examples footer carries this session's evidence: 113 examples and
+  live v1 shapes copied from responses.
+
 ### Docs (reconciled with the code, 2026-11-12) — verified
 
 - `ARCHITECTURE.md` and `DATABASE.md` claimed things that were not true any more: a folder

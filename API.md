@@ -125,7 +125,7 @@ Both form-encoded and JSON bodies are accepted; JSON must send
 ```json
 {
   "secret_value": "the plaintext, exactly once",
-  "metadata": { "ttl": 86400, "kind": "text" }
+  "metadata": { "kind": "text", "filename": null, "created_at": 1762819200, "ttl": 86400 }
 }
 ```
 
@@ -167,8 +167,9 @@ require a session.
 
 Errors: `422 validation_error` (bad TTL, empty/oversized secret, passphrase > 256),
 `413 payload_too_large`, `429 rate_limited`, `401 unauthorized` for the authenticated
-route. `AUTH_MODE=full` is not reachable yet; it must eventually return `501`, never
-silently fall back to anonymous creation (D-003).
+route. Under `AUTH_MODE=full` the authenticated routes return `501 not_configured` rather
+than silently falling back to anonymous creation (D-003); full mode is not implemented and
+must never degrade quietly.
 
 ### 5.2 Reveal
 
@@ -198,7 +199,9 @@ Errors:
 - `404 not_found` — unknown, expired, or already consumed (indistinguishable by design).
 - `429 rate_limited`.
 
-The record is deleted **before** the response is sent. The response is `no-store`.
+The record is consumed **before** the response is sent, and only after the passphrase
+check and the decryption have succeeded — a wrong passphrase, a rotated `SECRET` or a
+corrupt record leaves it intact (D-013). The response is `no-store`.
 If the request carries a valid session, the owner receipt is created on either conceal
 route and is removed from the owner index by the same atomic reveal.
 
@@ -223,15 +226,6 @@ emails are never written into Redis keys.
 Login failures are always `401 {"error":{"code":"invalid_credentials"}}`; do not reveal
 whether the email exists. Passwords/tokens never appear in responses or logs.
 
-### 5.4 Colonel (admin)
-
-Requires role `colonel`; otherwise `403 forbidden`.
-
-| Route | Response |
-| --- | --- |
-| `GET /api/v3/colonel/stats` | `200 {"customers":12,"active_secrets":4,"redis":"ok"}` (counts only) |
-| `GET /api/v3/colonel/customers?limit=50` | `200 {"customers":[{"id","email","role","created_at"}]}` |
-
 ## 6. Deferred endpoints (not in the v1 contract)
 
 Listed so nobody implements them accidentally. Organizations, domains, invites, account
@@ -239,14 +233,20 @@ SSO/MFA, and v2 are **out of scope** until [TASKS.md](TASKS.md) Phase 5:
 
 - `/api/v3/organizations*`, `/api/v3/invite*`, `/api/v3/domains*`
 - `/api/v3/account/mfa*`, `/api/v3/account/webauthn*`, `/api/v3/account/sso*`
+- `/api/v3/colonel*` — the admin console. The CLI covers the operator's needs today
+  (`bin/ots customers list|show|set-role`), so these routes are not mounted: they answer
+  `404`, and any future version must be added here, to `openapi.rb` and to the specs
+  together
 - `/api/v2/*`
 
 ## 7. OpenAPI
 
-`GET /api/v3/openapi.json` returns an OpenAPI 3.1 document generated from the route
-definitions (`lib/onetime/openapi.rb`, planned T-44). The generated file is committed to
-`docs/openapi.json` for client generation. The document must only describe implemented
-routes; deferred routes are omitted, not stubbed.
+`GET /api/v3/openapi.json` returns an OpenAPI 3.1 document built in
+`lib/onetime/web/openapi.rb` (T-44). The served document is the source of truth for
+clients; there is no committed copy to drift out of date. A spec asserts that every
+documented path is actually mounted and every `$ref` resolves, and the document must only
+describe implemented routes — deferred routes are omitted, not stubbed. Every
+Redis-backed route documents `503 service_unavailable` alongside its own codes.
 
 ## 8. Examples
 
@@ -267,6 +267,7 @@ curl -sX POST http://localhost:3000/api/v1/share -d 'secret=hello&ttl=1800'
 curl -sX POST http://localhost:3000/api/v1/secret/<key>
 ```
 
-Verified 2026-11-11 with Puma on `:3100` (Redis DB 0): create `201`, first reveal
-`200`, second reveal `404`; four parallel reveals produced one `200` and three `404`.
-`bundle exec rspec` → 94 examples, 0 failures.
+Verified 2026-11-12 against the production image through Compose (Redis DB 15 for the
+specs): create `201`, first reveal `200`, second reveal `404`; four parallel reveals
+produced one `200` and three `404`; the v1 shapes above were copied from live responses.
+`bundle exec rspec` → 113 examples, 0 failures.
