@@ -163,6 +163,9 @@ A change is not done until:
 - [ ] `docker compose config` validates and `SECRET=... docker compose up` is healthy for
       deployment changes.
 - [ ] No secret key appears in request logs (`<redacted>` expected).
+- [ ] `script/brand-sweep.sh` exits 0 for anything that touches `site/`, `frontend/`,
+      `lib/`, `bin/`, `config/` or user-visible copy. It scans tracked non-prose files;
+      `*.md` prose and `replica/` are out of scope by design (AGENTS.md explains why).
 - [ ] No spec depends on execution order, sleeps longer than needed, or hits DB ≠ 15.
 - [ ] No test logs request bodies containing secrets.
 

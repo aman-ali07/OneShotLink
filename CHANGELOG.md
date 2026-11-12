@@ -9,6 +9,24 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (`script/brand-sweep.sh`, the rebrand gate, 2026-11-12) — verified
+
+- **The launch sweep now scans what ships instead of the whole checkout.** The replica-brand
+  tool walks the filesystem and ignores `.gitignore`, so running it from the repo root also
+  scanned prose and local run artifacts; it reported hits for this checkout's own directory
+  name in `LOOP.md`'s cron line and in git-ignored `.loop-runs/` transcripts while every
+  shipped surface was clean. The wrapper copies the tracked, non-prose files (`*.md` and
+  `replica/` excluded, since the original belongs there as a comparison) into a temp tree and
+  sweeps that: 95 files, exit 0. Untracked artifacts can no longer colour the result.
+- Exit codes are `0` clean, `1` hits, `2` tool missing, so it can block a deploy. `AGENTS.md`,
+  `TESTING.md` (quality gates), `ROADMAP.md` (M5 gate) and `replica/deploy.md` now name the
+  script instead of the raw command.
+
+Verified: exit 0 from the repo root and from another cwd; **negative controls** — planting
+`Onetime Secret` in `site/index.html` gives exit 1 naming `site/index.html:6`, the same
+string in `TASKS.md` or in an untracked `.loop-runs/` file gives exit 0; `SWEEP=/nope`
+gives exit 2. The full-tree `sweep.py .` still reports the 2 loop-doc hits and is unchanged.
+
 ### Changed (account deletion is atomic, 2026-11-12) — verified
 
 - **`DeleteAccount` runs as one Redis `MULTI`/`EXEC` instead of a chain of single commands.**

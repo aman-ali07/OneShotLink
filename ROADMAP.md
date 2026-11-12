@@ -122,7 +122,8 @@ Deliverables: `replica/fixes.md` from real, linked reviews; new name/domain/ pal
 `sweep.py` clean; LICENSE; landing copy without fake proof; original name absent from
 UI, metadata, and package names.
 
-Gate: `sweep.py` exits 0; `contrast.py` AA; no fabricated quotes or numbers.
+Gate: `script/brand-sweep.sh` exits 0 (the shipped tree is clean); `contrast.py` AA; no
+fabricated quotes or numbers.
 
 ### M6 — Deploy (effort: 1 day)
 

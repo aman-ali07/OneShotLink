@@ -75,9 +75,16 @@ Useful commands (tools are stdlib Python; run them from the repo root):
 
 ```bash
 python3 ~/.agents/skills/replica-diff/parity.py replica/features.csv
-python3 ~/.agents/skills/replica-brand/sweep.py . --config replica/brand.json
+script/brand-sweep.sh                                   # rebrand gate over shipped files
 python3 ~/.agents/skills/replica-design/contrast.py replica/design/tokens.json   # once tokens exist
 ```
+
+`script/brand-sweep.sh` is the gate, not the raw tool: it runs `sweep.py` over the tracked
+files that ship (code, config, static assets, specs, e2e) and skips prose (`*.md`) and the
+`replica/` planning folder, where the original's name legitimately appears as a comparison.
+It copies those files into a temp tree first, so git-ignored run artifacts such as
+`.loop-runs/` can never turn the gate red. Run `sweep.py` over the whole repo by hand when
+you want to audit prose too.
 
 If the skills are missing (new machine), reinstall them with:
 

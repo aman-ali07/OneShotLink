@@ -14,7 +14,7 @@ here has been executed against a live host, and nothing is claimed to be live.
 | Backend specs | `bundle exec rspec` | **PASS** — 109 examples, 0 failures |
 | Browser journeys | `BASE_URL=… npm --prefix e2e test` + `run test:accounts` | **PASS in CI** (both journeys, container smoke job) — not re-run locally in this session |
 | Feature parity | `parity.py replica/features.csv` | **PASS** — 63.0, must-haves **11/11** |
-| Rebrand sweep | `sweep.py . --config replica/brand.json` | **PASS** — exit 0, clean |
+| Rebrand sweep | `script/brand-sweep.sh` | **PASS** — exit 0 over the 95 tracked non-prose files. The raw `sweep.py .` over the whole repo also reports 2 hits, both this checkout's directory name in loop prose (`LOOP.md`, `loop-run-log.md`) — that is why the gate scans the shipped tree (see AGENTS.md) |
 | Store listing lint | `listing.py replica/launch/listing.json` | **PASS** — 0 errors, 0 warnings (draft; no store submission) |
 | Production build | `npm --prefix frontend run build` | **PASS** — vue-tsc + Vite, emitted to `public/app` |
 | Hardened image + stack | `docker build`, `docker compose up` | **PASS in CI** (container smoke test) |
