@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="OneShotLink">
+  <!-- OneShotLink mark: a link that is whole until it is read, then breaks at the
+       seam. Single stroke, one colour (#0f766e), no fill, so it holds up at 16px
+       and scales to the app icon. Brief: replica/brand.md §4. -->
+  <g fill="none" stroke="#0f766e" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 9h-1a7 7 0 0 0-7 7 7 7 0 0 0 7 7h1" />
+    <path d="M18 9h1a7 7 0 0 1 7 7 7 7 0 0 1-7 7h-1" />
+  </g>
+</svg>

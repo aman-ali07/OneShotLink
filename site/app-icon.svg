@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="OneShotLink">
+  <!-- Opaque variant for icons that cannot carry transparency (iOS home screen,
+       store listing). Same mark, inset to 72% on the surface colour. -->
+  <rect width="32" height="32" fill="#ffffff" />
+  <g transform="translate(4.48 4.48) scale(0.72)">
+    <g fill="none" stroke="#0f766e" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 9h-1a7 7 0 0 0-7 7 7 7 0 0 0 7 7h1" />
+      <path d="M18 9h1a7 7 0 0 1 7 7 7 7 0 0 1-7 7h-1" />
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>OneShotLink social card</title>
+    <!-- Source for site/og.png and frontend/public/og.png (1200x630). Not served as a
+         page. Rendered by script/build-assets.sh; values come from
+         replica/design/tokens.json. No webfont and no third-party request. -->
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1200px; height: 630px; }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 64px;
+        padding: 0 96px;
+        background: #fafaf9;
+        color: #1c1917;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      .copy { display: flex; flex-direction: column; gap: 24px; }
+      .eyebrow {
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #57534e;
+      }
+      h1 { font-size: 76px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
+      .tagline { font-size: 40px; font-weight: 600; color: #0f766e; }
+      .lede { font-size: 25px; line-height: 1.45; color: #57534e; max-width: 660px; }
+      .mark { width: 232px; height: 232px; flex: none; }
+      .rule { width: 96px; height: 4px; background: #0f766e; border-radius: 2px; }
+    </style>
+  </head>
+  <body>
+    <div class="copy">
+      <p class="eyebrow">Self-hosted</p>
+      <h1>OneShotLink</h1>
+      <p class="tagline">Share a secret once.</p>
+      <div class="rule"></div>
+      <p class="lede">
+        Single-use links you run yourself. Encrypted at rest, deleted on the first open,
+        and no account needed on either end.
+      </p>
+    </div>
+    <svg class="mark" viewBox="0 0 32 32" role="img" aria-label="OneShotLink mark">
+      <g fill="none" stroke="#0f766e" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 9h-1a7 7 0 0 0-7 7 7 7 0 0 0 7 7h1" />
+        <path d="M18 9h1a7 7 0 0 1 7 7 7 7 0 0 1-7 7h-1" />
+      </g>
+    </svg>
+  </body>
+</html>

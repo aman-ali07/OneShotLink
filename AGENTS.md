@@ -76,6 +76,7 @@ Useful commands (tools are stdlib Python; run them from the repo root):
 ```bash
 python3 ~/.agents/skills/replica-diff/parity.py replica/features.csv
 script/brand-sweep.sh                                   # rebrand gate over shipped files
+script/build-assets.sh                                  # icons + og.png from their SVG/HTML sources
 python3 ~/.agents/skills/replica-design/contrast.py replica/design/tokens.json   # once tokens exist
 ```
 

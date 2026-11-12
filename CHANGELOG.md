@@ -9,6 +9,30 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (icons and social card, 2026-11-12) — verified
+
+- **A real mark, drawn from the logo brief** (`replica/brand.md` §4): `site/favicon.svg` is
+  one teal stroke, one colour, a link with both ends open at the seam — legible at 16px and
+  scalable to the app icon. `site/app-icon.svg` is the opaque 72%-inset tile for icons that
+  cannot carry transparency.
+- **`script/build-assets.sh`** renders the set from those sources plus `site/og-card.html`:
+  `favicon-16.png`, `favicon-32.png`, `apple-touch-icon.png` (180), `icon-512.png`, opaque
+  `app-icon-1024.png`, and a 1200×630 `og.png` card carrying the tagline "Share a secret
+  once." Icons land in `site/` and `frontend/public/` (Vite copies the latter into the
+  served root), so the landing site and the app cannot drift apart.
+- **Metadata:** every HTML head now links the icon set, `apple-touch-icon` and
+  `og:image`/`twitter:image` with width, height and alt. `og:image` stays relative because
+  no domain is registered yet; `replica/deploy.md` B2/B5 records that the operator must make
+  it absolute at deploy time.
+
+Verified: sizes and colour modes checked with Pillow (16/32/180/512/1024/1200×630; icons
+opaque `RGB`, favicons `RGBA`); Puma serves `/favicon.svg`, `/favicon-32.png`,
+`/apple-touch-icon.png` and `/og.png` as 200 with the right MIME; every local reference in
+`site/` returns 200; headless Chrome over `/`, `/privacy.html` and `/terms.html` reports no
+failed requests, no console errors, no third-party hosts and no horizontal overflow; the
+1200×630 card was read back by a vision model with the text intact and nothing clipped; the
+account and journey browser tests still pass; `script/brand-sweep.sh` exits 0.
+
 ### Added (`script/brand-sweep.sh`, the rebrand gate, 2026-11-12) — verified
 
 - **The launch sweep now scans what ships instead of the whole checkout.** The replica-brand

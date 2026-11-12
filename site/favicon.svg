@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="OneShotLink">
-  <!-- Placeholder mark from the logo brief: one stroke in, one stroke out, and a
-       clean break at the seam. Not the final identity; see replica/brand.md §4. -->
-  <rect width="32" height="32" rx="7" fill="#fafaf9"/>
-  <path d="M13 9h-2.5A5.5 5.5 0 0 0 10.5 20H13" fill="none" stroke="#0f766e" stroke-width="2.6" stroke-linecap="round"/>
-  <path d="M19 12h2.5a5.5 5.5 0 0 1 0 11H19" fill="none" stroke="#0f766e" stroke-width="2.6" stroke-linecap="round"/>
-  <path d="M13.5 16h1.6M17.4 16h1.1" stroke="#0f766e" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- OneShotLink mark: a link that is whole until it is read, then breaks at the
+       seam. Single stroke, one colour (#0f766e), no fill, so it holds up at 16px
+       and scales to the app icon. Brief: replica/brand.md §4. -->
+  <g fill="none" stroke="#0f766e" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 9h-1a7 7 0 0 0-7 7 7 7 0 0 0 7 7h1" />
+    <path d="M18 9h1a7 7 0 0 1 7 7 7 7 0 0 1-7 7h-1" />
+  </g>
 </svg>
