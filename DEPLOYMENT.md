@@ -177,7 +177,9 @@ port 6379 proto tcp`.
 Verify it, rather than assuming it: `script/tls-rehearsal.sh --with-redis` runs the real
 `script/preflight.sh` and prints `PASS host cannot reach Redis at 10.77.13.2:6379`. A host
 process must still fail to connect (`nc -zv 10.77.13.2 6379` times out) while the app
-keeps working (create → reveal → gone).
+keeps working (create → reveal → gone). On a ufw host, `ufw status numbered` must list
+`10.77.13.0/24 6379/tcp DENY OUT`, and `grep 10.77.13 /etc/ufw/user.rules` must show the
+`ufw-user-output` tuple — that file is what makes it survive a reboot.
 
 If a cloud/provider network policy (Kubernetes NetworkPolicy, a VPC security group for the
 Docker bridge subnet) is available, use that instead — the goal is the same: only the

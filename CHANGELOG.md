@@ -42,7 +42,10 @@ typecheck + Vite build clean; `bundler-audit` and `npm audit` clean.
   and cannot be silently bypassed by a new random subnet. The documented `nft` OUTPUT rule
   was applied and verified: a host connection to `10.77.13.2:6379` now times out while the
   app still creates and reveals secrets, published test Redis on `:6399` is unaffected, and
-  the full preflight ends **green with 0 skips** (`host cannot reach Redis` PASS).
+  the full preflight ends **green with 0 skips** (`host cannot reach Redis` PASS). The
+  rule lives in the host's own firewall (ufw `user.rules`, enabled at boot) rather than a
+  temporary kernel table, so it survives reboot; the throwaway `nft` table used while
+  proving it was removed, leaving exactly one mechanism.
 - **`script/tls-rehearsal.sh` — the TLS gate is now repeatable without a domain.** It boots
   the production Compose stack behind a real TLS terminator (Caddy) with a throwaway local
   CA, then runs the real `script/preflight.sh` against it with certificate verification on.

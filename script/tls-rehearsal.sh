@@ -139,6 +139,7 @@ if [ "$status" -eq 0 ]; then
     echo "Redis isolation was skipped; add --with-redis to include it (T-71)."
   fi
   echo "Still the operator's to prove on the real hostname: DNS and the real certificate"
-  echo "chain. The nft rule is runtime-only until it is saved (DEPLOYMENT.md 4.0)."
+  echo "chain. Persist the rule: ufw saves its own, a bare nft rule does not"
+  echo "(DEPLOYMENT.md 4.0)."
 fi
 exit "$status"
