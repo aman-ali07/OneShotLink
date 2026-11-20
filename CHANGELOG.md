@@ -9,6 +9,14 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (published crypto and single-use spec, 2026-11-20) — verified
+
+- `docs/CRYPTO_SPEC.md` documents the actual AES-256-GCM/HKDF parameters, Argon2id settings,
+  opaque IDs, record shape, compare-and-delete Lua, CAS rotation, expiry semantics and the
+  explicit non-claims (no zero-knowledge, no cryptographic erasure from backups).
+- The document's own verification commands were run: crypto, store and secrets API specs →
+  `37 examples, 0 failures`. Linked from `README.md` and `FEATURE_MATRIX.md`.
+
 ### Added (developer guide and runnable examples, 2026-11-20) — verified
 
 - `docs/SDK.md` documents config discovery, guest and authenticated flows, the preview-vs-

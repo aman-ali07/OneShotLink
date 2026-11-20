@@ -217,6 +217,8 @@ Read [AGENTS.md](AGENTS.md) before clone work.
 - [API.md](API.md) — HTTP contract and implemented status
 - [DATABASE.md](DATABASE.md) — Redis schema and invariants
 - [SECURITY.md](SECURITY.md) — controls, threat model, D-012
+- [docs/CRYPTO_SPEC.md](docs/CRYPTO_SPEC.md) — code-grounded crypto and single-use spec
+- [docs/SDK.md](docs/SDK.md) — API guide with runnable curl/TypeScript/Python examples
 - [TESTING.md](TESTING.md) / [DEPLOYMENT.md](DEPLOYMENT.md)
 - [RUNBOOK.md](RUNBOOK.md) — incident response (key compromise, Redis loss, rollback)
 - [TECH_STACK.md](TECH_STACK.md) / [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)

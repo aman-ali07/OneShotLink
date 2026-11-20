@@ -39,12 +39,17 @@ identity, no new runtime dependency.
   passphrase flow returned `preview passphrase_required:true`, `passphrase_required`,
   `invalid_passphrase`, then the value on the correct passphrase. No new dependencies.
 
-## Phase 3 — Security: visible assurance (TODO)
+## Phase 3 — Security: visible assurance (IN PROGRESS)
 
-- Surface one-time/expiry/passphrase semantics as short, honest UI statements (no
-  "zero-knowledge" claim; D-012).
-- Re-run `SECURITY.md` checks, CSP/journey tests, and the TLS rehearsal after UI changes.
-- Keep all crypto and consume paths untouched.
+- DONE: `docs/CRYPTO_SPEC.md` publishes the actual algorithms, parameters, record shape,
+  single-use Lua, expiry semantics and explicit non-claims (no zero-knowledge, no
+  cryptographic erasure from backups). Its verification commands were executed:
+  `crypto_spec + store_spec + secrets_api_spec` → **37 examples, 0 failures**. Linked from
+  README and the feature matrix; closes the "partial" crypto-spec row in documentation.
+- TODO by the frontend owner (Phase 1): surface one-time/expiry/passphrase semantics as
+  short, honest UI statements — no "zero-knowledge" claim (D-012).
+- TODO after UI changes: re-run `SECURITY.md` checks, CSP/journey tests and the TLS rehearsal.
+- Crypto and consume paths were not touched.
 
 ## Phase 4 — Deployment readiness (TODO)
 

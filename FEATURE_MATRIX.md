@@ -29,7 +29,8 @@ are marked "not verified" rather than guessed.
 | Open-source license | MIT | source available | Apache-2.0 | GPLv3 | AGPLv3 | — |
 | Premium, distinctive frontend | **partial** (functional, token-based) | polished SaaS | functional | polished SaaS | utilitarian | **P0: P-G1/P-G3/P-G4/P-G5** |
 | Responsive + accessible | yes (375/768/1280, AA tokens) | yes | yes | yes | partial | preserve while redesigning |
-| Documentation depth | strong ops docs, weak product/SDK docs | strong | strong | strong | FAQ | P1: SDK guide |
+| Documentation depth | strong ops docs + [SDK guide](docs/SDK.md) + [crypto spec](docs/CRYPTO_SPEC.md) | strong | strong | strong | FAQ | SDK guide and crypto spec shipped this pass; UI copy remains Phase 1 |
+| Published crypto spec / verify-it-yourself | yes ([docs/CRYPTO_SPEC.md](docs/CRYPTO_SPEC.md), code-grounded, includes non-claims) | not verified | not verified | not verified | not verified | Resolves the `replica/features.csv` "partial" row in docs; no zero-knowledge claim |
 
 ## What this means for this pass
 
