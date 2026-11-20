@@ -121,6 +121,21 @@ To inspect a record yourself, create a secret against a **throwaway** Redis DB, 
 the raw value with `redis-cli GET secret:object:<key>`: you will see base64 fields and no
 plaintext. The committed integration spec asserts exactly this (ciphertext-only Redis).
 
+Executed live against a throwaway stack (2026-11-20), with `SECRET` generated at boot:
+
+```text
+GET secret:object:<id>  -> {"v":1,...,"ciphertext":"X4VA...","iv":"67DR...",
+                            "tag":"pjKH...","salt":"4E2n...","cipher":"aes-256-gcm"}
+grep -c 'TAMPER_SENTINEL' over all secret:object values -> 0
+flip one base64 char in ciphertext, POST .../reveal -> 500
+  {"error":{"code":"internal_error","message":"Stored secret failed integrity verification",...}}
+EXISTS secret:object:<id> after the failed reveal -> 1
+restore the original bytes, POST .../reveal -> 200 with the exact value
+```
+
+That is the D-013 guarantee observed at runtime, not inferred from source: an integrity
+failure neither leaks nor destroys the secret.
+
 ## 8. What this does not claim
 
 - No zero-knowledge: the instance `SECRET` can decrypt every record (D-012).
