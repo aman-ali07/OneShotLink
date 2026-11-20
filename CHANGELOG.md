@@ -9,6 +9,19 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Security (login CSRF and full-origin checks, 2026-11-20) — verified
+
+- A cross-site page could force a signin/signup in a victim's browser: those routes set the
+  session cookie without an origin proof, and `verify_csrf!` returned early when no cookie
+  existed, so simply reusing it would have been a no-op. The new `verify_request_origin!`
+  rejects `Sec-Fetch-Site: cross-site` and any `Origin` whose full scheme/host/port differs,
+  and runs on signup/signin and on cookie-authenticated mutations.
+- `verify_csrf!` now compares the whole origin, not just `uri.host == request.host`; a URL
+  with the right host but the wrong scheme or port is refused. Headerless non-browser
+  clients (curl, the go-live preflight) keep working; only browser-carried cookies are gated.
+- Five specs written first and watched fail (4 red → 5 green). Suite 125 examples / 0
+  failures; both browser journeys pass against a live Puma; TLS rehearsal stays green.
+
 ### Fixed (CI smoke test was stale after K-35, 2026-11-20) — verified
 
 - The Compose smoke step still asserted that a v3 `GET /secret/:key` returns the value and

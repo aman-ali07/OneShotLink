@@ -81,6 +81,66 @@ RSpec.describe "Simple-mode accounts" do
     end
   end
 
+  describe "request origin proofs" do
+    def account_payload(email)
+      { email: email, password: PASSWORD }
+    end
+
+    it "refuses a signup with a cross-site Origin and creates no account or cookie" do
+      simple do
+        post_json("/api/v3/signup", account_payload("csrf@example.com"),
+                  { "HTTP_ORIGIN" => "https://evil.example" })
+
+        expect(last_response.status).to eq(403)
+        expect(last_response.headers["Set-Cookie"]).to be_nil
+        expect(Onetime::Models::Customer.find_by_email("csrf@example.com")).to be_nil
+      end
+    end
+
+    it "refuses a signin carrying Sec-Fetch-Site: cross-site" do
+      simple do
+        signup
+        clear_cookies
+        post_json("/api/v3/signin", account_payload("person@example.com"),
+                  { "HTTP_ORIGIN" => "https://evil.example", "HTTP_SEC_FETCH_SITE" => "cross-site" })
+
+        expect(last_response.status).to eq(403)
+        expect(last_response.headers["Set-Cookie"]).to be_nil
+      end
+    end
+
+    it "refuses an Origin that matches the host but not the port" do
+      simple do
+        post_json("/api/v3/signup", account_payload("port@example.com"),
+                  { "HTTP_ORIGIN" => "http://example.org:444" })
+        expect(last_response.status).to eq(403)
+      end
+    end
+
+    it "allows a same-origin browser request and a headerless API client" do
+      simple do
+        post_json("/api/v3/signup", account_payload("browser@example.com"),
+                  { "HTTP_ORIGIN" => "http://example.org", "HTTP_SEC_FETCH_SITE" => "same-origin" })
+        expect(last_response.status).to eq(201)
+
+        post "/api/v3/signup", JSON.generate(account_payload("cli@example.com")),
+             { "CONTENT_TYPE" => "application/json" }
+        expect(last_response.status).to eq(201)
+      end
+    end
+
+    it "refuses a cookie-authenticated mutation whose Origin has the wrong port" do
+      simple do
+        signup
+
+        delete_json("/api/v3/account", { password: PASSWORD },
+                    { "HTTP_ORIGIN" => "http://example.org:444" })
+        expect(last_response.status).to eq(403)
+        expect(Onetime::Models::Customer.find_by_email("person@example.com")).not_to be_nil
+      end
+    end
+  end
+
   describe "signin and session" do
     it "returns a generic 401 for a wrong password and succeeds with the right one" do
       simple do

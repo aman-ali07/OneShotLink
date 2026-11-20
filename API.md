@@ -15,7 +15,7 @@ requests must send `Content-Type: application/json`. v1 accepts
 | Topic | Rule |
 | --- | --- |
 | Auth | Session cookie `ots_session` (opaque, `HttpOnly`, `SameSite=Lax`, `Secure` when `SSL=true`, 14-day sliding TTL). v1 endpoints do not require auth. Account and owner routes require a session in `AUTH_MODE=simple`; in `disabled` they return `403 forbidden`, and in `full` they return `501 not_configured` rather than degrading. |
-| CSRF | v3 mutations require `Content-Type: application/json` and, when a session cookie is present, same-origin proof (`Sec-Fetch-Site: same-origin` or an `Origin` host matching `Host`). Cookie-authenticated conceal requests are rejected without it. No v1 endpoint reads the session cookie. |
+| CSRF | v3 mutations require `Content-Type: application/json`. Cookie-authenticated requests must carry same-origin proof (`Sec-Fetch-Site: same-origin` or an `Origin` matching the full scheme, host and port); without it they are `403`. Signup/signin are also checked when a browser proof is present, so a cross-site forced login cannot bind a victim's session — headerless API clients are unaffected. No v1 endpoint reads the session cookie. |
 | IDs | Opaque; `secret_key` is the only public secret identifier. |
 | Errors (v3) | `{"error":{"code":"...","message":"...","request_id":"..."}}` |
 | Errors (v1) | `{"message":"..."}` (legacy shape) |

@@ -357,21 +357,40 @@ module Onetime
         raise Forbidden, "Accounts are disabled on this instance."
       end
 
-      # Cookie-authenticated mutations must come from our own origin. Browsers
-      # send Sec-Fetch-Site/Origin; non-browser clients with a session cookie
-      # must send Origin too. No cookie means no CSRF authority to abuse.
+      # A request that can carry a victim's cookies must prove it came from our
+      # own origin. Browsers send Sec-Fetch-Site; their Origin, when present,
+      # must match the full scheme/host/port. Non-browser clients send neither
+      # header (curl, CLI, API consumers) and are allowed: an attacker cannot
+      # make them attach someone else's session cookie.
+      def verify_request_origin!(require_proof: false)
+        site = env["HTTP_SEC_FETCH_SITE"]
+        if site
+          raise Forbidden, "Cross-site request rejected." unless site == "same-origin"
+
+          return
+        end
+
+        origin = env["HTTP_ORIGIN"].to_s
+        if origin.empty?
+          raise Forbidden, "Cross-site request rejected." if require_proof
+
+          return
+        end
+
+        uri = URI.parse(origin)
+        expected = "#{request.scheme}://#{request.host}:#{request.port}"
+        actual = "#{uri.scheme}://#{uri.host}:#{uri.port}"
+        raise Forbidden, "Cross-site request rejected." unless actual == expected
+      rescue URI::InvalidURIError
+        raise Forbidden, "Cross-site request rejected."
+      end
+
+      # Cookie-authenticated mutations must come from our own origin. No cookie
+      # means there is no CSRF authority to abuse, so leave those requests alone.
       def verify_csrf!
         return unless session_token
 
-        return if env["HTTP_SEC_FETCH_SITE"] == "same-origin"
-
-        origin = env["HTTP_ORIGIN"].to_s
-        raise Forbidden, "Cross-site request rejected." if origin.empty?
-
-        uri = URI.parse(origin)
-        raise Forbidden, "Cross-site request rejected." unless uri.host == request.host
-      rescue URI::InvalidURIError
-        raise Forbidden, "Cross-site request rejected."
+        verify_request_origin!(require_proof: true)
       end
 
       def require_session!
@@ -545,6 +564,7 @@ module Onetime
 
             r.post "signup" do
               require_accounts!
+              verify_request_origin!
               enforce_rate_limit!(:signin)
               body = parse_json_body
               result = Logic::SignUp.new(email: body["email"], password: body["password"]).call
@@ -555,6 +575,7 @@ module Onetime
 
             r.post "signin" do
               require_accounts!
+              verify_request_origin!
               enforce_rate_limit!(:signin)
               body = parse_json_body
               result = Logic::SignIn.new(email: body["email"], password: body["password"]).call
