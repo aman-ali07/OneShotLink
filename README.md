@@ -22,7 +22,8 @@ configurable TTL.
   copy, reveal confirmation, passphrase prompt, and destroyed state.
 - No auto-reveal on page load and no consuming GET: link previews cannot burn a secret,
   through the UI or the v3 API.
-- `POST /api/v3/guest/conceal` and `GET|POST /api/v3/guest/secret/:key[/reveal]`.
+- `POST /api/v3/guest/conceal`; `GET /api/v3/guest/secret/:key` previews;
+  `POST /api/v3/guest/secret/:key/reveal` consumes. See [docs/SDK.md](docs/SDK.md).
 - Legacy `POST /api/v1/share` and `GET|POST /api/v1/secret/:key` (form or JSON).
 - Encryption at rest with AES-256-GCM; plaintext never enters Redis.
 - Atomic compare-and-delete: 8 concurrent reveals produce exactly one `200`.
@@ -122,9 +123,15 @@ curl -s localhost:3000/health
 curl -s -X POST localhost:3000/api/v3/guest/conceal \
   -H 'content-type: application/json' -d '{"secret":"hello","ttl":1800}'
 # copy secret_key from the response, then:
-curl -si localhost:3000/api/v3/guest/secret/<key>   # 200
-curl -si localhost:3000/api/v3/guest/secret/<key>   # 404
+curl -si localhost:3000/api/v3/guest/secret/<key>                         # 200, metadata only
+curl -si -X POST localhost:3000/api/v3/guest/secret/<key>/reveal \
+  -H 'content-type: application/json' -d '{}'                             # 200, value once
+curl -si -X POST localhost:3000/api/v3/guest/secret/<key>/reveal \
+  -H 'content-type: application/json' -d '{}'                             # 404
 ```
+
+Copy-paste examples in curl, TypeScript and Python are in [`examples/`](examples/),
+explained in [docs/SDK.md](docs/SDK.md).
 
 ## Local development (no host Ruby required)
 

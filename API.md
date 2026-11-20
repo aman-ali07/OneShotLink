@@ -276,18 +276,25 @@ curl -sX POST http://localhost:3000/api/v3/guest/conceal \
   -H 'content-type: application/json' \
   -d '{"secret":"hello","ttl":1800}'
 
-# reveal once
+# preview only — GET never consumes and never returns the value
 curl -si http://localhost:3000/api/v3/guest/secret/<key>
+
+# reveal once: POST is the only consuming route
+curl -si -X POST http://localhost:3000/api/v3/guest/secret/<key>/reveal \
+  -H 'content-type: application/json' -d '{}'
 
 # second reveal -> 404
-curl -si http://localhost:3000/api/v3/guest/secret/<key>
+curl -si -X POST http://localhost:3000/api/v3/guest/secret/<key>/reveal \
+  -H 'content-type: application/json' -d '{}'
 
-# v1 create + reveal
+# v1 create + reveal (frozen legacy contract: v1 GET consumes)
 curl -sX POST http://localhost:3000/api/v1/share -d 'secret=hello&ttl=1800'
 curl -sX POST http://localhost:3000/api/v1/secret/<key>
 ```
 
-Verified 2026-11-12 against the production image through Compose (Redis DB 15 for the
-specs): create `201`, first reveal `200`, second reveal `404`; four parallel reveals
-produced one `200` and three `404`; the v1 shapes above were copied from live responses.
-`bundle exec rspec` → 133 examples, 0 failures.
+Runnable, dependency-free versions of this flow (curl, TypeScript, Python) live in
+[`examples/`](examples/) and are documented in [`docs/SDK.md`](docs/SDK.md).
+
+Verified against the production image through Compose (Redis DB 15 for the specs): create
+`201`, preview `200` with metadata only, first reveal `200`, second reveal `404`; parallel
+reveals produce exactly one `200`. The v1 shapes above were copied from live responses.

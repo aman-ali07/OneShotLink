@@ -9,6 +9,16 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (developer guide and runnable examples, 2026-11-20) — verified
+
+- `docs/SDK.md` documents config discovery, guest and authenticated flows, the preview-vs-
+  consume rule, passphrase semantics, error envelopes, TTLs, rate limits and retry hints.
+- Three dependency-free examples (`examples/curl`, `examples/typescript`, `examples/python`)
+  were executed against a live Puma + Redis stack: each created a secret, confirmed `GET`
+  carries no value, revealed once, and asserted `404` on replay. The passphrase flow was
+  checked separately (`passphrase_required` → `invalid_passphrase` → value).
+- Stale `GET`-as-reveal snippets in `README.md` and `API.md` were corrected to `POST …/reveal`.
+
 ### Fixed (the origin check trusted client-supplied forwarded headers, 2026-11-20) — verified
 
 - `verify_request_origin!` built its expected origin from `request.scheme/host/port`. Rack 3
