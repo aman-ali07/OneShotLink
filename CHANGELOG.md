@@ -13,9 +13,10 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 - `.env.example` used `replace-with-openssl-rand-hex-32` as its `SECRET` placeholder. That
   string is exactly 32 bytes, so `Config.validate!` accepted it and a copy-and-go deployment
-  ran with a public key. Both placeholders are now `CHANGE-ME`, which boot rejects.
-- A spec reads the committed example and asserts its `SECRET` fails validation; it was red
-  before the change. Suite 132 examples / 0 failures.
+  ran with a public key. Both placeholders are now `CHANGE-ME`: boot rejects the short
+  `SECRET` and the `REDIS_PASSWORD=CHANGE-ME` sentinel.
+- Specs read the committed example and assert both values fail validation; both were red
+  before their changes. Suite 133 examples / 0 failures.
 
 ### Fixed (backups no longer lose owner receipts, 2026-11-20) — verified
 

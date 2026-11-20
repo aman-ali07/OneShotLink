@@ -1,6 +1,7 @@
 # Go-live decision memo — OneShotLink
 
-Snapshot: **2026-11-20**, verified at `main` HEAD `dd14fa7` (pushed). Companion artifact:
+Snapshot: **2026-11-20**, verified on the `dd14fa7` tree plus the final `REDIS_PASSWORD`
+sentinel guard (both pushed). Companion artifact:
 [FEATURE_EVIDENCE.md](FEATURE_EVIDENCE.md).
 
 ## Production audit: 84/100 — launchable with caveats
@@ -15,7 +16,7 @@ rule (`AGENTS.md`, `PRODUCTION_READINESS.md` §Verdict) still forbids calling th
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| Backend suite | `docker run … ots-dev bundle exec rspec` (Redis on :6400/15) | **132 examples, 0 failures** (seed 6711) |
+| Backend suite | `docker run … ots-dev bundle exec rspec` (Redis on :6400/15) | **133 examples, 0 failures** (seed 21790) |
 | Frontend unit | `npm --prefix frontend run test` | **11 passed** (Vitest 5.1.0) |
 | Frontend typecheck + build | `npm --prefix frontend run typecheck && npm --prefix frontend run build` | clean `vue-tsc`; 212.69 kB JS / 14.21 kB CSS |
 | Rebrand gate | `script/brand-sweep.sh` | clean |
@@ -37,11 +38,11 @@ throwaway and have been torn down.
 
 | ID | Gap | Fix / evidence |
 | --- | --- | --- |
-| K-41 | Login/signup CSRF; CSRF checked only `uri.host` | Shared full-origin proof on signin/signup and cookie mutations; 5 specs red→green; 132/0 (T-104) |
+| K-41 | Login/signup CSRF; CSRF checked only `uri.host` | Shared full-origin proof on signin/signup and cookie mutations; 5 specs red→green; 133/0 (T-104) |
 | K-42 | Key rotation could resurrect a consumed secret | Lua compare-and-swap `Store.rewrite_if_unchanged` with `KEEPTTL`; 4 specs red→green (T-105) |
 | K-43 | Backup lost owner receipts and customer zsets | Receipt hashes with TTL exported/restored; zset/set restore added; 2 specs red→green (T-106) |
-| K-44 | `.env.example` placeholder passed boot validation (32 bytes) | Placeholders now `CHANGE-ME`; spec reads the committed example and asserts rejection (T-107) |
-| T-108 | Rollback prescribed a `docker pull` no-op; stale counts | Rollback checks out a known-good commit and rebuilds; live spec counts reconciled to 132 |
+| K-44 | `.env.example` placeholder passed boot validation (32 bytes) | Placeholders now `CHANGE-ME`; boot rejects both the short `SECRET` and the `REDIS_PASSWORD=CHANGE-ME` sentinel, with specs reading the committed example (T-107) |
+| T-108 | Rollback prescribed a `docker pull` no-op; stale counts | Rollback checks out a known-good commit and rebuilds; live spec counts reconciled to 133 |
 | T-109 | CI omitted brand sweep and Compose validation | Both added; rebrand tool pinned to SHA `77c9436` (hash verified locally against the installed tool) |
 
 Earlier in the session K-38 cleared four newly disclosed Puma 7.2.1 advisories with a

@@ -68,6 +68,9 @@ module Onetime
       raise Error, "AUTH_MODE must be disabled, simple, or full" unless %w[disabled simple full].include?(auth_mode)
       raise Error, "REDIS_TIMEOUT must be positive" if self["REDIS_TIMEOUT"].to_f <= 0
       raise Error, "REDIS_RECONNECT_ATTEMPTS must be >= 0" if redis_reconnect_attempts.negative?
+      # The example file ships this sentinel; accepting it would put a public
+      # credential on a deployment that copied it verbatim.
+      raise Error, "REDIS_PASSWORD is a placeholder" if ENV["REDIS_PASSWORD"].to_s == "CHANGE-ME"
       validated_redis_url
 
       # Parse now so a typo fails at boot, not on the first proxied request.
