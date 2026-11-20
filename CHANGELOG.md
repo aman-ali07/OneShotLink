@@ -9,6 +9,18 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Security (rotation can no longer resurrect a burned secret, 2026-11-20) — verified
+
+- `bin/ots rotate-key` read each record with `GET` and rewrote it with `SET … KEEPTTL`. If a
+  reveal consumed that record between the two calls, rotation wrote it back and a spent
+  secret became revealable again.
+- Rewrites now go through `Store.rewrite_if_unchanged`, a Lua compare-and-swap that only
+  writes when the stored value still matches the one that was decrypted. A vanished or
+  changed key is counted as skipped; the CLI message now says why. TTLs are preserved by
+  `KEEPTTL` in the same round trip.
+- Four specs written first (all red: three missing-method errors plus `reencrypted: 1`),
+  then green. Suite 129 examples / 0 failures.
+
 ### Security (login CSRF and full-origin checks, 2026-11-20) — verified
 
 - A cross-site page could force a signin/signup in a victim's browser: those routes set the

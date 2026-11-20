@@ -50,7 +50,10 @@ audit, accidental commit).
 
    The CLI prints `Re-encrypted N secret(s) with the new key.` and then reminds you to
    update `SECRET`. **Do that before restarting** — the rotation is already applied to the
-   data, so a web process still holding the old key cannot read it:
+   data, so a web process still holding the old key cannot read it. Each rewrite is a
+   compare-and-swap: if a reveal consumes a secret between the read and the rewrite, that
+   record is skipped (and counted as skipped) instead of being resurrected. There is no
+   need to drain traffic first:
 
    ```sh
    # .env (or your secret manager), not the shell alone: `compose up` re-reads the file

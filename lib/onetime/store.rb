@@ -59,6 +59,23 @@ module Onetime
         redis.eval(CONSUME_SCRIPT, keys: [key], argv: [expected_value.to_s]).to_i == 1
       end
 
+      # Rewriting a record (key rotation) must not resurrect a secret that was
+      # consumed between the read and the write. KEEPTTL preserves the remaining
+      # lifetime without a second round trip; a vanished or changed key is left
+      # alone and reported to the caller as a skip.
+      REWRITE_SCRIPT = <<~LUA
+        local current = redis.call('GET', KEYS[1])
+        if not current or current ~= ARGV[1] then return 0 end
+        redis.call('SET', KEYS[1], ARGV[2], 'KEEPTTL')
+        return 1
+      LUA
+
+      def rewrite_if_unchanged(key, expected_value, new_value)
+        raise ArgumentError, "expected_value is required" if expected_value.nil? || expected_value.empty?
+
+        redis.eval(REWRITE_SCRIPT, keys: [key], argv: [expected_value.to_s, new_value.to_s]).to_i == 1
+      end
+
       def get_json(key)
         raw = redis.get(key)
         raw && JSON.parse(raw)

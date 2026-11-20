@@ -66,7 +66,7 @@ zero-knowledge or "the server cannot decrypt".
 | Transport | HSTS emitted when `SSL=true`; the app port stays private with `APP_BIND=127.0.0.1` when the proxy runs on the same host (verified: LAN address refused, loopback answers). **TLS termination + real hostname is the operator's host (T-70), not bundled** — rehearsed end to end by `script/tls-rehearsal.sh` |
 | Passphrase guessing | Per-IP reveal limiter is the v1 control; no per-secret lockout (D-012, accepted) |
 | Redis auth/TLS | **Implemented:** `--requirepass` + `REDIS_PASSWORD` (verified `NOAUTH` without it), `rediss://` for TLS. Host path to the container is closed by one narrow firewall rule against the fixed backend subnet (T-71, applied and proven: the real preflight passes with 0 skips) |
-| Key rotation | **Implemented:** `bin/ots rotate-key` re-encrypts in place (T-65, verified) |
+| Key rotation | **Implemented:** `bin/ots rotate-key` re-encrypts in place with a compare-and-swap, so a secret consumed mid-rotation is skipped, never resurrected (T-65, T-105, verified) |
 | Dependencies | **Implemented:** `bundler-audit` + `npm audit` in CI; 0 vulnerabilities (T-74) |
 | Backups | **Implemented:** `bin/ots backup`/`restore`, ciphertext-only, TTLs preserved; RPO/RTO documented (T-72, verified) |
 | Audit logging | **Implemented:** append-only `audit:events` stream for account and reveal events; plus redacted, correlated request logs (K-34) |

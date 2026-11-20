@@ -28,4 +28,24 @@ RSpec.describe Onetime::Store do
     described_class.redis.set(key, "current")
     expect { described_class.consume(key, "") }.to raise_error(ArgumentError)
   end
+
+  it "rewrites a value while it is still unchanged, keeping its TTL" do
+    described_class.redis.set(key, "before", ex: 30)
+
+    expect(described_class.rewrite_if_unchanged(key, "before", "after")).to be(true)
+    expect(described_class.redis.get(key)).to eq("after")
+    expect(described_class.redis.ttl(key)).to be_between(1, 30)
+  end
+
+  it "refuses to rewrite a value that changed meanwhile" do
+    described_class.redis.set(key, "current")
+
+    expect(described_class.rewrite_if_unchanged(key, "stale", "after")).to be(false)
+    expect(described_class.redis.get(key)).to eq("current")
+  end
+
+  it "refuses to rewrite a key that is gone" do
+    expect(described_class.rewrite_if_unchanged(key, "before", "after")).to be(false)
+    expect(described_class.redis.exists?(key)).to be(false)
+  end
 end

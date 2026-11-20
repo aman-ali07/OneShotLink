@@ -42,14 +42,16 @@ module Onetime
           reencrypted_payload = reencrypt(plaintext)
           rewritten = record.reject { |k, _| %w[ciphertext iv tag salt cipher].include?(k) }
                             .merge(reencrypted_payload)
-          ttl = Store.redis.ttl(key)
           new_raw = JSON.generate(rewritten)
-          if ttl.positive?
-            Store.redis.set(key, new_raw, keepttl: true)
+
+          # A reveal may have consumed this record since we read it. Rewriting
+          # unconditionally would bring a burned secret back; the CAS keeps the
+          # original one-time invariant intact during rotation.
+          if Store.rewrite_if_unchanged(key, raw, new_raw)
+            reencrypted += 1
           else
-            Store.redis.set(key, new_raw)
+            skipped += 1
           end
-          reencrypted += 1
         end
 
         { reencrypted: reencrypted, skipped: skipped }

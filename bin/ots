@@ -146,7 +146,7 @@ module Cli
 
     stats = Onetime::Logic::RotateKey.new(new_secret: ENV["OTS_NEW_SECRET"]).call
     puts "Re-encrypted #{stats[:reencrypted]} secret(s) with the new key."
-    puts "Skipped #{stats[:skipped]} unreadable record(s)." if stats[:skipped].positive?
+    puts "Skipped #{stats[:skipped]} record(s) (unreadable or consumed during rotation)." if stats[:skipped].positive?
     puts "Update SECRET to OTS_NEW_SECRET and restart the web process."
   rescue Onetime::Error => e
     abort "Error (#{e.code}): #{e.message}"

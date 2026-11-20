@@ -51,6 +51,21 @@ RSpec.describe "Audit, backup, and key rotation" do
       remaining = Onetime::Store.redis.ttl(Onetime::Models::Secret.object_key(objid))
       expect(remaining).to be_between(1, 600)
     end
+
+    it "does not resurrect a secret consumed between the read and the rewrite" do
+      objid, = Onetime::Models::Secret.create(plaintext: "racy", ttl: 600)
+      object_key = Onetime::Models::Secret.object_key(objid)
+
+      allow(Onetime::Crypto).to receive(:encrypt).and_wrap_original do |original, plaintext, **kwargs|
+        Onetime::Store.redis.del(object_key) # the reveal wins the race here
+        original.call(plaintext, **kwargs)
+      end
+
+      stats = described_class.new(new_secret: "w" * 40).call
+      expect(stats[:reencrypted]).to eq(0)
+      expect(stats[:skipped]).to be >= 1
+      expect(Onetime::Store.redis.exists?(object_key)).to be(false)
+    end
   end
 
   describe Onetime::Backup do
