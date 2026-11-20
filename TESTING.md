@@ -41,6 +41,12 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run build       # also the gate for the SPA shell in Rack
 ```
 
+SDK examples (boots a throwaway stack, runs all three examples, cleans up):
+
+```bash
+script/test-examples.sh               # curl, TypeScript and Python quickstarts
+```
+
 Docker path on a host without Ruby (this is the command that was run):
 
 ```bash

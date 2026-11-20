@@ -171,8 +171,15 @@ metadata and a link, never the plaintext.
 - [curl + `python3` JSON parsing](../examples/curl/quickstart.sh).
 
 Each script creates a secret, previews it, reveals it once, asserts the second reveal is
-`404`, and prints a one-line result. They are executed against a live stack in CI style;
-see `TESTING.md` for the canonical stack commands.
+`404`, and prints a one-line result. To check all three against a throwaway stack (Docker,
+curl, python3 and node required; no container left behind):
+
+```bash
+script/test-examples.sh
+```
+
+Verified output: all three print `ok: create=… preview=no-content reveal=match replay=404`.
+See `TESTING.md` for the canonical stack and spec commands.
 
 ## 8. Security notes for integrators
 
