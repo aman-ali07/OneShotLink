@@ -9,6 +9,18 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (backups no longer lose owner receipts, 2026-11-20) — verified
+
+- `bin/ots backup` exported only `secret:object:*` plus `customer:*`. Owner receipt hashes
+  (`secret:receipt:*`) were never written, and `restore` silently ignored the zset and set
+  values the export already collected — so the dashboard's owner index was empty after a
+  restore even though the secrets themselves decrypted.
+- Export now includes receipts with their TTL, restore rehydrates them, and customer
+  zsets/sets are restored with their scores and members. Old backups still restore: the new
+  top-level `receipt` key is optional.
+- Two specs written first and watched fail (`receipts: nil`, zset score `nil`), then green.
+  Suite 131 examples / 0 failures.
+
 ### Security (rotation can no longer resurrect a burned secret, 2026-11-20) — verified
 
 - `bin/ots rotate-key` read each record with `GET` and rewrote it with `SET … KEEPTTL`. If a

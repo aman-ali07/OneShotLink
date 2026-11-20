@@ -68,7 +68,7 @@ zero-knowledge or "the server cannot decrypt".
 | Redis auth/TLS | **Implemented:** `--requirepass` + `REDIS_PASSWORD` (verified `NOAUTH` without it), `rediss://` for TLS. Host path to the container is closed by one narrow firewall rule against the fixed backend subnet (T-71, applied and proven: the real preflight passes with 0 skips) |
 | Key rotation | **Implemented:** `bin/ots rotate-key` re-encrypts in place with a compare-and-swap, so a secret consumed mid-rotation is skipped, never resurrected (T-65, T-105, verified) |
 | Dependencies | **Implemented:** `bundler-audit` + `npm audit` in CI; 0 vulnerabilities (T-74) |
-| Backups | **Implemented:** `bin/ots backup`/`restore`, ciphertext-only, TTLs preserved; RPO/RTO documented (T-72, verified) |
+| Backups | **Implemented:** `bin/ots backup`/`restore`, ciphertext-only, TTLs preserved; owner receipts and customer zsets/set indexes restored too (T-72, T-106); RPO/RTO documented |
 | Audit logging | **Implemented:** append-only `audit:events` stream for account and reveal events; plus redacted, correlated request logs (K-34) |
 | Metrics/tracing | **Implemented (metrics):** Prometheus text at `/metrics` behind `METRICS_ENABLED` — request/error counters, duration, Redis up + memory ratio (T-73, verified live). **Open:** distributed tracing |
 

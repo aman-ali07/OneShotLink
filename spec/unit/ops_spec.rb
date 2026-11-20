@@ -96,5 +96,37 @@ RSpec.describe "Audit, backup, and key rotation" do
         expect(File.read(path)).not_to include(Onetime::Models::Session::INDEX_PREFIX)
       end
     end
+
+    it "exports and restores owner receipts with their TTL" do
+      objid, = Onetime::Models::Secret.create(plaintext: "owned-backup", ttl: 600, owner_id: "cust-backup")
+      receipt_key = Onetime::Models::Secret.receipt_key(objid)
+      expect(Onetime::Store.redis.exists?(receipt_key)).to be(true)
+
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "dump.json")
+        stats = described_class.export(path)
+        expect(stats[:receipts]).to eq(1)
+
+        Onetime::Store.redis.flushdb
+        described_class.restore(path)
+
+        expect(Onetime::Store.redis.hgetall(receipt_key)["owner_id"]).to eq("cust-backup")
+        expect(Onetime::Store.redis.ttl(receipt_key)).to be_between(1, 600)
+      end
+    end
+
+    it "restores the customer owner index zset" do
+      objid, = Onetime::Models::Secret.create(plaintext: "indexed", ttl: 600, owner_id: "cust-index")
+      index_key = Onetime::Models::Secret.owner_index("cust-index")
+      expect(Onetime::Store.redis.zscore(index_key, objid)).not_to be_nil
+
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "dump.json")
+        described_class.export(path)
+        Onetime::Store.redis.flushdb
+        described_class.restore(path)
+        expect(Onetime::Store.redis.zscore(index_key, objid)).not_to be_nil
+      end
+    end
   end
 end

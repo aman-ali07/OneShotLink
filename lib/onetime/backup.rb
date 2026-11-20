@@ -20,13 +20,18 @@ module Onetime
         "format" => FORMAT_VERSION,
         "exported_at" => Time.now.utc.iso8601,
         "secret" => collect_secrets,
+        "receipt" => collect_receipts,
         "customer" => collect_customers
       }
 
       tmp = "#{path}.tmp"
       File.write(tmp, JSON.pretty_generate(payload))
       File.rename(tmp, path)
-      { secrets: payload["secret"].length, customers: payload["customer"].length }
+      {
+        secrets: payload["secret"].length,
+        receipts: payload["receipt"].length,
+        customers: payload["customer"].length
+      }
     end
 
     # Restores export() output into the current Redis. Returns counts.
@@ -46,17 +51,31 @@ module Onetime
         secrets += 1
       end
 
+      receipts = 0
+      (data["receipt"] || {}).each do |key, entry|
+        Store.redis.hset(key, entry["value"])
+        ttl = entry["ttl"].to_i
+        Store.redis.expire(key, ttl) if ttl.positive?
+        receipts += 1
+      end
+
       customers = 0
       (data["customer"] || {}).each do |key, entry|
-        if entry["type"] == "hash"
+        case entry["type"]
+        when "hash"
           Store.redis.hset(key, entry["value"])
-        elsif entry["type"] == "string"
+        when "string"
           Store.redis.set(key, entry["value"])
+        when "zset"
+          pairs = entry["value"].map { |member, score| [score, member] }
+          Store.redis.zadd(key, pairs) unless pairs.empty?
+        when "set"
+          Store.redis.sadd(key, entry["value"]) unless entry["value"].empty?
         end
         customers += 1
       end
 
-      { secrets: secrets, customers: customers }
+      { secrets: secrets, receipts: receipts, customers: customers }
     end
 
     def collect_secrets
@@ -71,6 +90,21 @@ module Onetime
       out
     end
     private_class_method :collect_secrets
+
+    # Owner receipts are metadata, not plaintext, but the dashboard needs them
+    # after a restore. They are hashes with the same TTL as their secret.
+    def collect_receipts
+      out = {}
+      scan_keys("#{Models::Secret::RECEIPT_PREFIX}*").each do |key|
+        value = Store.redis.hgetall(key)
+        next if value.empty?
+
+        ttl = Store.redis.ttl(key)
+        out[key] = { "value" => value, "ttl" => ttl.positive? ? ttl : 0 }
+      end
+      out
+    end
+    private_class_method :collect_receipts
 
     # Customer records and their indexes; never session keys (those are
     # ephemeral credentials and should not be resurrected by a restore).

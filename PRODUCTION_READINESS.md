@@ -40,7 +40,7 @@ no accounts by design.
 | OpenAPI published | `/api/v3/openapi.json` served; spec asserts every documented path is mounted and every `$ref` resolves |
 | Session revocation | password change and `customers reset-password` revoke other/all sessions; verified live and by spec |
 | Audit trail | append-only `audit:events` stream; identifiers only, never emails/passwords/secret values |
-| Backup / restore | `bin/ots backup`/`restore`; verified live: deleted secret (404) → restored → decrypts; RPO/RTO documented |
+| Backup / restore | `bin/ots backup`/`restore`; verified live: deleted secret (404) → restored → decrypts; owner receipts (with TTL) and customer zset/set indexes are restored too (T-106); RPO/RTO documented |
 | Key rotation | `bin/ots rotate-key`; verified live: 21 secrets rotated, pre-rotation secret still decrypts, old key fails |
 | Load / single-use invariant | `script/loadtest.rb`: 400 secrets, 40 threads, 8-way race, 0 double reveals (~240 creates/s) |
 | Incident runbook | `RUNBOOK.md` (key compromise, Redis loss, reveal regression, lockout, rollback) |
