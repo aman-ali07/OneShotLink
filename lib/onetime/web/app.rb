@@ -358,6 +358,23 @@ module Onetime
         json(result)
       end
 
+      def create_webhook_payload(customer)
+        body = parse_json_body
+        result = Webhook.create(owner_id: customer[:id], url: body["url"], events: body["events"])
+        audit("webhook.created", actor_id: customer[:id])
+        json(result, status: 201)
+      end
+
+      def list_webhooks_payload(customer)
+        json({ webhooks: Webhook.list(customer[:id]) })
+      end
+
+      def delete_webhook_payload(customer, id)
+        result = Webhook.delete(owner_id: customer[:id], id: id)
+        audit("webhook.deleted", actor_id: customer[:id], detail: id)
+        json(result)
+      end
+
       def cookies
         @cookies ||= Rack::Utils.parse_cookies(env)
       end
@@ -754,6 +771,42 @@ module Onetime
                   verify_csrf!
                   customer = require_session!
                   reveal_request_payload(key, customer)
+                end
+
+                r.get(/.*/) { v3_not_found }
+                r.post(/.*/) { v3_not_found }
+              end
+
+              r.get(/.*/) { v3_not_found }
+              r.post(/.*/) { v3_not_found }
+            end
+
+            r.on "webhooks" do
+              r.post true do
+                require_accounts!
+                verify_csrf!
+                customer = require_session!
+                create_webhook_payload(customer)
+              end
+
+              r.get true do
+                require_accounts!
+                customer = require_session!
+                list_webhooks_payload(customer)
+              end
+
+              r.on String do |id|
+                r.get "deliveries" do
+                  require_accounts!
+                  customer = require_session!
+                  json({ deliveries: Webhook.deliveries(customer[:id]) })
+                end
+
+                r.is(method: "DELETE") do
+                  require_accounts!
+                  verify_csrf!
+                  customer = require_session!
+                  delete_webhook_payload(customer, id)
                 end
 
                 r.get(/.*/) { v3_not_found }

@@ -6,7 +6,7 @@ verifiable command; no phase is called done on inspection alone.
 ## Phase 0 — Audit and comparison (DONE)
 
 - `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md`, this plan.
-- Evidence: local inspection, 142 backend specs, public competitor pages.
+- Evidence: local inspection, 149 backend specs, public competitor pages.
 - Constraint: clean-room + REA unavailable recorded in the audit.
 
 ## Phase 1 — Product: premium frontend in place (DONE)
@@ -57,7 +57,7 @@ identity, no new runtime dependency.
 
 ## Phase 4 — Deployment readiness (DONE, in-repo portion)
 
-- Full gate battery re-run and recorded in `docs/GO_LIVE_HANDOFF.md`: 142 specs / 0 failures,
+- Full gate battery re-run and recorded in `docs/GO_LIVE_HANDOFF.md`: 149 specs / 0 failures,
   12 Vitest, clean build, brand sweep clean, contrast 12/12 AA, parity 66.7 with 11/11
   must-haves, Compose config valid, image builds, both browser journeys green, load test
   100/100 revealed exactly once, TLS rehearsal `PREFLIGHT PASSED`, preflight self-test 5/5,
@@ -99,9 +99,20 @@ identity, no new runtime dependency.
 - Verification: 4 red→green specs (142 total), 12 Vitest, four browser journeys including a
   new `e2e/requests.mjs`; parity 63.0 → 66.7. Text-only submissions, no passphrase: documented.
 
+## Phase 8 — Signed webhooks (DONE)
+
+- Owner endpoint registry with an encrypted-at-rest signing secret returned once; closed
+  event vocabulary; SSRF protection (private addresses refused unless explicitly enabled for
+  local testing).
+- Redis-backed queue delivered by `bin/ots webhooks:work`: HMAC-SHA256 signature, stable
+  delivery id claimed with `SET NX`, three-attempt backoff, status-only delivery records.
+- Dashboard create/list/remove controls; API.md §5.5, OpenAPI paths/schemas, SDK guide.
+- Verification: 7 red→green specs, local receiver proof, worker CLI output, fifth browser
+  journey; suite 149 examples / 0 failures. Operator must schedule the worker.
+
 ## Explicitly out of scope this release
 
-Webhooks, SSO/MFA/WebAuthn, client-side encryption,
+SSO/MFA/WebAuthn, client-side encryption,
 i18n locales, read counts >1, custom domains. They stay `no`/`skip` in the feature matrix.
 
 ## Change discipline

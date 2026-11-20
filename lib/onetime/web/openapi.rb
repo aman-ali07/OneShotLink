@@ -26,6 +26,7 @@ module Onetime
             { "name" => "owner", "description" => "Session-scoped secret lifecycle (v3)" },
             { "name" => "account", "description" => "Simple-mode accounts" },
             { "name" => "requests", "description" => "Incoming secret requests (v3)" },
+            { "name" => "webhooks", "description" => "Signed event delivery (v3)" },
             { "name" => "legacy", "description" => "v1 compatibility surface" }
           ],
           "paths" => paths,
@@ -117,6 +118,44 @@ module Onetime
                 "404" => json_ref("Error"),
                 "429" => rate_limited
               }
+            )
+          },
+          "/api/v3/webhooks" => {
+            "post" => op(
+              "webhooks",
+              "Register a signed webhook endpoint (the signing secret is returned once)",
+              body: "WebhookCreateRequest",
+              security: [{ cookie: [] }],
+              responses: {
+                "201" => json_ref("WebhookCreated"),
+                "401" => json_ref("Error"),
+                "403" => json_ref("Error"),
+                "422" => json_ref("Error")
+              }
+            ),
+            "get" => op(
+              "webhooks",
+              "List the signed-in customer's webhook endpoints",
+              security: [{ cookie: [] }],
+              responses: { "200" => json_ref("WebhookList"), "401" => json_ref("Error") }
+            )
+          },
+          "/api/v3/webhooks/{key}" => {
+            "delete" => op(
+              "webhooks",
+              "Remove a webhook endpoint",
+              params: [key_param],
+              security: [{ cookie: [] }],
+              responses: { "200" => json_ref("Ok"), "401" => json_ref("Error"), "404" => json_ref("Error") }
+            )
+          },
+          "/api/v3/webhooks/{key}/deliveries" => {
+            "get" => op(
+              "webhooks",
+              "List recent delivery attempts for the signed-in customer's endpoints",
+              params: [key_param],
+              security: [{ cookie: [] }],
+              responses: { "200" => json_ref("WebhookDeliveryList"), "401" => json_ref("Error") }
             )
           },
           "/api/v3/guest/conceal" => {
@@ -412,6 +451,64 @@ module Onetime
                 "max_file_bytes" => { "type" => "integer" },
                 "version" => { "type" => "string" }
               }
+            },
+            "Ok" => {
+              "type" => "object",
+              "properties" => { "ok" => { "type" => "boolean" } }
+            },
+            "WebhookCreateRequest" => {
+              "type" => "object",
+              "required" => %w[url events],
+              "properties" => {
+                "url" => { "type" => "string", "format" => "uri" },
+                "events" => {
+                  "type" => "array",
+                  "items" => { "type" => "string" }
+                }
+              }
+            },
+            "Webhook" => {
+              "type" => "object",
+              "properties" => {
+                "id" => { "type" => "string" },
+                "url" => { "type" => "string" },
+                "events" => { "type" => "array", "items" => { "type" => "string" } },
+                "enabled" => { "type" => "boolean" },
+                "created_at" => { "type" => "integer" }
+              }
+            },
+            "WebhookCreated" => {
+              "allOf" => [
+                json_ref("Webhook"),
+                {
+                  "type" => "object",
+                  "properties" => {
+                    "signing_secret" => {
+                      "type" => "string",
+                      "description" => "Returned once; rotate by deleting and recreating the endpoint."
+                    }
+                  }
+                }
+              ]
+            },
+            "WebhookList" => {
+              "type" => "object",
+              "properties" => { "webhooks" => { "type" => "array", "items" => json_ref("Webhook") } }
+            },
+            "WebhookDelivery" => {
+              "type" => "object",
+              "properties" => {
+                "id" => { "type" => "string" },
+                "event" => { "type" => "string" },
+                "status" => { "type" => "string", "enum" => %w[queued delivered retrying failed skipped] },
+                "attempts" => { "type" => "integer" },
+                "response_code" => { "type" => "integer", "nullable" => true },
+                "created_at" => { "type" => "integer" }
+              }
+            },
+            "WebhookDeliveryList" => {
+              "type" => "object",
+              "properties" => { "deliveries" => { "type" => "array", "items" => json_ref("WebhookDelivery") } }
             },
             "CreateRequestRequest" => {
               "type" => "object",

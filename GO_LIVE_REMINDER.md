@@ -1,6 +1,6 @@
 # Go-live reminder — OneShotLink
 
-Plain-language note to self. The **app is done**: 142 backend specs, 12 Vitest tests, four
+Plain-language note to self. The **app is done**: 149 backend specs, 12 Vitest tests, five
 browser journeys (text, accounts, file), clean typecheck/build, brand sweep, and free-tier-safe
 checks all pass.
 What remains is not code — it is hosting, a public address, and two sign-offs.

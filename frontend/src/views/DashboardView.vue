@@ -7,17 +7,29 @@ import {
   ApiError,
   changePassword,
   createRequest,
+  createWebhook,
+  deleteWebhook,
   deleteAccount,
   errorMessage,
   getAccount,
   listReceipts,
   listRequests,
+  listWebhooks,
   revealRequest,
   signOut,
   type Customer,
   type Receipt,
   type RequestItem,
+  type Webhook,
 } from "@/lib/api";
+
+const WEBHOOK_EVENTS = [
+  "secret.created",
+  "secret.revealed",
+  "request.created",
+  "request.responded",
+  "request.revealed",
+] as const;
 
 const customer = ref<Customer | null>(null);
 const receipts = ref<Receipt[]>([]);
@@ -28,6 +40,12 @@ const creatingRequest = ref(false);
 const requestError = ref("");
 const revealedRequest = ref<{ value: string; label: string } | null>(null);
 const revealingKey = ref("");
+const webhooks = ref<Webhook[]>([]);
+const hookUrl = ref("");
+const hookEvents = ref<string[]>(["secret.revealed"]);
+const addingHook = ref(false);
+const hookError = ref("");
+const newSigningSecret = ref("");
 const loading = ref(true);
 const unauthenticated = ref(false);
 const error = ref("");
@@ -59,14 +77,16 @@ async function load() {
   loading.value = true;
   error.value = "";
   try {
-    const [account, list, incoming] = await Promise.all([
+    const [account, list, incoming, hooks] = await Promise.all([
       getAccount(),
       listReceipts(),
       listRequests(),
+      listWebhooks(),
     ]);
     customer.value = account.customer;
     receipts.value = list.receipts;
     requests.value = incoming.requests;
+    webhooks.value = hooks.webhooks;
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 401) {
       unauthenticated.value = true;
@@ -113,6 +133,45 @@ async function openIncoming(item: RequestItem) {
   } finally {
     revealingKey.value = "";
   }
+}
+
+async function addHook() {
+  hookError.value = "";
+  if (hookUrl.value.trim() === "" || hookEvents.value.length === 0) {
+    hookError.value = "Enter an endpoint URL and choose at least one event.";
+    return;
+  }
+  addingHook.value = true;
+  try {
+    const created = await createWebhook(hookUrl.value.trim(), hookEvents.value);
+    newSigningSecret.value = created.signing_secret;
+    hookUrl.value = "";
+    await load();
+  } catch (cause) {
+    hookError.value = errorMessage(cause);
+  } finally {
+    addingHook.value = false;
+  }
+}
+
+async function removeHook(id: string) {
+  hookError.value = "";
+  try {
+    await deleteWebhook(id);
+    await load();
+  } catch (cause) {
+    hookError.value = errorMessage(cause);
+  }
+}
+
+function copyText(value: string) {
+  void navigator.clipboard?.writeText(value);
+}
+
+function toggleHookEvent(event: string) {
+  hookEvents.value = hookEvents.value.includes(event)
+    ? hookEvents.value.filter((item) => item !== event)
+    : [...hookEvents.value, event];
 }
 
 async function logout() {
@@ -328,6 +387,76 @@ onMounted(load);
                   Reveal answer
                 </AppButton>
               </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="ots-panel overflow-hidden" aria-labelledby="webhooks-heading">
+        <div class="flex items-center gap-3 border-b border-border px-6 py-4">
+          <span class="ots-eyebrow">Developers</span>
+          <span class="ots-rule flex-1" aria-hidden="true" />
+          <span class="text-xs text-muted">Signed, idempotent delivery</span>
+        </div>
+        <div class="space-y-5 px-6 py-6">
+          <div class="space-y-1">
+            <h2 id="webhooks-heading" class="text-xl font-semibold">Webhooks</h2>
+            <p class="text-sm text-muted">
+              Receive metadata-only events. Payloads never contain secret values; each delivery
+              carries a stable id and an HMAC-SHA256 signature.
+            </p>
+          </div>
+
+          <form class="space-y-4" @submit.prevent="addHook">
+            <div class="space-y-2">
+              <label for="hook-url" class="block text-sm font-semibold">Endpoint URL</label>
+              <input
+                id="hook-url"
+                v-model="hookUrl"
+                type="url"
+                class="ots-inset w-full px-3 py-2.5 text-sm"
+                placeholder="https://hooks.example.com/ots"
+              />
+              <p class="text-xs text-muted">Public HTTPS endpoints only. Private addresses are refused.</p>
+            </div>
+            <fieldset class="space-y-2">
+              <legend class="text-sm font-semibold">Events</legend>
+              <div class="flex flex-wrap gap-3">
+                <label v-for="event in WEBHOOK_EVENTS" :key="event" class="flex items-center gap-2 text-xs text-muted">
+                  <input
+                    type="checkbox"
+                    :checked="hookEvents.includes(event)"
+                    @change="toggleHookEvent(event)"
+                  />
+                  <span class="font-mono">{{ event }}</span>
+                </label>
+              </div>
+            </fieldset>
+            <AppButton type="submit" :loading="addingHook">Add endpoint</AppButton>
+          </form>
+
+          <AppAlert v-if="hookError" tone="danger">{{ hookError }}</AppAlert>
+
+          <div v-if="newSigningSecret" class="ots-inset space-y-3 p-4" aria-live="polite">
+            <p class="text-sm font-semibold">Copy this signing secret now</p>
+            <p class="break-all font-mono text-xs text-text">{{ newSigningSecret }}</p>
+            <div class="flex gap-2">
+              <AppButton type="button" variant="secondary" @click="copyText(newSigningSecret)">Copy secret</AppButton>
+              <AppButton type="button" variant="secondary" @click="newSigningSecret = ''">Done</AppButton>
+            </div>
+            <p class="text-xs text-muted">It is encrypted in Redis and is not shown again.</p>
+          </div>
+
+          <p v-if="webhooks.length === 0" class="ots-inset p-4 text-sm text-muted">
+            No endpoints yet. Add one to receive lifecycle events.
+          </p>
+          <ul v-else class="divide-y divide-border rounded-md border border-border bg-surface">
+            <li v-for="hook in webhooks" :key="hook.id" class="flex flex-wrap items-center justify-between gap-3 p-4">
+              <div class="min-w-0 space-y-1">
+                <p class="break-all font-mono text-sm text-text">{{ hook.url }}</p>
+                <p class="text-xs text-muted">{{ hook.events.join(' · ') }}</p>
+              </div>
+              <AppButton type="button" variant="danger" @click="removeHook(hook.id)">Remove</AppButton>
             </li>
           </ul>
         </div>

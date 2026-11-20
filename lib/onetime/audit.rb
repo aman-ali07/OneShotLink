@@ -27,6 +27,8 @@ module Onetime
       request.created
       request.responded
       request.revealed
+      webhook.created
+      webhook.deleted
       admin.role_changed
     ].freeze
 

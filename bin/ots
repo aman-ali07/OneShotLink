@@ -133,6 +133,16 @@ module Cli
     puts "Status: ok"
   end
 
+  def work_webhooks(limit)
+    claimed = Onetime::Webhook.claim(limit: limit)
+    counts = Hash.new(0)
+    claimed.each do |item|
+      counts[Onetime::Webhook.deliver(item)] += 1
+    end
+    puts "Webhooks: claimed=#{claimed.length} delivered=#{counts[:delivered]} " \
+         "retrying=#{counts[:retrying]} failed=#{counts[:failed]} skipped=#{counts[:skipped]}"
+  end
+
   def rotate_key
     unless ENV["OTS_NEW_SECRET"]
       abort "Set OTS_NEW_SECRET to the new instance secret (>= 32 bytes)."
@@ -184,6 +194,7 @@ module Cli
         backup --out FILE                         Export encrypted records to FILE
         restore --in FILE                         Restore records from a backup FILE
         rotate-key                                Re-encrypt all secrets under OTS_NEW_SECRET
+        webhooks:work [LIMIT]                     Deliver queued webhook events (default 10)
         version                                   Print the version
 
       Password input:
@@ -226,6 +237,8 @@ when "restore"
   Cli.restore(options[:in])
 when "rotate-key"
   Cli.rotate_key
+when "webhooks:work"
+  Cli.work_webhooks((ARGV.shift || 10).to_i)
 when "version"
   puts Onetime::VERSION
 else

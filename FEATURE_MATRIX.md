@@ -24,7 +24,7 @@ are marked "not verified" rather than guessed.
 | Accounts + dashboard | yes (simple mode) | yes | OIDC (paid) | yes (Bitwarden account) | no | SSO/MFA deferred (D-003) |
 | Audit trail / read receipts | yes (append-only events) | claimed | yes (paid) | enterprise | no | — |
 | API / SDK | OpenAPI + REST + [docs/SDK.md](docs/SDK.md) and 3 runnable examples | API (public docs) | CLI + REST | CLI/API | API-ish | **D-G1 resolved (P1):** SDK guide plus curl/TypeScript/Python examples executed against a live stack; no SDK package is claimed |
-| Webhooks | no | not verified | yes (paid) | not verified | no | P2 |
+| Webhooks | yes (signed, idempotent, metadata-only; external worker command) | not verified | yes (paid) | not verified | no | Done — T-118; operator must schedule `bin/ots webhooks:work` |
 | Self-hosting / Docker | yes (non-root, Compose) | self-host option | yes (Go + Redis) | yes (vault) | yes | — |
 | Open-source license | MIT | source available | Apache-2.0 | GPLv3 | AGPLv3 | — |
 | Premium, distinctive frontend | **yes** (in-place OneShotLink redesign committed `5165921`; visual review at 375/1280 px, 12 Vitest, clean typecheck/build, three browser journeys green) | polished SaaS | functional | polished SaaS | utilitarian | P0 delivered; original UI not copied |
@@ -39,6 +39,7 @@ are marked "not verified" rather than guessed.
    considered security product. Redesign in place with the existing tokens and identity.
 3. The second deficit is developer onboarding: add real, runnable API examples and an SDK
    guide instead of promising an SDK that does not exist.
-4. Do not add fake parity: SSO/MFA, client-side encryption and webhooks stay explicitly
-   deferred until implemented. File secrets moved from `no` to `yes` only after the backend,
+4. Do not add fake parity: SSO/MFA and client-side encryption stay explicitly deferred until
+   implemented. Webhooks moved to `yes` only after signed delivery, an idempotency key, specs
+   and a browser journey landed. File secrets moved from `no` to `yes` only after the backend,
    browser journey, API docs and OpenAPI all landed (T-115).

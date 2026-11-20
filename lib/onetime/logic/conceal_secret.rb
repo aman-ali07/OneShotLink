@@ -45,6 +45,9 @@ module Onetime
           filename: @filename
         )
 
+        Webhook.emit("secret.created", owner_id: @owner_id,
+                     data: { identifier: objid, kind: @kind, ttl: ttl })
+
         {
           secret_key: objid,
           receipt: {

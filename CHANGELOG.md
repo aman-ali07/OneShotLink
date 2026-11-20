@@ -9,6 +9,19 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (signed webhooks, 2026-11-20) — verified
+
+- Owners can register HTTPS endpoints in the dashboard for `secret.created`, `secret.revealed`
+  and the three `request.*` events. The signing secret is encrypted at rest and shown once.
+- Delivery is outside the request path: events go to a Redis queue and `bin/ots webhooks:work`
+  posts signed JSON. Each delivery has a stable id claimed with `SET NX`, an HMAC-SHA256
+  signature header, private-address refusal and three-attempt backoff. Payloads are
+  metadata-only — no plaintext, ciphertext, passphrases or tokens.
+- Verified with seven red/green specs including a local HTTP receiver that checked the
+  signature and single delivery, a worker run (`claimed=1 delivered=1`), and a fifth browser
+  journey that created an endpoint and confirmed the listing never returns the signing secret.
+  Suite 149 examples / 0 failures. The operator must schedule the worker.
+
 ### Added (incoming secret requests, 2026-11-20) — verified
 
 - An owner with a simple-mode account can create a public link asking for a secret. Anyone

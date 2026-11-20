@@ -302,6 +302,33 @@ emails are never written into Redis keys.
 Login failures are always `401 {"error":{"code":"invalid_credentials"}}`; do not reveal
 whether the email exists. Passwords/tokens never appear in responses or logs.
 
+### 5.5 Webhooks (simple mode)
+
+Owner-scoped endpoints receive **metadata-only** lifecycle events. Payloads never contain
+plaintext, ciphertext, passphrases or tokens — only identifiers and the same metadata the
+dashboard shows.
+
+| Route | Auth | Body | Success |
+| --- | --- | --- | --- |
+| `POST /api/v3/webhooks` | session + CSRF proof | `{"url":"https://hooks.example.com/ots","events":["secret.revealed"]}` | `201` with `id`, `url`, `events`, `enabled`, `created_at` and `signing_secret` (**returned once**) |
+| `GET /api/v3/webhooks` | session | — | `200 {"webhooks":[…]}` — never includes `signing_secret` |
+| `GET /api/v3/webhooks/:id/deliveries` | session | — | `200 {"deliveries":[{id,event,status,attempts,response_code,created_at}]}` |
+| `DELETE /api/v3/webhooks/:id` | session + CSRF proof | — | `200 {"ok":true}` |
+
+Event names: `secret.created`, `secret.revealed`, `request.created`, `request.responded`,
+`request.revealed`. Unknown names and non-public URLs are `422 validation_error`; private
+addresses are refused unless the operator explicitly sets `WEBHOOK_ALLOW_PRIVATE=true` for
+local development.
+
+Delivery runs in `bin/ots webhooks:work` (optionally with a limit), so web traffic never
+waits on an external HTTP call. Each delivery has a stable `X-OneShotLink-Delivery` id and
+is claimed with Redis `SET NX`, so a replayed event cannot produce a second POST. The body
+is signed with HMAC-SHA256 over the raw JSON using the per-endpoint signing secret and sent
+as `X-OneShotLink-Signature: sha256=<hex>` alongside `X-OneShotLink-Event`. Failed deliveries
+are retried up to three times with backoff and recorded with status/failure class only —
+response bodies and secret material are never logged. The signing secret is encrypted at
+rest with the same AES-256-GCM path used for secrets.
+
 ## 6. Deferred endpoints (not in the v1 contract)
 
 Listed so nobody implements them accidentally. Organizations, domains, invites, account

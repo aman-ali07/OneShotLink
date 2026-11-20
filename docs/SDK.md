@@ -183,6 +183,26 @@ encrypted with AES-256-GCM before storage and is text-only with no passphrase �
 ordinary secret link when a passphrase is needed. `GET …/:key` never returns the answer, so
 chat previews cannot burn it.
 
+## 4c. Webhooks (simple mode)
+
+Register an endpoint with `POST /api/v3/webhooks` using an array of event names. The response
+contains a `signing_secret` **once**; store it in your secret manager. Listings never include
+it. Events are `secret.created`, `secret.revealed`, `request.created`, `request.responded`
+and `request.revealed`, and their payloads contain metadata only — never secret values.
+
+```sh
+curl -sS -X POST http://localhost:3000/api/v3/webhooks \
+  -H 'content-type: application/json' -H "Origin: http://localhost:3000" \
+  -b cookies.txt -d '{"url":"https://hooks.example.com/ots","events":["secret.revealed"]}'
+```
+
+Deliveries happen outside the request cycle: run `bin/ots webhooks:work` (or with a limit)
+from the container. Verify the `X-OneShotLink-Signature` header by computing
+`HMAC-SHA256(signing_secret, raw_request_body)` and comparing it in constant time to the
+`sha256=<hex>` value. Deduplicate on `X-OneShotLink-Delivery`: that id is stable per event and
+never delivered twice. Respond with any 2xx to stop retries; failures are retried up to three
+times with backoff.
+
 ## 5. Errors, limits and retries
 
 Every v3 error has the same envelope; keep `request_id` when reporting a problem:

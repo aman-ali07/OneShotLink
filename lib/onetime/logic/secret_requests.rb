@@ -19,6 +19,8 @@ module Onetime
         label = validate_label
         ttl = validate_ttl
         key, record = Models::SecretRequest.create(owner_id: @owner_id, label: label, ttl: ttl)
+        Webhook.emit("request.created", owner_id: @owner_id,
+                     data: { request_key: key, label: label, ttl: ttl })
         { request_key: key, metadata: { label: record["label"], created_at: record["created_at"], ttl: ttl } }
       end
 
@@ -70,6 +72,8 @@ module Onetime
         written = Models::SecretRequest.submit(@key, raw, ttl: record["ttl"].to_i)
         raise Conflict, "This request has already been answered." unless written
 
+        Webhook.emit("request.responded", owner_id: record["owner_id"],
+                     data: { request_key: @key, label: record["label"].to_s })
         { ok: true, label: record["label"].to_s }
       end
     end
@@ -95,6 +99,8 @@ module Onetime
         plaintext = Crypto.decrypt(JSON.parse(raw))
         raise NotFound unless Models::SecretRequest.consume_submission(@key, raw)
 
+        Webhook.emit("request.revealed", owner_id: @owner_id,
+                     data: { request_key: @key, label: record["label"].to_s })
         {
           secret_value: plaintext,
           metadata: {

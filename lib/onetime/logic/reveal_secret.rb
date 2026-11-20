@@ -35,6 +35,8 @@ module Onetime
         raise NotFound unless Models::Secret.consume(key, raw)
 
         Models::Secret.cleanup(key, owner_id: record["owner_id"])
+        Webhook.emit("secret.revealed", owner_id: record["owner_id"],
+                     data: { identifier: key, kind: record["kind"], ttl: record["ttl"].to_i })
 
         {
           secret_value: plaintext,

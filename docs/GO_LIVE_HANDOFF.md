@@ -65,8 +65,8 @@ The three-pillar pass added `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md` and
   filename and a 512 KiB decoded ceiling; the SPA has a Text/File switch and a browser-side
   download button. API.md, OpenAPI and the SDK guide were updated in the same change. v1 is
   untouched.
-- **Evidence at the file-secret tree:** 142 backend examples / 0 failures, 12 Vitest, clean
-  build (225.65 kB JS / 22.46 kB CSS), four browser journeys (text, accounts, file, requests) green on
+- **Evidence at the file-secret tree:** 149 backend examples / 0 failures, 12 Vitest, clean
+  build (225.65 kB JS / 22.46 kB CSS), five browser journeys (text, accounts, file, requests, webhooks) green on
   a live stack, brand sweep clean, 12/12 AA contrast pairs, parity 63.0 with 11/11 must-haves,
   Compose config valid. File secrets are an unscored "not in the original" row; incoming
   secret requests are a scored `should` row and moved parity from 63.0 to 66.7.
@@ -79,7 +79,7 @@ real host. No deploy was performed.
 
 | Gate | Result |
 | --- | --- |
-| `bundle exec rspec` (Docker, Redis DB 15) | **142 examples, 0 failures** |
+| `bundle exec rspec` (Docker, Redis DB 15) | **149 examples, 0 failures** |
 | Vitest / typecheck / build | **12 passed**; clean; 225.65 kB JS / 22.46 kB CSS |
 | `script/brand-sweep.sh` | clean |
 | Contrast check (`replica/design/tokens.json`) | **12 pairs, 0 failing AA** |
@@ -105,6 +105,16 @@ stable `request.*` names. The SPA has a responder route (`/request/:key`) and da
 create/list/reveal controls. Added API.md §5.3, OpenAPI paths/schemas, SDK guide, and a fourth
 browser journey (`e2e/requests.mjs`): `{"ok":true,...,"errors":[]}` against a live Puma. No
 passphrase on submitted answers — documented, not hidden.
+
+## Signed webhooks (T-118)
+
+Owners can register endpoints in the dashboard; events are metadata-only and delivered by
+`bin/ots webhooks:work` with HMAC-SHA256, a stable `SET NX` delivery id and three-attempt
+backoff. Verified with seven specs (including a local receiver that checked the signature and
+single delivery), the worker CLI (`claimed=1 delivered=1`, receiver logged a signed
+payload containing only identifiers), and a fifth browser journey. **Operator action:** the
+worker is not scheduled by the web process and must be run periodically from the container.
+Payloads never contain secret material; this is not end-to-end encrypted delivery.
 
 ## Open items — all require a human or a real host
 

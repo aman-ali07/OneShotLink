@@ -10,9 +10,10 @@ actor** (not this audit) committed it as `2158b9a`, then continued changing the 
 `e2e/journey.mjs` was modified, and later `lib/onetime.rb`, `lib/onetime/audit.rb` were
 changed with new uncommitted `lib/onetime/logic/secret_requests.rb`,
 `lib/onetime/models/secret_request.rb` and `spec/integration/requests_spec.rb` (an
-incoming-secret-request feature). This document reports the state at `2158b9a` as observed
-and **does not audit those later uncommitted additions**; no source code was modified by
-the audit. Findings marked **[V]** were verified by reading code/config or by running a
+incoming-secret-request feature). It moved again to `2441b46` during the final review,
+adding uncommitted webhook work (`lib/onetime/webhook.rb`, `spec/**/webhook*_spec.rb`,
+`e2e/webhooks.mjs`). This document reports the state at `2158b9a` as observed and **does not
+audit those later uncommitted additions**; no source code was modified by the audit. Findings marked **[V]** were verified by reading code/config or by running a
 command during this audit; **[D]** means the claim comes from documentation only and was
 not independently executed.
 
@@ -186,7 +187,11 @@ tooling, multipart/image-preview file upload, and distributed tracing. They rema
 
 - **[V]** Status layer is materially inconsistent: spec counts 94 / 113 / 114 / 133 / 134 /
   138 across `ARCHITECTURE.md:53`, `KNOWN_ISSUES.md:6`, `README.md:90`, `TASKS.md:39,50,53,196`,
-  `AGENTS.md:8`; actual suite = **138 examples**. `KNOWN_ISSUES.md:68-74` and
+  `AGENTS.md:8`; actual suite at the pinned snapshot = **138 examples** (§8). After the
+  snapshot the banner was raised to **142** in `AGENTS.md:8`, `TASKS.md:17` and `README.md:11`,
+  while `KNOWN_ISSUES.md:6` still says **133**, and a live grep counted **149** `it` blocks
+  with the uncommitted webhook specs present — the number is in flux, so re-run before acting.
+  `KNOWN_ISSUES.md:68-74` and
   `PRODUCTION_READINESS.md:91` still list file secrets as missing; `PRD.md:78,81,176` still
   mark OpenAPI/file secrets "No"/deferred although both ship. `ARCHITECTURE.md:172` lists
   only three views although Dashboard/SignIn/SignUp exist. `DEPLOYMENT.md:484-491` contains
@@ -329,7 +334,8 @@ above are caused by those choices, and D-001/D-002/D-003 still hold.
 | `npm --prefix frontend run build` | clean; `index.html` 1.52 kB, CSS 22.46 kB (gzip 5.22), JS 225.65 kB (gzip 74.81). Rollup printed only zod comment-annotation warnings. |
 | `grep -cE '^\s*(it|specify)\s*...' spec/**/*_spec.rb` (agent) | 138 example blocks — matches the executed suite |
 | `parity.py replica/features.csv` (agent) | 63.0/100, accounts 0.0 — consistent with row 13–14 drift |
-| `git status/log/show` | HEAD `828a1c3` → `2158b9a` committed externally mid-audit; further uncommitted changes (incl. new secret-request files) appeared afterwards — see header |
+| `git status/log/show` | HEAD `828a1c3` → `2158b9a` → `2441b46`, all committed externally mid-audit; further uncommitted secret-request/webhook files appeared — see header |
+| `grep -rE '^\s*(it\|specify)...' spec/**/*_spec.rb \| wc -l` (post-snapshot) | 149 example blocks with the in-flight webhook specs present; status docs variously say 133/142 |
 
 Not re-run in this audit (documented evidence only): TLS rehearsal, preflight self-test,
 load test, brand sweep, GitHub Actions runs, backup/restore drill, `docker compose build`.
@@ -349,8 +355,8 @@ Their last recorded results are in `TASKS.md`/`PRODUCTION_READINESS.md` and are 
   status code is accurate (see §5.4).
 - Several working-tree changes appeared during the audit from an external actor
   (`GO_LIVE_REMINDER.md`, `docs/GO_LIVE_HANDOFF.md`, `e2e/journey.mjs`, and the new
-  secret-request files listed in the header). They were not reviewed as part of the pinned
-  `2158b9a` snapshot; in particular the newly added incoming-secret-request feature may
+  secret-request and webhook files listed in the header). They were not reviewed as part of
+  the pinned `2158b9a` snapshot; in particular the incoming-secret-request feature may
   change the "deferred features" assessment in §5.5 once committed and audited.
 
 **Open questions for a human:** (1) accept or mitigate the distributed-passphrase-guessing

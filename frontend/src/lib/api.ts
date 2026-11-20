@@ -27,6 +27,16 @@ const ReceiptSchema = z.object({
   secret_url: z.string().optional(),
 });
 
+const WebhookSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  events: z.array(z.string()),
+  enabled: z.boolean(),
+  created_at: z.number().int(),
+});
+
+const WebhookCreateSchema = WebhookSchema.extend({ signing_secret: z.string() });
+
 const CustomerSchema = z.object({
   id: z.string(),
   email: z.string(),
@@ -82,6 +92,7 @@ export type RevealResponse = z.infer<typeof RevealResponseSchema>;
 export type Customer = z.infer<typeof CustomerSchema>;
 export type RequestPreview = z.infer<typeof RequestPreviewSchema>;
 export type RequestItem = z.infer<typeof RequestItemSchema>;
+export type Webhook = z.infer<typeof WebhookSchema>;
 export type Receipt = z.infer<typeof ReceiptSchema>;
 
 export class ApiError extends Error {
@@ -210,6 +221,25 @@ export function revealRequest(key: string): Promise<RevealResponse> {
     RevealResponseSchema,
     { method: "POST", body: {} },
   );
+}
+
+export function listWebhooks(): Promise<{ webhooks: Webhook[] }> {
+  return request("/api/v3/webhooks", z.object({ webhooks: z.array(WebhookSchema) }), {
+    method: "GET",
+  });
+}
+
+export function createWebhook(url: string, events: string[]): Promise<z.infer<typeof WebhookCreateSchema>> {
+  return request("/api/v3/webhooks", WebhookCreateSchema, {
+    method: "POST",
+    body: { url, events },
+  });
+}
+
+export function deleteWebhook(id: string): Promise<{ ok: boolean }> {
+  return request(`/api/v3/webhooks/${encodeURIComponent(id)}`, z.object({ ok: z.boolean() }), {
+    method: "DELETE",
+  });
 }
 
 export function errorMessage(error: unknown): string {

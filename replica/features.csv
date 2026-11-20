@@ -31,3 +31,4 @@ Client-side (zero-knowledge) encryption option,security,should,no,no,"Evidence R
 File and image secrets,core,could,no,yes,Text files up to 512 KiB via v3 JSON/base64; encrypted at rest and single-use download (T-116). Image preview and multipart upload are not implemented
 Read counts greater than one,core,could,no,no,Evidence R-08: 1 review (thin); 'view limits greater than 1'
 Published crypto spec and a 'verify it yourself' page,docs,should,partial,partial,"Evidence R-08: 6 reviews on trust/crypto; SECURITY.md exists, no standalone verifiable spec page yet"
+Signed webhook event delivery,developer,could,no,yes,Metadata-only HMAC-signed events with a Redis queue and bin/ots webhooks:work worker; operator schedules the worker (T-118)
