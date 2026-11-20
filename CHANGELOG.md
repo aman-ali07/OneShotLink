@@ -9,6 +9,18 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (redesigned UI touch targets and scrollable regions, 2026-11-20) — verified
+
+- Browser QA with axe WCAG 2.2 AA found five serious `target-size` failures in footer links
+  (16 px tall, too close together). Footer links now have a 24 px minimum target; re-ran
+  21/21 checks across home/reveal/signup at 1440/768/375: 0 violations, 0 overflow.
+- The static landing page had two mobile `scrollable-region-focusable` violations. The code
+  block and both scrollable tables are now keyboard-focusable; re-verified 0 violations at
+  1440 and 375.
+- Full deployment-readiness battery re-run on the shipped UI: 134 specs/0 failures, 11 Vitest,
+  clean build and image, both browser journeys, brand sweep, TLS rehearsal with 0 skipped,
+  preflight self-test 5/5, and 100/100 single-use under concurrent load.
+
 ### Changed (premium frontend and site refresh, 2026-11-20) — verified
 
 - The SPA keeps its routes, API and identity but now uses a layered shell: a quiet technical

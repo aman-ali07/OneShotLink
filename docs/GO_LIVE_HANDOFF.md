@@ -69,6 +69,27 @@ The three-pillar pass added `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md` and
 Phase 4 (deployment readiness) is unchanged: the items below still need an operator and a
 real host. No deploy was performed.
 
+## Phase 4 verification (full gate battery, re-run)
+
+| Gate | Result |
+| --- | --- |
+| `bundle exec rspec` (Docker, Redis DB 15) | **134 examples, 0 failures** |
+| Vitest / typecheck / build | **11 passed**; clean; 221.33 kB JS / 22.35 kB CSS |
+| `script/brand-sweep.sh` | clean |
+| Contrast check (`replica/design/tokens.json`) | **12 pairs, 0 failing AA** |
+| `parity.py replica/features.csv` | **63.0 / 100**, must-haves **11 / 11** |
+| `docker compose config --quiet` | OK |
+| `docker build -t ots-prod:phase4 .` | built `709cc557e47d` |
+| Both browser journeys | lifecycle `ok: true`, accounts `ok` |
+| `script/loadtest.rb 100 20` | **100/100 revealed exactly once**, 0 wrong |
+| `script/tls-rehearsal.sh` | `PREFLIGHT PASSED` (Redis isolation skipped by design) |
+| `script/preflight_selftest.sh` | **5 assertions passed**, including negative controls |
+| `bundler-audit check --update` / `npm audit --audit-level=high` | **0 vulnerabilities** / **0** |
+
+The in-repo portion of Phase 4 is complete. It does **not** close T-70/T-71: a real hostname,
+a public certificate chain, a green preflight on that host and the per-host firewall rule are
+still operator actions. All verification containers and stacks were torn down.
+
 ## Open items — all require a human or a real host
 
 | ID | Item | Owner | State |

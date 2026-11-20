@@ -131,7 +131,7 @@
             One view, or the expiry you chose — the record is deleted from Redis.
           </li>
         </ol>
-        <pre><code>export SECRET="$(openssl rand -hex 32)"
+        <pre tabindex="0" aria-label="Self-hosting commands"><code>export SECRET="$(openssl rand -hex 32)"
 export REDIS_PASSWORD="$(openssl rand -hex 24)"
 docker compose up -d --build
 curl -fsS http://localhost:3000/health</code></pre>
@@ -144,7 +144,7 @@ curl -fsS http://localhost:3000/health</code></pre>
 
       <section aria-labelledby="features">
         <h2 id="features">What it does differently</h2>
-        <div class="table-scroll">
+        <div class="table-scroll" role="region" tabindex="0" aria-label="Feature comparison table">
           <table>
             <caption>Each row is a property of the code in this repository, not a roadmap item.</caption>
             <thead>
@@ -211,7 +211,7 @@ curl -fsS http://localhost:3000/health</code></pre>
 
       <section aria-labelledby="pricing">
         <h2 id="pricing">Pricing</h2>
-        <div class="table-scroll">
+        <div class="table-scroll" role="region" tabindex="0" aria-label="Pricing table">
           <table>
             <thead>
               <tr>

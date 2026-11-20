@@ -39,23 +39,36 @@ identity, no new runtime dependency.
   passphrase flow returned `preview passphrase_required:true`, `passphrase_required`,
   `invalid_passphrase`, then the value on the correct passphrase. No new dependencies.
 
-## Phase 3 — Security: visible assurance (IN PROGRESS)
+## Phase 3 — Security: visible assurance (DONE)
 
 - DONE: `docs/CRYPTO_SPEC.md` publishes the actual algorithms, parameters, record shape,
   single-use Lua, expiry semantics and explicit non-claims (no zero-knowledge, no
   cryptographic erasure from backups). Its verification commands were executed:
   `crypto_spec + store_spec + secrets_api_spec` → **37 examples, 0 failures**. Linked from
   README and the feature matrix; closes the "partial" crypto-spec row in documentation.
-- TODO by the frontend owner (Phase 1): surface one-time/expiry/passphrase semantics as
-  short, honest UI statements — no "zero-knowledge" claim (D-012).
-- TODO after UI changes: re-run `SECURITY.md` checks, CSP/journey tests and the TLS rehearsal.
+- DONE by the frontend refresh: the conceal screen states "Encrypted at rest", "A preview
+  cannot spend it" and "One view, then gone"; the passphrase panel says the server holds
+  the encryption key and this is **not** client-side encryption. No zero-knowledge claim
+  (D-012). Verified in the captured 1440/768/375 screenshots and by axe.
+- DONE after UI changes: CSP/hardening-header assertions and the plain-HTTP redirect passed
+  in `script/tls-rehearsal.sh --with-redis` (`PREFLIGHT PASSED (0 skipped)`, 9 assertions);
+  both committed browser journeys passed with `errors: []`; brand sweep clean.
 - Crypto and consume paths were not touched.
 
-## Phase 4 — Deployment readiness (TODO)
+## Phase 4 — Deployment readiness (DONE, in-repo portion)
 
-- Re-run the full gate battery (specs, frontend, brand sweep, parity, image, journeys,
-  load test, preflight self-test, audits) and refresh `docs/GO_LIVE_HANDOFF.md`.
-- T-70/T-71 remain operator-owned; do not claim production ready without them.
+- Full gate battery re-run and recorded in `docs/GO_LIVE_HANDOFF.md`: 134 specs / 0 failures,
+  11 Vitest, clean build, brand sweep clean, contrast 12/12 AA, parity 63.0 with 11/11
+  must-haves, Compose config valid, image builds, both browser journeys green, load test
+  100/100 revealed exactly once, TLS rehearsal `PREFLIGHT PASSED`, preflight self-test 5/5,
+  bundler-audit and npm audit both 0 vulnerabilities.
+- Independent browser QA on the shipped UI: Puppeteer + axe WCAG 2.2 AA on home, reveal and
+  signup at 1440/768/375 → **21/21 checks**, 0 violations, 0 overflow, 0 console/5xx errors;
+  two footer targets were found too small (`target-size`, 5 nodes) and fixed to `min-h-6`
+  in `AppFooter.vue`, then re-verified clean. The redesigned static landing page also passed
+  axe at 1440/375 after giving the code block and both scrollable tables `tabindex="0"`.
+- T-70/T-71 remain operator-owned; do not claim production ready without them. This phase is
+  "done" only for what can be proven from the repository.
 
 ## Explicitly out of scope this release
 
