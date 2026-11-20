@@ -28,3 +28,6 @@ yarn-error.log*
 
 # Reference screenshots of the original: never shipped
 replica/screens/*.png
+
+# Local agent skills workspace: tooling, not product (D-011)
+.claude/
