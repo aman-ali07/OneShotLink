@@ -9,6 +9,12 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (authored product still, 2026-11-20) — verified
+
+- `docs/stageshow/` adds a Stageshow-authored recipient still (wide and compact) with its
+  source and reproduction notes. Both widths passed the kit's rehearsal gate; it is a design
+  artifact only — no new app dependency and no copied competitor identity.
+
 ### Added (file secrets, 2026-11-20) — verified
 
 - v3 can now conceal a binary file: `kind: "file"`, a safe `filename`, and strict base64

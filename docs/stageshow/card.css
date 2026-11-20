@@ -1,0 +1,120 @@
+/* OneShotLink look: warm paper ground, quiet technical grid, one teal accent. */
+.osl-stage {
+  & .ss-stage {
+    --ss-accent: #0f766e;
+    --ss-accent-soft: #d7eee8;
+    --ss-well: #fafaf8;
+    --ss-canvas: #ffffff;
+    --ss-surface: #ffffff;
+    --ss-ink: #1c1917;
+    --ss-text: #44403c;
+    --ss-muted: #78716c;
+    --ss-line: #e7e5e4;
+    overflow: hidden;
+    border-radius: 18px;
+    background-color: var(--ss-well);
+    background-image: linear-gradient(to right, rgba(28,25,23,.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(28,25,23,.045) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .osl-window {
+    position: absolute;
+    top: 26px;
+    left: 34px;
+    width: 640px;
+    height: 370px;
+    border-radius: 12px;
+    background: var(--ss-surface);
+    box-shadow: var(--ss-shadow-hero);
+    overflow: hidden;
+  }
+
+  & [data-layout="compact"] .osl-window { left: 23px; width: 312px; }
+  & [data-layout="compact"] .osl-body { padding: 16px 18px; }
+  & [data-layout="compact"] .osl-notice { display: none; }
+  & [data-layout="compact"] .osl-title { font-size: 19px; margin-top: 8px; }
+  & [data-layout="compact"] .osl-sub { margin-top: 4px; }
+  & [data-layout="compact"] .osl-fields { margin-top: 10px; }
+  & [data-layout="compact"] .osl-cta { margin: 12px 0; }
+
+  .osl-window .ss-window__body { display: block; }
+
+  .osl-body { padding: 22px 26px; }
+
+  .osl-eyebrow {
+    color: var(--ss-accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+  }
+
+  .osl-title {
+    display: block;
+    margin-top: 14px;
+    color: var(--ss-ink);
+    font-size: 23px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+  }
+
+  .osl-sub { display: block; margin-top: 6px; color: var(--ss-text); font-size: 12px; }
+
+  .osl-notice {
+    margin-top: 18px;
+    padding: 10px 12px;
+    border: 1px solid var(--ss-line);
+    border-radius: 8px;
+    color: var(--ss-text);
+    font-size: 11px;
+  }
+
+  .osl-fields { margin-top: 18px; display: grid; gap: 8px; }
+  .osl-field { display: flex; justify-content: space-between; font-size: 11px; }
+  .osl-label { color: var(--ss-muted); }
+  .osl-value { color: var(--ss-ink); font-weight: 600; }
+
+  .osl-cta {
+    display: inline-flex;
+    align-items: center;
+    margin: 20px 0 12px;
+    padding: 9px 14px;
+    border-radius: 7px;
+    background: var(--ss-accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .osl-result {
+    position: absolute;
+    top: 196px;
+    left: 524px;
+    width: 236px;
+    border-color: var(--ss-line);
+  }
+
+  & [data-layout="compact"] .osl-result { left: 190px; top: 214px; width: 142px; }
+
+  .osl-result-top { display: flex; align-items: center; gap: 8px; }
+  .osl-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ss-accent); }
+  .osl-result-eyebrow { color: var(--ss-accent); font-size: 10px; font-weight: 700; letter-spacing: .1em; }
+  .osl-result-value {
+    color: var(--ss-ink);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .osl-result-rule { height: 1px; background: var(--ss-line); }
+  .osl-result-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--ss-muted);
+    font-size: 10px;
+  }
+  .osl-result-foot .ss-bar { flex: 0 0 24px; }
+}

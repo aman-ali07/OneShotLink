@@ -70,6 +70,14 @@ identity, no new runtime dependency.
 - T-70/T-71 remain operator-owned; do not claim production ready without them. This phase is
   "done" only for what can be proven from the repository.
 
+## Phase 6 — Stageshow product still (DONE)
+
+- `docs/stageshow/` contains the authored OneShotLink recipient still (source, wide 720×340
+  and compact 358×300 PNGs, reproduction notes). Built from the Stageshow `static-card`
+  gold structure with our own copy and tokens; no competitor identity or app dependency.
+- Verified with the kit's `--gate`: wide → `film: no-issues-detected; rehearsal passed`;
+  compact → `rehearsal passed` (one non-blocking near-tangent note).
+
 ## Phase 5 — File secrets (DONE)
 
 - Backend: `ConcealSecret` accepts `kind: "file"`, strict base64 payload and a safe filename;
