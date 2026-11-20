@@ -61,9 +61,15 @@ The three-pillar pass added `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md` and
   and a code-grounded `docs/CRYPTO_SPEC.md` (the README's previously dangling links).
 - **Honesty fixes:** landing FAQ now states that v3 `GET` is a preview, and the spec count was
   corrected to 134; no "zero-knowledge" or production-ready claim was added.
-- **Evidence at the file-secret tree:** 138 backend examples / 0 failures, 12 Vitest, clean build
-  (221 kB JS / 22 kB CSS), both browser journeys green on a live stack, brand sweep clean,
-  12/12 AA contrast pairs, parity 63.0 with 11/11 must-haves, Compose config valid.
+- **File secrets (T-116):** v3 accepts `kind: "file"` with strict base64 content, a safe
+  filename and a 512 KiB decoded ceiling; the SPA has a Text/File switch and a browser-side
+  download button. API.md, OpenAPI and the SDK guide were updated in the same change. v1 is
+  untouched.
+- **Evidence at the file-secret tree:** 138 backend examples / 0 failures, 12 Vitest, clean
+  build (225.65 kB JS / 22.46 kB CSS), three browser journeys (text, accounts, file) green on
+  a live stack, brand sweep clean, 12/12 AA contrast pairs, parity 63.0 with 11/11 must-haves,
+  Compose config valid. File secrets are an unscored "not in the original" row, so the parity
+  number did not move even though `replica/features.csv` now marks the capability `yes`.
   Screenshots at 375 px and 1280 px were reviewed with zero horizontal overflow.
 
 Phase 4 (deployment readiness) is unchanged: the items below still need an operator and a
@@ -80,7 +86,7 @@ real host. No deploy was performed.
 | `parity.py replica/features.csv` | **63.0 / 100**, must-haves **11 / 11** |
 | `docker compose config --quiet` | OK |
 | `docker build -t ots-prod:phase4 .` | built `709cc557e47d` |
-| Both browser journeys | lifecycle `ok: true`, accounts `ok` |
+| Three browser journeys | lifecycle `ok: true`, accounts `ok`, file `{"ok":true,"bytes":8,"replay":"404"}` |
 | `script/loadtest.rb 100 20` | **100/100 revealed exactly once**, 0 wrong |
 | `script/tls-rehearsal.sh` | `PREFLIGHT PASSED` (Redis isolation skipped by design) |
 | `script/preflight_selftest.sh` | **5 assertions passed**, including negative controls |

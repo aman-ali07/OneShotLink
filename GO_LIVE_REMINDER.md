@@ -1,7 +1,8 @@
 # Go-live reminder — OneShotLink
 
-Plain-language note to self. The **app is done**: 134 backend specs, 11 Vitest tests, both
-browser journeys, clean typecheck/build, brand sweep, and free-tier-safe checks all pass.
+Plain-language note to self. The **app is done**: 138 backend specs, 12 Vitest tests, three
+browser journeys (text, accounts, file), clean typecheck/build, brand sweep, and free-tier-safe
+checks all pass.
 What remains is not code — it is hosting, a public address, and two sign-offs.
 
 > Rule from `AGENTS.md`: do not say "production ready" or "zero-knowledge" in public copy
