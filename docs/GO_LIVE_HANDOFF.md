@@ -49,6 +49,26 @@ Earlier in the session K-38 cleared four newly disclosed Puma 7.2.1 advisories w
 7.2.3 lockfile bump (0 vulnerabilities today). Protected paths (`app.rb`, workflows) were
 edited only with explicit operator approval.
 
+## Product and developer pass (same date, pushed)
+
+The three-pillar pass added `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md` and
+`IMPLEMENTATION_PLAN.md`, then executed Phases 1 and 2:
+
+- **Product:** premium SPA shell, brand masthead, two-column conceal/reveal, dashboard
+  summary and grouped settings, finished empty/loading/terminal states, and a wider static
+  site with a CSS product preview. All e2e selectors and button labels were preserved.
+- **Developer:** `docs/SDK.md` plus runnable curl/TypeScript/Python examples in `examples/`,
+  and a code-grounded `docs/CRYPTO_SPEC.md` (the README's previously dangling links).
+- **Honesty fixes:** landing FAQ now states that v3 `GET` is a preview, and the spec count was
+  corrected to 134; no "zero-knowledge" or production-ready claim was added.
+- **Evidence at HEAD `3149bca`:** 134 backend examples / 0 failures, 11 Vitest, clean build
+  (221 kB JS / 22 kB CSS), both browser journeys green on a live stack, brand sweep clean,
+  12/12 AA contrast pairs, parity 63.0 with 11/11 must-haves, Compose config valid.
+  Screenshots at 375 px and 1280 px were reviewed with zero horizontal overflow.
+
+Phase 4 (deployment readiness) is unchanged: the items below still need an operator and a
+real host. No deploy was performed.
+
 ## Open items — all require a human or a real host
 
 | ID | Item | Owner | State |
