@@ -24,6 +24,16 @@ jobs:
           node-version: "24"
       - name: Frontend dependency audit (high and above fails)
         run: npm --prefix frontend ci --no-audit --no-fund && npm --prefix frontend audit --audit-level=high
+      - name: Install the pinned rebrand gate tool
+        run: |
+          # AGENTS.md names this MIT repo as the canonical source. Pin the SHA so
+          # CI runs the exact sweep verified locally (sha256 e70165b7...).
+          git clone --quiet https://github.com/Jakeschincariol/replica-skill.git /tmp/replica-skill
+          git -C /tmp/replica-skill checkout --quiet 77c9436fb3d18c3d58169efb8caf4fe906b0dc51
+          mkdir -p "$HOME/.agents/skills"
+          cp -R /tmp/replica-skill/replica-brand "$HOME/.agents/skills/"
+      - name: Rebrand gate
+        run: script/brand-sweep.sh
 
   backend:
     name: Backend specs
@@ -83,6 +93,8 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: e2e/package-lock.json
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
       - run: docker build -t oneshotlink-web .
       - name: Boot compose stack and run a lifecycle smoke test
         run: |

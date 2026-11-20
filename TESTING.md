@@ -234,6 +234,9 @@ bad certificate, a plain-HTTP 200, and a host-reachable Redis. That last case ne
 reachable Redis, so the self-test stack gets its own subnet (`PF_REDIS_SUBNET`, default
 `172.30.99.0/24`) — on a hardened host the production subnet is denied to every host
 process, which would otherwise make the case pass for the wrong reason. CI runs on every push (K-32 closed; the first real run found the load-test env
-bug). Tests must not require network access beyond gem/npm installs and image pulls.
+bug). The security job also installs the rebrand sweep at the pinned replica-skill SHA
+`77c9436` and runs `script/brand-sweep.sh`; the container job runs
+`docker compose config --quiet` before building (T-109). Tests must not require network
+access beyond gem/npm installs, image pulls, and that one pinned tool clone.
 Fail the build on any unhandled promise rejection or Ruby warning promoted by `.rspec`
 (`--warnings` once clean).
