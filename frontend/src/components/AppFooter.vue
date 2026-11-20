@@ -10,14 +10,14 @@
       </div>
       <div class="space-y-1">
         <p class="font-semibold text-text">Product</p>
-        <RouterLink to="/" class="block hover:text-accent">New secret</RouterLink>
-        <RouterLink to="/dashboard" class="block hover:text-accent">Account</RouterLink>
+        <RouterLink to="/" class="inline-flex min-h-6 items-center hover:text-accent">New secret</RouterLink>
+        <RouterLink to="/dashboard" class="inline-flex min-h-6 items-center hover:text-accent">Account</RouterLink>
       </div>
       <div class="space-y-1">
         <p class="font-semibold text-text">Developers</p>
-        <a href="/api/v3/openapi.json" class="block hover:text-accent">OpenAPI document</a>
-        <a href="https://github.com/aman-ali07/OneShotLink/blob/main/docs/SDK.md" class="block hover:text-accent">SDK guide</a>
-        <a href="https://github.com/aman-ali07/OneShotLink" class="block hover:text-accent">Source</a>
+        <a href="/api/v3/openapi.json" class="inline-flex min-h-6 items-center hover:text-accent">OpenAPI document</a>
+        <a href="https://github.com/aman-ali07/OneShotLink/blob/main/docs/SDK.md" class="inline-flex min-h-6 items-center hover:text-accent">SDK guide</a>
+        <a href="https://github.com/aman-ali07/OneShotLink" class="inline-flex min-h-6 items-center hover:text-accent">Source</a>
       </div>
     </div>
   </footer>
