@@ -119,6 +119,10 @@ No passphrase parameter in v1 (legacy behaviour). A passphrase-protected secret
 returns `401` with the legacy `{"message":"..."}` shape and is **not** consumed; reveal
 it through v3 or the UI.
 
+`HEAD /api/v1/secret/:key` answers `405` with `Allow: GET, POST`. HEAD is rewritten to GET
+internally, and because the v1 GET consumes, a HEAD would otherwise destroy the secret
+while its body is discarded — link unfurlers and probes must not be able to do that.
+
 Both form-encoded and JSON bodies are accepted; JSON must send
 `Content-Type: application/json`.
 
@@ -286,4 +290,4 @@ curl -sX POST http://localhost:3000/api/v1/secret/<key>
 Verified 2026-11-12 against the production image through Compose (Redis DB 15 for the
 specs): create `201`, first reveal `200`, second reveal `404`; four parallel reveals
 produced one `200` and three `404`; the v1 shapes above were copied from live responses.
-`bundle exec rspec` → 119 examples, 0 failures.
+`bundle exec rspec` → 120 examples, 0 failures.

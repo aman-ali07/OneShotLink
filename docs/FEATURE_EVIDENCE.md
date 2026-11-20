@@ -10,16 +10,16 @@ status of record (63.0/100, must-haves 11/11).
 
 | # | Feature | Evidence | Verification this session |
 | --- | --- | --- | --- |
-| 2 | Create a secret from pasted text | `spec/integration/secrets_api_spec.rb` (v3 guest conceal `201`); `e2e/journey.mjs` create step | PASS — RSpec 119/0; lifecycle journey `ok: true` |
+| 2 | Create a secret from pasted text | `spec/integration/secrets_api_spec.rb` (v3 guest conceal `201`); `e2e/journey.mjs` create step | PASS — RSpec 120/0; lifecycle journey `ok: true` |
 | 3 | Reveal exactly once and destroy | `spec/integration/secrets_api_spec.rb` (8-way race); `script/loadtest.rb` | PASS — 20-way race, 100/100 revealed exactly once, 0 wrong |
-| 4 | Configurable expiry (TTL) | `spec/integration/secrets_api_spec.rb` TTL allowlist + Redis TTL cases | PASS (in 119/0) |
+| 4 | Configurable expiry (TTL) | `spec/integration/secrets_api_spec.rb` TTL allowlist + Redis TTL cases | PASS (in 120/0) |
 | 5 | Copyable one-time link | `frontend/src/views/ConcealView.vue` copy button; link in conceal response; `e2e/journey.mjs` navigates the link | PARTIAL — link generation exercised by the journey; **copy-to-clipboard has no dedicated automated assertion** (documented gap) |
 | 6 | Optional passphrase gate | `spec/integration/secrets_api_spec.rb`; `spec/unit/password_spec.rb`; D-012/D-014; `e2e/journey.mjs` | PASS — wrong attempt preserves the record, correct one reveals; 7/8-byte floor in RSpec and browser |
-| 7 | Expired / viewed / unknown terminal states | `spec/integration/secrets_api_spec.rb` (uniform `404`) | PASS (in 119/0) |
-| 8 | REST API create and reveal | `spec/integration/secrets_api_spec.rb` (v1 form + JSON, v3 guest) | PASS (in 119/0) |
-| 9 | Guest use without an account | `spec/integration/secrets_api_spec.rb` guest routes | PASS (in 119/0) |
-| 10 | Encryption at rest | `spec/integration/secrets_api_spec.rb` ciphertext-only Redis assertion; `spec/unit/crypto_spec.rb` | PASS (in 119/0) |
-| 11 | Rate limiting on create and reveal | `spec/unit/limiter_spec.rb`; `spec/integration/secrets_api_spec.rb` (`429` + `Retry-After`) | PASS (in 119/0) |
+| 7 | Expired / viewed / unknown terminal states | `spec/integration/secrets_api_spec.rb` (uniform `404`) | PASS (in 120/0) |
+| 8 | REST API create and reveal | `spec/integration/secrets_api_spec.rb` (v1 form + JSON, v3 guest) | PASS (in 120/0) |
+| 9 | Guest use without an account | `spec/integration/secrets_api_spec.rb` guest routes | PASS (in 120/0) |
+| 10 | Encryption at rest | `spec/integration/secrets_api_spec.rb` ciphertext-only Redis assertion; `spec/unit/crypto_spec.rb` | PASS (in 120/0) |
+| 11 | Rate limiting on create and reveal | `spec/unit/limiter_spec.rb`; `spec/integration/secrets_api_spec.rb` (`429` + `Retry-After`) | PASS (in 120/0) |
 | 12 | Accessible responsive create/reveal UI | `e2e/journey.mjs`; headless DOM audit at 375/768/1280 px (T-35) | PARTIAL — journey passed with zero console errors; **no automated axe-core assertion is committed** (documented gap) |
 
 ## Rows marked `partial`

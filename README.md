@@ -8,7 +8,7 @@ configurable TTL.
 > **Project status: production-packaged core with optional simple-mode accounts,
 > pre-alpha product.** The anonymous create → one-time reveal flow and optional accounts
 > run in a hardened non-root container with Redis persistence, CI, and redacted logs.
-> **119 backend specs pass**; the TypeScript/Vite build, a headless-Chrome secret journey,
+> **120 backend specs pass**; the TypeScript/Vite build, a headless-Chrome secret journey,
 > and a browser signup → receipt → signout → signin journey were verified. Operational
 > controls are closed in the repository (Redis auth, backups, metrics, dependency scanning,
 > key rotation, Redis isolation); what is left is **TLS on the operator's own host and
@@ -162,7 +162,7 @@ docker run --rm --network=host \
   ots-dev bundle exec rspec
 ```
 
-Expected: `119 examples, 0 failures`. The suite only touches Redis DB 15 and calls
+Expected: `120 examples, 0 failures`. The suite only touches Redis DB 15 and calls
 `FLUSHDB` there, never `FLUSHALL`.
 
 Frontend checks:

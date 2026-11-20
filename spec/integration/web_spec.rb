@@ -149,4 +149,22 @@ RSpec.describe "HEAD responses" do
     expect(last_response.body).to eq("")
     expect(last_response.headers["Content-Type"]).to include("application/json")
   end
+
+  it "refuses HEAD on the consuming v1 reveal route without burning the secret" do
+    post "/api/v1/share", secret: "head-must-not-burn", ttl: 1800
+    expect(last_response.status).to eq(200)
+    key = JSON.parse(last_response.body)["secret_key"]
+
+    head "/api/v1/secret/#{key}"
+    expect(last_response.status).to eq(405)
+    expect(last_response.headers["Allow"]).to include("GET")
+    expect(last_response.body).to eq("")
+
+    # Still revealable exactly once: HEAD must never be a consume.
+    post "/api/v1/secret/#{key}"
+    expect(last_response.status).to eq(200)
+    expect(JSON.parse(last_response.body)["secret_value"]).to eq("head-must-not-burn")
+    post "/api/v1/secret/#{key}"
+    expect(last_response.status).to eq(404)
+  end
 end

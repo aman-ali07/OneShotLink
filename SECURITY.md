@@ -4,7 +4,7 @@ This document separates **controls that exist and have been exercised** from **c
 that must still be implemented**. Nothing here is a claim that the system is fully
 production-ready: there is no bundled TLS terminator and simplified accounts intentionally
 omit full-mode features. The secret lifecycle, simple-mode accounts, UI, hardened
-container, and Compose stack are implemented and covered by 119 specs, a live Puma run,
+container, and Compose stack are implemented and covered by 120 specs, a live Puma run,
 two headless-browser journeys, and a container smoke test.
 
 ## 1. Assets and trust boundaries
@@ -44,7 +44,7 @@ inside the trust boundary but are assumed readable by an attacker only together 
 | Non-root, read-only container with no secrets | `Dockerfile`, `compose.yaml` | Verified: UID 10001, read-only rootfs, no `.env` in image |
 | Input limits: TTL allowlist, `MAX_SECRET_BYTES` cap, passphrase 8–256 bytes (an empty string means none); the body actually read is capped on both the JSON and the form path | `ConcealSecret`, `App#read_body_within_limit!` | Verified: exact boundary accepts N and rejects N+1 (`413`); a 7-byte passphrase is `422` and writes nothing, 8 bytes is accepted and enforced (D-014, T-47); a chunked form body with no `Content-Length` is refused with `413` and writes nothing (K-37) |
 | Error hygiene: no stack traces/Redis errors, request ID only | `app.rb` error handler | Verified by 404/500 paths. A Redis outage answers `503 service_unavailable` + `Retry-After` on both API versions (never a `500`, never the driver's message) |
-| No auto-reveal on page load, and no GET consumes a secret (link previews are safe) | `RevealView.vue`, `app.rb#peek_payload` | Verified in the browser and over HTTP: `GET /api/v3/guest/secret/:key` answers metadata only, three GETs in a row leave the key intact, and only `POST …/reveal` consumes (K-35 resolved). The v1 GET is still destructive — that contract is frozen (API.md §4) |
+| No auto-reveal on page load, and no GET consumes a secret (link previews are safe) | `RevealView.vue`, `app.rb#peek_payload` | Verified in the browser and over HTTP: `GET /api/v3/guest/secret/:key` answers metadata only, three GETs in a row leave the key intact, and only `POST …/reveal` consumes (K-35 resolved). The v1 GET is still destructive — that contract is frozen (API.md §4); `HEAD /api/v1/secret/:key` is refused with `405 Allow: GET, POST` so a rewritten HEAD cannot burn it (K-39) |
 | No plaintext in URL, localStorage, or sessionStorage | SPA state only | Verified: `localStorage === "{}"` after create; URL contains only the key |
 | No `v-html` for user content | SPA templates | Code review; CSP now blocks inline/third-party scripts |
 | Argon2id customer passwords (bcrypt legacy verify then rehash) | `Models::Customer`, `Password` | Verified: no plaintext password in Redis; duplicate email cannot race |

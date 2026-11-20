@@ -9,6 +9,16 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (a HEAD request burned a v1 secret, 2026-11-20) — verified
+
+- `HEAD /api/v1/secret/:key` used to be rewritten to GET by the HEAD middleware, and the
+  frozen v1 GET consumes the secret. The middleware then discarded the body, so a link
+  unfurler or monitoring probe could destroy a secret without ever receiving it.
+- HEAD on that route now answers `405` with `Allow: GET, POST` and writes nothing. A spec
+  was written first and watched fail (`200` → `405`), then confirmed green.
+- Verified live over Puma: two HEADs → `405`, `POST …/secret/:key` → `200` with the value,
+  replay → `404`. Full suite: `120 examples, 0 failures`; both browser journeys pass.
+
 ### Security (Puma patch bump, 2026-11-20) — verified
 
 - A fresh `bundler-audit check --update` found four advisories against the locked Puma
