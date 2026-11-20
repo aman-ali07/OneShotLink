@@ -134,6 +134,7 @@ module Onetime
           auth_mode: Config.auth_mode,
           ui_enabled: Config.ui_enabled?,
           max_secret_bytes: Config.max_secret_bytes,
+          max_file_bytes: Logic::ConcealSecret::MAX_FILE_BYTES,
           version: VERSION
         }
       end
@@ -446,7 +447,8 @@ module Onetime
           ttl: body["ttl"],
           passphrase: body["passphrase"],
           owner_id: owner_id,
-          kind: body["kind"]
+          kind: body["kind"],
+          filename: body["filename"]
         ).call
         json(result, status: 201)
       end

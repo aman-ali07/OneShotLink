@@ -204,6 +204,76 @@ RSpec.describe "Secret lifecycle API" do
     end
   end
 
+  describe "file secrets" do
+    def create_file(payload:, filename: "notes.txt", passphrase: nil)
+      body = { secret: payload, ttl: 1800, kind: "file", filename: filename }
+      body[:passphrase] = passphrase if passphrase
+      post "/api/v3/guest/conceal", JSON.generate(body), JSON_HEADERS
+      JSON.parse(last_response.body)
+    end
+
+    it "stores an encrypted file and reveals base64 with its filename once" do
+      content = "binary\x00content\xFF".b
+      created = create_file(payload: Base64.strict_encode64(content), filename: "notes.txt")
+      expect(last_response.status).to eq(201)
+      expect(created.dig("receipt", "kind")).to eq("file")
+      key = created["secret_key"]
+
+      raw = Onetime::Store.redis.get(Onetime::Models::Secret.object_key(key))
+      expect(raw).not_to include("binary")
+      expect(JSON.parse(raw)["filename"]).to eq("notes.txt")
+
+      peek_v3(key)
+      expect(JSON.parse(last_response.body).dig("metadata", "kind")).to eq("file")
+
+      reveal_v3(key)
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body.dig("metadata", "kind")).to eq("file")
+      expect(body.dig("metadata", "filename")).to eq("notes.txt")
+      expect(Base64.strict_decode64(body["secret_value"])).to eq(content)
+
+      reveal_v3(key)
+      expect(last_response.status).to eq(404)
+    end
+
+    it "refuses a filename with a path component or control character" do
+      create_file(payload: Base64.strict_encode64("x"), filename: "../secret.txt")
+      expect(last_response.status).to eq(422)
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq("validation_error")
+
+      create_file(payload: Base64.strict_encode64("x"), filename: "bad\nname.txt")
+      expect(last_response.status).to eq(422)
+    end
+
+    it "refuses a non-base64 payload and a decoded file over the file ceiling" do
+      create_file(payload: "not base64!", filename: "x.bin")
+      expect(last_response.status).to eq(422)
+
+      oversized = "a" * (Onetime::Logic::ConcealSecret::MAX_FILE_BYTES + 1)
+      create_file(payload: Base64.strict_encode64(oversized), filename: "big.bin")
+      expect(last_response.status).to eq(413)
+    end
+
+    it "does not burn a protected file on a wrong passphrase" do
+      content = "passphrase protected file".b
+      created = create_file(
+        payload: Base64.strict_encode64(content),
+        filename: "private.txt",
+        passphrase: "open-sesame",
+      )
+      key = created["secret_key"]
+
+      reveal_v3(key, passphrase: "wrong")
+      expect(last_response.status).to eq(401)
+      expect(Onetime::Store.redis.exists?(Onetime::Models::Secret.object_key(key))).to be(true)
+
+      reveal_v3(key, passphrase: "open-sesame")
+      expect(last_response.status).to eq(200)
+      expect(Base64.strict_decode64(JSON.parse(last_response.body)["secret_value"])).to eq(content)
+    end
+  end
+
   describe "v1 compatibility" do
     it "creates via form and reveals with the legacy shape" do
       post "/api/v1/share", secret: "legacy-secret", ttl: 1800

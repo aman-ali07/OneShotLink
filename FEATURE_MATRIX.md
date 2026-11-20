@@ -18,7 +18,7 @@ are marked "not verified" rather than guessed.
 | Client-side encryption | no | claimed | yes (OpenPGP in browser) | yes | yes | P2, opt-in only; never claim zero-knowledge |
 | Encryption at rest | yes (AES-GCM, instance key) | yes | ciphertext only | yes | ciphertext only | — |
 | Link preview does not consume | yes (GET = metadata) | not verified | not verified | not verified | not verified | Competitive advantage, keep |
-| File secrets | no | yes (paid) | yes (≤1 MB free) | yes | yes | P2 |
+| File secrets | yes (v3 JSON/base64, 512 KiB, encrypted at rest, single-use download) | yes (paid) | yes (≤1 MB free) | yes | yes | Done — T-116; browser base64 rather than multipart, documented in API.md §5.1 |
 | Branding / custom domain | no (brand fixed, clean-room) | yes (paid) | yes (paid) | partial | self-hosted theme | deliberately deferred |
 | Secret request links (incoming) | no | yes (paid) | yes (paid) | no | no | P2 |
 | Accounts + dashboard | yes (simple mode) | yes | OIDC (paid) | yes (Bitwarden account) | no | SSO/MFA deferred (D-003) |
@@ -27,7 +27,7 @@ are marked "not verified" rather than guessed.
 | Webhooks | no | not verified | yes (paid) | not verified | no | P2 |
 | Self-hosting / Docker | yes (non-root, Compose) | self-host option | yes (Go + Redis) | yes (vault) | yes | — |
 | Open-source license | MIT | source available | Apache-2.0 | GPLv3 | AGPLv3 | — |
-| Premium, distinctive frontend | **yes** (in-place OneShotLink redesign committed `5165921`; visual review at 375/1280 px, 11 Vitest, clean typecheck/build, both browser journeys green) | polished SaaS | functional | polished SaaS | utilitarian | P0 delivered; original UI not copied |
+| Premium, distinctive frontend | **yes** (in-place OneShotLink redesign committed `5165921`; visual review at 375/1280 px, 12 Vitest, clean typecheck/build, three browser journeys green) | polished SaaS | functional | polished SaaS | utilitarian | P0 delivered; original UI not copied |
 | Responsive + accessible | yes (375/768/1280, AA tokens) | yes | yes | yes | partial | preserve while redesigning |
 | Documentation depth | strong ops docs + [SDK guide](docs/SDK.md) + [crypto spec](docs/CRYPTO_SPEC.md) | strong | strong | strong | FAQ | SDK guide and crypto spec shipped this pass; UI copy remains Phase 1 |
 | Published crypto spec / verify-it-yourself | yes ([docs/CRYPTO_SPEC.md](docs/CRYPTO_SPEC.md), code-grounded, includes non-claims) | not verified | not verified | not verified | not verified | Resolves the `replica/features.csv` "partial" row in docs; no zero-knowledge claim |
@@ -39,5 +39,6 @@ are marked "not verified" rather than guessed.
    considered security product. Redesign in place with the existing tokens and identity.
 3. The second deficit is developer onboarding: add real, runnable API examples and an SDK
    guide instead of promising an SDK that does not exist.
-4. Do not add fake parity: file secrets, SSO/MFA, client-side encryption and webhooks stay
-   explicitly deferred until implemented.
+4. Do not add fake parity: SSO/MFA, client-side encryption and webhooks stay explicitly
+   deferred until implemented. File secrets moved from `no` to `yes` only after the backend,
+   browser journey, API docs and OpenAPI all landed (T-115).

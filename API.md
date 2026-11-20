@@ -53,6 +53,7 @@ requests must send `Content-Type: application/json`. v1 accepts
   "auth_mode": "disabled",
   "ui_enabled": true,
   "max_secret_bytes": 1048576,
+  "max_file_bytes": 524288,
   "version": "0.1.0"
 }
 ```
@@ -177,6 +178,39 @@ or longer than 256 bytes; an empty passphrase means none),
 route. Under `AUTH_MODE=full` the authenticated routes return `501 not_configured` rather
 than silently falling back to anonymous creation (D-003); full mode is not implemented and
 must never degrade quietly.
+
+#### File secrets (v3 only)
+
+Send `kind: "file"`, a safe `filename` (1–255 bytes, no path separators or control
+characters) and `secret` containing **strict base64** of the file bytes. The decoded size
+must not exceed `max_file_bytes` from `/api/v3/config` (512 KiB by default); the encoded
+body still passes through the ordinary `MAX_SECRET_BYTES` ceiling. The record is encrypted
+exactly like text, and the metadata keeps `kind` and `filename`.
+
+```json
+{
+  "secret": "AAH+/0FCQg==",
+  "ttl": 1800,
+  "kind": "file",
+  "filename": "notes.bin"
+}
+```
+
+A reveal of a file returns `secret_value` as **base64**, not as raw text:
+
+```json
+{
+  "secret_value": "AAH+/0FCQg==",
+  "metadata": { "kind": "file", "filename": "notes.bin", "created_at": 1762819200, "ttl": 1800 }
+}
+```
+
+Base64 is used because the decrypt path forces UTF-8; arbitrary binary bytes would be
+corrupted if stored raw. Decode in the browser (or your client) before writing the file.
+Invalid base64 is `422 validation_error`; a decoded file over the ceiling is `413
+payload_too_large`; an unsafe or missing filename is `422 validation_error`. All other
+single-use, passphrase and preview semantics are identical to text secrets. v1 has no file
+support and keeps its frozen shape.
 
 ### 5.2 Reveal
 

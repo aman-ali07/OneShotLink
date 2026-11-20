@@ -45,6 +45,22 @@ describe("concealSecret", () => {
     expect(JSON.parse(init.body)).toEqual({ secret: "hello", ttl: 1800 });
   });
 
+  it("sends kind and filename for a file secret", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ secret_key: "key123", receipt, links: { secret: "/secret/key123" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await concealSecret({ secret: "YWJj", ttl: 1800, kind: "file", filename: "notes.txt" });
+
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({
+      secret: "YWJj",
+      ttl: 1800,
+      kind: "file",
+      filename: "notes.txt",
+    });
+  });
+
   it("includes a passphrase only when non-empty", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({ secret_key: "key123", receipt, links: { secret: "/secret/key123" } }),

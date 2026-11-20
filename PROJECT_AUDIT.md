@@ -66,7 +66,7 @@ API v2, distributed tracing. See `docs/DECISIONS.md` and `KNOWN_ISSUES.md:68-74`
 
 | Check | Result |
 | --- | --- |
-| `docker run … ots-dev bundle exec rspec` | **134 examples, 0 failures** at `a89a5e0` (counts moved 119 → 120 → 132 → 133 → 134 as fixes landed) |
+| `docker run … ots-dev bundle exec rspec` | **138 examples, 0 failures** at the file-secret tree (counts moved 119 → 120 → 132 → 133 → 134 → 138 as features landed) |
 | `npm --prefix frontend test` / `run typecheck` / `run build` | 11 Vitest pass; clean `vue-tsc`; Vite build clean |
 | `BASE_URL=… npm --prefix e2e test` and `test:accounts` | both journeys pass, `errors: []`, zero console errors |
 | live HTTP probes | GET ×3 non-consuming → POST reveals once → 404; HEAD v1 → 405 with secret intact |

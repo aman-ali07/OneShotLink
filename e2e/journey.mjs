@@ -106,6 +106,36 @@ try {
     return { status: response.status, body: await response.json() };
   });
 
+  // File secrets: upload a binary file, reveal once, see the download UI.
+  const filePath = "/tmp/opencode/e2e-file.bin";
+  const fileBytes = Buffer.from([0x00, 0x01, 0xfe, 0xff, 0x41, 0x42]);
+  fs.writeFileSync(filePath, fileBytes);
+  await page.goto(`${base}/`, { waitUntil: "networkidle0" });
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "File");
+    if (!button) throw new Error("file mode button missing");
+    button.click();
+  });
+  await page.waitForSelector("#file");
+  await (await page.$("#file")).uploadFile(filePath);
+  await page.waitForFunction(
+    () => [...document.querySelectorAll("p")].some((p) => p.textContent.includes("e2e-file.bin")),
+    { timeout: 10000 },
+  );
+  await page.click("form button[type=submit]");
+  await page.waitForSelector("#result-heading", { timeout: 10000 });
+  const fileLink = await page.$eval("p.break-all", (element) => element.textContent.trim());
+  await page.goto(fileLink, { waitUntil: "networkidle0" });
+  await page.click("form button[type=submit]");
+  await page.waitForFunction(
+    () => [...document.querySelectorAll("button")].some((b) => b.textContent.includes("Download file")),
+    { timeout: 10000 },
+  );
+  const fileUi = await page.$eval("main", (element) => element.textContent);
+  await page.reload({ waitUntil: "networkidle0" });
+  await page.click("form button[type=submit]");
+  await page.waitForSelector("#gone-heading", { timeout: 10000 });
+
   assert(link.includes("/secret/"), "result link is not a /secret/ URL");
   assert(!link.includes(secret), "plaintext leaked into the link");
   assert(revealed === secret, "revealed value did not match");
@@ -120,9 +150,13 @@ try {
     "short passphrase was refused with the wrong code"
   );
   assert(/not correct/i.test(wrongMessage), "wrong-passphrase message missing");
+  assert(fileLink.includes("/secret/"), "file result link is not a /secret/ URL");
+  assert(!fileLink.includes("e2e-file"), "file plaintext leaked into the link");
+  assert(fileUi.includes("e2e-file.bin"), "file name missing from the reveal UI");
+  assert(fileUi.includes("binary file"), "file size/type line missing");
   assert(errors.length === 0, `browser errors: ${errors.join(" | ")}`);
 
-  console.log(JSON.stringify({ ok: true, link, wrongMessage, errors }, null, 2));
+  console.log(JSON.stringify({ ok: true, link, fileLink, wrongMessage, errors }, null, 2));
 } finally {
   await browser.close();
 }

@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node journey.mjs",
-    "test:accounts": "node accounts.mjs"
+    "test:accounts": "node accounts.mjs",
+    "test:file": "node file.mjs"
   },
   "dependencies": {
     "puppeteer-core": "^24.10.0"

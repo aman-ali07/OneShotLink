@@ -11,6 +11,10 @@ import {
 } from "@/lib/api";
 
 const secret = ref("");
+const mode = ref<"text" | "file">("text");
+const chosenFile = ref<File | null>(null);
+const fileName = ref("");
+const maxFileBytes = ref(512 * 1024);
 const ttl = ref(86400);
 const passphrase = ref("");
 const ttlOptions = ref<number[]>([1800, 43200, 86400, 259200]);
@@ -25,7 +29,9 @@ const secretInput = ref<HTMLTextAreaElement | null>(null);
 let controller: AbortController | undefined;
 
 const bytes = computed(() => new TextEncoder().encode(secret.value).length);
-const usage = computed(() => Math.min(100, Math.round((bytes.value / maxBytes.value) * 100)));
+const payloadBytes = computed(() => chosenFile.value?.size ?? bytes.value);
+const limitBytes = computed(() => (mode.value === "file" ? maxFileBytes.value : maxBytes.value));
+const usage = computed(() => Math.min(100, Math.round((payloadBytes.value / limitBytes.value) * 100)));
 const link = computed(() => {
   if (!result.value) return "";
   return new URL(result.value.links.secret, window.location.origin).toString();
@@ -41,12 +47,49 @@ function sizeLabel(value: number): string {
   return value >= 1024 * 1024 ? `${(value / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(value / 1024)} KB`;
 }
 
+function setMode(next: "text" | "file") {
+  if (mode.value === next) return;
+  mode.value = next;
+  error.value = "";
+  secret.value = "";
+  chosenFile.value = null;
+  fileName.value = "";
+}
+
+async function chooseFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const chosen = input.files?.[0] ?? null;
+  error.value = "";
+  secret.value = "";
+  chosenFile.value = null;
+  fileName.value = "";
+  if (!chosen) return;
+  if (chosen.size > maxFileBytes.value) {
+    error.value = `Files must be at most ${sizeLabel(maxFileBytes.value)}.`;
+    input.value = "";
+    return;
+  }
+
+  // Base64 stays ASCII, so the existing AES-GCM path (which forces UTF-8 on
+  // decrypt) cannot corrupt the original bytes.
+  const view = new Uint8Array(await chosen.arrayBuffer());
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < view.length; i += CHUNK) {
+    binary += String.fromCharCode(...view.subarray(i, i + CHUNK));
+  }
+  secret.value = btoa(binary);
+  chosenFile.value = chosen;
+  fileName.value = chosen.name;
+}
+
 onMounted(async () => {
   controller = new AbortController();
   try {
     const config = await getConfig(controller.signal);
     ttlOptions.value = config.ttl_options;
     maxBytes.value = config.max_secret_bytes;
+    maxFileBytes.value = config.max_file_bytes ?? maxFileBytes.value;
     ttl.value = config.ttl_options.includes(config.default_ttl)
       ? config.default_ttl
       : (config.ttl_options[0] ?? 86400);
@@ -59,11 +102,15 @@ onBeforeUnmount(() => controller?.abort());
 
 async function submit() {
   error.value = "";
-  if (secret.value === "") {
-    error.value = "Enter the secret you want to share.";
+  if (mode.value === "file" && !chosenFile.value) {
+    error.value = "Choose a file to share.";
     return;
   }
-  if (bytes.value > maxBytes.value) {
+  if (secret.value === "") {
+    error.value = mode.value === "file" ? "Choose a file to share." : "Enter the secret you want to share.";
+    return;
+  }
+  if (mode.value === "text" && bytes.value > maxBytes.value) {
     error.value = "The secret is too large. Use a shorter value.";
     return;
   }
@@ -78,10 +125,13 @@ async function submit() {
       secret: secret.value,
       ttl: ttl.value,
       passphrase: passphrase.value || undefined,
+      kind: mode.value,
+      filename: mode.value === "file" ? fileName.value : undefined,
     });
     // Do not keep plaintext in component state after the request succeeds.
     secret.value = "";
     passphrase.value = "";
+    chosenFile.value = null;
     await nextTick();
     resultHeading.value?.focus();
   } catch (cause) {
@@ -94,6 +144,9 @@ async function submit() {
 function reset() {
   result.value = null;
   error.value = "";
+  chosenFile.value = null;
+  fileName.value = "";
+  secret.value = "";
   nextTick(() => secretInput.value?.focus());
 }
 </script>
@@ -122,26 +175,67 @@ function reset() {
           <AppAlert v-if="configNote">{{ configNote }}</AppAlert>
 
           <form class="space-y-6" @submit.prevent="submit">
-            <div class="space-y-2">
-              <label for="secret" class="block text-sm font-semibold">Secret</label>
-              <textarea
-                id="secret"
-                ref="secretInput"
-                v-model="secret"
-                rows="8"
-                spellcheck="false"
-                autocomplete="off"
-                aria-describedby="secret-help"
-                class="ots-inset w-full resize-y p-3 font-mono text-sm text-text placeholder:text-muted/70"
-                placeholder="Paste the value you want to share…"
-              />
+            <div class="space-y-3">
+              <div class="flex gap-2" role="group" aria-label="What do you want to share?">
+                <button
+                  type="button"
+                  :aria-pressed="mode === 'text'"
+                  :class="[
+                    'rounded-md px-4 py-2 text-sm font-semibold transition-colors',
+                    mode === 'text' ? 'bg-accent text-on-accent' : 'ots-inset text-muted hover:text-text',
+                  ]"
+                  @click="setMode('text')"
+                >
+                  Text
+                </button>
+                <button
+                  type="button"
+                  :aria-pressed="mode === 'file'"
+                  :class="[
+                    'rounded-md px-4 py-2 text-sm font-semibold transition-colors',
+                    mode === 'file' ? 'bg-accent text-on-accent' : 'ots-inset text-muted hover:text-text',
+                  ]"
+                  @click="setMode('file')"
+                >
+                  File
+                </button>
+              </div>
+
+              <template v-if="mode === 'text'">
+                <label for="secret" class="block text-sm font-semibold">Secret</label>
+                <textarea
+                  id="secret"
+                  ref="secretInput"
+                  v-model="secret"
+                  rows="8"
+                  spellcheck="false"
+                  autocomplete="off"
+                  aria-describedby="secret-help"
+                  class="ots-inset w-full resize-y p-3 font-mono text-sm text-text placeholder:text-muted/70"
+                  placeholder="Paste the value you want to share…"
+                />
+              </template>
+              <template v-else>
+                <label for="file" class="block text-sm font-semibold">File</label>
+                <input
+                  id="file"
+                  type="file"
+                  class="ots-inset w-full p-3 text-sm text-text"
+                  aria-describedby="secret-help"
+                  @change="chooseFile"
+                />
+                <p v-if="chosenFile" class="text-xs text-muted">
+                  {{ fileName }} · {{ sizeLabel(chosenFile.size) }} — encrypted before it is stored.
+                </p>
+              </template>
+
               <div id="secret-help" class="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-                <span>Never put secrets in the URL or in an email.</span>
-                <span>{{ bytes }} / {{ maxBytes }} bytes</span>
+                <span>{{ mode === 'file' ? 'Files are private only until the link is opened.' : 'Never put secrets in the URL or in an email.' }}</span>
+                <span>{{ payloadBytes }} / {{ limitBytes }} bytes</span>
               </div>
               <div class="h-1 overflow-hidden rounded-full bg-border" aria-hidden="true">
                 <div
-                  class="h-full rounded-full bg-accent transition-[width] duration-200"
+                  class="h-full rounded-full transition-[width] duration-200"
                   :class="usage > 90 ? 'bg-danger' : 'bg-accent'"
                   :style="{ width: `${usage}%` }"
                 />
@@ -223,7 +317,9 @@ function reset() {
           </p>
         </div>
 
-        <p class="px-1 text-xs text-muted">Maximum size on this instance: {{ sizeLabel(maxBytes) }}.</p>
+        <p class="px-1 text-xs text-muted">
+          Limits on this instance: {{ sizeLabel(maxBytes) }} of text, {{ sizeLabel(maxFileBytes) }} per file.
+        </p>
       </aside>
     </div>
 
@@ -249,7 +345,11 @@ function reset() {
         </div>
 
         <div class="grid gap-3 sm:grid-cols-2">
-          <AppAlert tone="success">
+          <AppAlert v-if="result.receipt.kind === 'file'" tone="success">
+            The file is stored encrypted. Deleted after one download, or after
+            {{ ttlLabel(result.receipt.secret_ttl) }}.
+          </AppAlert>
+          <AppAlert v-else tone="success">
             Stored encrypted. Deleted after one view, or after {{ ttlLabel(result.receipt.secret_ttl) }}.
           </AppAlert>
           <AppAlert v-if="result.receipt.passphrase_required">

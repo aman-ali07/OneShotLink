@@ -14,6 +14,7 @@ const ConfigSchema = z.object({
   auth_mode: z.string(),
   ui_enabled: z.boolean(),
   max_secret_bytes: z.number().int().positive(),
+  max_file_bytes: z.number().int().positive().optional(),
   version: z.string(),
 });
 
@@ -129,9 +130,13 @@ export function concealSecret(input: {
   secret: string;
   ttl: number;
   passphrase?: string;
+  kind?: "text" | "file";
+  filename?: string;
 }): Promise<ConcealResponse> {
   const body: Record<string, unknown> = { secret: input.secret, ttl: input.ttl };
   if (input.passphrase) body.passphrase = input.passphrase;
+  if (input.kind) body.kind = input.kind;
+  if (input.kind === "file") body.filename = input.filename;
   return request("/api/v3/guest/conceal", ConcealResponseSchema, {
     method: "POST",
     body,

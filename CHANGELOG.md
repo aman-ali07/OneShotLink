@@ -9,6 +9,20 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (file secrets, 2026-11-20) — verified
+
+- v3 can now conceal a binary file: `kind: "file"`, a safe `filename`, and strict base64
+  content. The decoded size is capped at `max_file_bytes` (512 KiB by default, published by
+  `/api/v3/config`), the filename rejects paths and control characters, and invalid base64
+  is refused. The bytes are encrypted with the same AES-256-GCM path and deleted by the same
+  atomic single-use reveal as text.
+- The SPA has a Text/File switch, browser-side binary-to-base64 encoding with size feedback,
+  and a download button on reveal that decodes in the browser. The API contract, OpenAPI
+  document, SDK guide and `FEATURE_MATRIX.md` were updated in the same change; v1 is unchanged.
+- Four backend specs were written first and watched red (201 → 422, missing constant), then
+  green. Suite 138 examples / 0 failures, Vitest 12/12, build clean, both committed journeys
+  plus a dedicated file journey pass against a live Puma. No new dependency was added.
+
 ### Fixed (redesigned UI touch targets and scrollable regions, 2026-11-20) — verified
 
 - Browser QA with axe WCAG 2.2 AA found five serious `target-size` failures in footer links

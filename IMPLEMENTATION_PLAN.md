@@ -6,7 +6,7 @@ verifiable command; no phase is called done on inspection alone.
 ## Phase 0 — Audit and comparison (DONE)
 
 - `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md`, this plan.
-- Evidence: local inspection, 134 backend specs, public competitor pages.
+- Evidence: local inspection, 138 backend specs, public competitor pages.
 - Constraint: clean-room + REA unavailable recorded in the audit.
 
 ## Phase 1 — Product: premium frontend in place (DONE)
@@ -57,8 +57,8 @@ identity, no new runtime dependency.
 
 ## Phase 4 — Deployment readiness (DONE, in-repo portion)
 
-- Full gate battery re-run and recorded in `docs/GO_LIVE_HANDOFF.md`: 134 specs / 0 failures,
-  11 Vitest, clean build, brand sweep clean, contrast 12/12 AA, parity 63.0 with 11/11
+- Full gate battery re-run and recorded in `docs/GO_LIVE_HANDOFF.md`: 138 specs / 0 failures,
+  12 Vitest, clean build, brand sweep clean, contrast 12/12 AA, parity 63.0 with 11/11
   must-haves, Compose config valid, image builds, both browser journeys green, load test
   100/100 revealed exactly once, TLS rehearsal `PREFLIGHT PASSED`, preflight self-test 5/5,
   bundler-audit and npm audit both 0 vulnerabilities.
@@ -70,9 +70,21 @@ identity, no new runtime dependency.
 - T-70/T-71 remain operator-owned; do not claim production ready without them. This phase is
   "done" only for what can be proven from the repository.
 
+## Phase 5 — File secrets (DONE)
+
+- Backend: `ConcealSecret` accepts `kind: "file"`, strict base64 payload and a safe filename;
+  512 KiB decoded ceiling; `app.rb` passes the filename and `/api/v3/config` publishes
+  `max_file_bytes`. Reveal metadata already carried `kind`/`filename`, so no data-shape
+  change was needed.
+- Frontend: text/file mode on conceal, binary-safe base64 encoding, size feedback and a
+  download button on reveal (browser-side decode).
+- Verification: 4 red→green backend specs (138 total), 12 Vitest, both committed journeys
+  plus a dedicated file journey, live curl, OpenAPI/API/SDK docs.
+- Still honest: this is server-side encryption; a file secret is not zero-knowledge.
+
 ## Explicitly out of scope this release
 
-File secrets, incoming secret requests, webhooks, SSO/MFA/WebAuthn, client-side encryption,
+Incoming secret requests, webhooks, SSO/MFA/WebAuthn, client-side encryption,
 i18n locales, read counts >1, custom domains. They stay `no`/`skip` in the feature matrix.
 
 ## Change discipline

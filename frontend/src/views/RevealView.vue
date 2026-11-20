@@ -73,6 +73,37 @@ function ttlLabel(seconds: number): string {
   if (seconds < 86400) return `${Math.round(seconds / 3600)} hours`;
   return `${Math.round(seconds / 86400)} day${seconds >= 172800 ? "s" : ""}`;
 }
+
+function sizeLabel(value: number): string {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const isFile = () => revealed.value?.metadata.kind === "file";
+const downloadName = () => revealed.value?.metadata.filename || "secret.bin";
+
+function decodedSize(base64: string): number {
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+}
+
+// The payload is base64 because Crypto.decrypt forces UTF-8 on the record.
+// Decode to bytes here so arbitrary binary files survive the last hop.
+function downloadFile() {
+  if (!revealed.value || !isFile()) return;
+  const binary = atob(revealed.value.secret_value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = downloadName();
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
 </script>
 
 <template>
@@ -108,10 +139,29 @@ function ttlLabel(seconds: number): string {
           <h1 id="revealed-heading" ref="revealHeading" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-4xl">
             Your secret
           </h1>
-          <p class="text-muted">Copy it now. It has been deleted from the server and cannot be shown again.</p>
+          <p class="text-muted">
+            {{ isFile() ? "Download it now." : "Copy it now." }}
+            It has been deleted from the server and cannot be shown again.
+          </p>
         </div>
 
-        <div class="ots-inset space-y-4 p-5">
+        <div v-if="isFile()" class="ots-inset space-y-4 p-5" aria-labelledby="file-name">
+          <div class="flex items-start gap-4">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+              </svg>
+            </div>
+            <div class="min-w-0 space-y-1">
+              <p id="file-name" class="truncate font-semibold text-text">{{ downloadName() }}</p>
+              <p class="text-xs text-muted">{{ sizeLabel(decodedSize(revealed.secret_value)) }} · binary file</p>
+            </div>
+          </div>
+          <AppButton type="button" @click="downloadFile">Download file</AppButton>
+          <p class="text-xs text-muted">The download is decoded in your browser. Do not reload — the file is already gone from the server.</p>
+        </div>
+        <div v-else class="ots-inset space-y-4 p-5">
           <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-sm text-text">{{ revealed.secret_value }}</pre>
           <CopyButton :text="revealed.secret_value" label="Copy secret" />
         </div>

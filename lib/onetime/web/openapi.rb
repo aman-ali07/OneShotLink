@@ -348,6 +348,7 @@ module Onetime
                 "auth_mode" => { "type" => "string", "enum" => %w[disabled simple full] },
                 "ui_enabled" => { "type" => "boolean" },
                 "max_secret_bytes" => { "type" => "integer" },
+                "max_file_bytes" => { "type" => "integer" },
                 "version" => { "type" => "string" }
               }
             },
@@ -359,7 +360,14 @@ module Onetime
                 "ttl" => { "type" => "integer" },
                 "passphrase" => { "type" => "string", "minLength" => 8, "maxLength" => 256,
                                   "description" => "Optional access gate. 8-256 bytes; an empty string means no passphrase (D-014)." },
-                "kind" => { "type" => "string", "enum" => %w[text] }
+                "kind" => {
+                  "type" => "string", "enum" => %w[text file], "default" => "text",
+                  "description" => "kind=file expects a strict base64 payload and a filename; decoded bytes must fit max_file_bytes."
+                },
+                "filename" => {
+                  "type" => "string", "minLength" => 1, "maxLength" => 255,
+                  "description" => "Required for kind=file. No path separators or control characters."
+                }
               }
             },
             "RevealRequest" => {
@@ -388,7 +396,10 @@ module Onetime
             "RevealResponse" => {
               "type" => "object",
               "properties" => {
-                "secret_value" => { "type" => "string" },
+                "secret_value" => {
+                  "type" => "string",
+                  "description" => "Plaintext for kind=text; strict base64 of the original bytes for kind=file."
+                },
                 "metadata" => {
                   "type" => "object",
                   "properties" => {

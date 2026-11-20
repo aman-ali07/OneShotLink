@@ -17,7 +17,7 @@ rule (`AGENTS.md`, `PRODUCTION_READINESS.md` §Verdict) still forbids calling th
 | Gate | Command | Result |
 | --- | --- | --- |
 | Backend suite | `docker run … ots-dev bundle exec rspec` (Redis on :6400/15) | **133 examples, 0 failures** (seed 21790) |
-| Frontend unit | `npm --prefix frontend run test` | **11 passed** (Vitest 5.1.0) |
+| Frontend unit | `npm --prefix frontend run test` | **12 passed** (Vitest 5.1.0) |
 | Frontend typecheck + build | `npm --prefix frontend run typecheck && npm --prefix frontend run build` | clean `vue-tsc`; 212.69 kB JS / 14.21 kB CSS |
 | Rebrand gate | `script/brand-sweep.sh` | clean |
 | Feature parity | `parity.py replica/features.csv` | **63.0 / 100**, must-haves **11 / 11** |
@@ -61,7 +61,7 @@ The three-pillar pass added `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md` and
   and a code-grounded `docs/CRYPTO_SPEC.md` (the README's previously dangling links).
 - **Honesty fixes:** landing FAQ now states that v3 `GET` is a preview, and the spec count was
   corrected to 134; no "zero-knowledge" or production-ready claim was added.
-- **Evidence at HEAD `3149bca`:** 134 backend examples / 0 failures, 11 Vitest, clean build
+- **Evidence at the file-secret tree:** 138 backend examples / 0 failures, 12 Vitest, clean build
   (221 kB JS / 22 kB CSS), both browser journeys green on a live stack, brand sweep clean,
   12/12 AA contrast pairs, parity 63.0 with 11/11 must-haves, Compose config valid.
   Screenshots at 375 px and 1280 px were reviewed with zero horizontal overflow.
@@ -73,8 +73,8 @@ real host. No deploy was performed.
 
 | Gate | Result |
 | --- | --- |
-| `bundle exec rspec` (Docker, Redis DB 15) | **134 examples, 0 failures** |
-| Vitest / typecheck / build | **11 passed**; clean; 221.33 kB JS / 22.35 kB CSS |
+| `bundle exec rspec` (Docker, Redis DB 15) | **138 examples, 0 failures** |
+| Vitest / typecheck / build | **12 passed**; clean; 225.65 kB JS / 22.46 kB CSS |
 | `script/brand-sweep.sh` | clean |
 | Contrast check (`replica/design/tokens.json`) | **12 pairs, 0 failing AA** |
 | `parity.py replica/features.csv` | **63.0 / 100**, must-haves **11 / 11** |

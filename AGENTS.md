@@ -5,8 +5,8 @@ original one-time secret service.
 **Stack:** Ruby 3.3 + Roda on Rack 3 + Puma, Redis, Vue 3 + TypeScript + Vite + Tailwind.
 **Status:** production-packaged core with optional simple-mode accounts. The Vue SPA and
 APIs support create → link → reveal once → gone, including the passphrase path; account
-signup/signin, owner receipts, and the dashboard are implemented. **134 backend specs pass**,
-two headless browser journeys are verified, and the non-root Compose stack is smoke-tested.
+signup/signin, owner receipts, and the dashboard are implemented. **138 backend specs pass**,
+three headless browser journeys are verified, and the non-root Compose stack is smoke-tested.
 Every in-repo gate is closed (Redis auth, network isolation, backups, metrics, dependency
 scanning, key rotation, load test). Still open: **TLS on a real hostname** (T-70 — operator
 infrastructure; the app side is rehearsed by `script/tls-rehearsal.sh`) and `AUTH_MODE=full`,

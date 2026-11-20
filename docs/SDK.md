@@ -61,6 +61,40 @@ under the instance `SECRET` before it is stored; never log the request body. The
 equivalent is `POST /api/v1/share` with form fields `secret`, `ttl`, `passphrase` and a
 legacy response shape — use v3 for new integrations.
 
+## 2b. File secrets (v3)
+
+Files travel as strict base64 inside the same JSON envelope. Read `max_file_bytes` from
+`GET /api/v3/config` (512 KiB by default) before reading a file into memory.
+
+```sh
+PAYLOAD=$(base64 -w0 ./notes.bin)
+curl -sS -X POST http://localhost:3000/api/v3/guest/conceal \
+  -H 'content-type: application/json' \
+  -d "{\"secret\":\"$PAYLOAD\",\"ttl\":1800,\"kind\":\"file\",\"filename\":\"notes.bin\"}"
+```
+
+```ts
+export async function concealFile(baseUrl: string, file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  const res = await fetch(`${baseUrl}/api/v3/guest/conceal`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ secret: btoa(binary), ttl: 86400, kind: "file", filename: file.name }),
+  });
+  if (!res.ok) throw new Error(`file conceal failed: ${res.status}`);
+  const body = (await res.json()) as { links: { secret: string } };
+  return new URL(body.links.secret, baseUrl).toString();
+}
+```
+
+A reveal of a file returns `secret_value` as base64 with `metadata.kind === "file"` and
+`metadata.filename` set. Decode before writing it to disk. The filename is metadata only —
+never build a destination path from an untrusted string without sanitising it.
+
 ## 3. Preview, then reveal (the contract that matters)
 
 `GET` is a **preview**. It returns metadata only and never consumes the secret, so chat
