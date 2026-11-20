@@ -484,6 +484,10 @@ Redis is the system of record, so it must not be reachable unauthenticated.
 - A single Redis is a single point of failure. Sentinel/Cluster is out of scope. The
   outage behaviour is: `/health` and every Redis-backed route answer `503
   service_unavailable` with `Retry-After`, and they recover without a restart — an outage
+  is neve limits are per Redis, not per instance — good.
+- A single Redis is a single point of failure. Sentinel/Cluster is out of scope. The
+  outage behaviour is: `/health` and every Redis-backed route answer `503
+  service_unavailable` with `Retry-After`, and they recover without a restart — an outage
   is never reported as a generic `500`.
 - **When Redis reaches `maxmemory`** (with `noeviction`) every write is rejected with the
   same `503`, and so is every reveal — the atomic consume is a Lua `EVAL`, which Redis

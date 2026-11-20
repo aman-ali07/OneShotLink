@@ -1,6 +1,6 @@
 # Testing
 
-> **Status: 120 backend examples, 0 failures (2026-11-20), plus two verified headless
+> **Status: 132 backend examples, 0 failures (2026-11-20), plus two verified headless
 > browser journeys and a Compose smoke test.** Ruby/Bundler are not installed on the
 > host, so backend tests run in the `ots-dev` Docker image against Redis DB 15. Lifecycle,
 > passphrase, TTL, at-rest encryption, concurrency, v1, rate limits, and simple-mode
@@ -85,7 +85,7 @@ server or a second suite can neither be flushed nor make a run under-report. Nev
 | `e2e/journey.mjs` | 1 journey | create → reveal → gone, wrong/correct passphrase, 5-byte passphrase refused in the field and by the API (D-014), no console errors |
 | `e2e/accounts.mjs` | 1 journey | signup → owner receipt → reload → signout → signed-out prompt → signin → delete account |
 
-Backend total: **120 examples, 0 failures**; frontend: **11 Vitest tests, 0 failures**.
+Backend total: **132 examples, 0 failures**; frontend: **11 Vitest tests, 0 failures**.
 Tampering is covered two ways: the real one over HTTP (a flipped ciphertext byte in Redis →
 `500`, no plaintext, record intact, then readable again once the bytes are put back) and a
 stubbed decrypt for the rotated-`SECRET` case. The exact size boundary is covered, and so is

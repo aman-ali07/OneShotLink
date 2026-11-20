@@ -212,11 +212,15 @@ mode. Point the requester at `docs/DECISIONS.md` D-003 and the `T-60` task.
 
 ## 6. Rollback
 
-1. Deployments are immutable images; roll back by pinning the previous tag:
+1. This stack builds the image from the checked-out source: `compose.yaml` has `build:` and
+   no `image:`. Roll back by checking out the last known-good commit or tag and rebuilding:
    ```sh
-   docker compose down
-   docker pull <registry>/<image>:<previous-tag> && docker compose up -d
+   git checkout <known-good-tag-or-sha>
+   docker compose up -d --build
    ```
+   A bare `docker pull <registry>/<image>:<tag>` does nothing here — Compose will not run a
+   pulled image while `build:` is present. If you publish images, add an `image:` with a
+   pinned digest to `compose.yaml` first.
 2. Data is backward compatible across patch releases (the record has a `"v"` field).
    A rollback never requires a Redis migration today; if a schema change adds one, this
    section must be updated before that release.
