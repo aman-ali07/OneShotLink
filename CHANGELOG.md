@@ -9,6 +9,17 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (CI smoke test was stale after K-35, 2026-11-20) — verified
+
+- The Compose smoke step still asserted that a v3 `GET /secret/:key` returns the value and
+  that a second GET is `404`. Since T-95 GET is a non-consuming preview, so GitHub CI went
+  red (`jq .secret_value` returned `null`; an earlier `curl (56)` during startup was a red
+  herring, not the failing assertion).
+- The step now asserts the GET preview carries no value, reveals with
+  `POST /api/v3/guest/secret/:key/reveal`, and expects `404` on replay. Reproduced locally
+  on the production image: GET → metadata only, POST → `ci-smoke`, replay → `404`. The
+  protected `.github/workflows/` path was changed only with explicit operator approval.
+
 ### Fixed (a HEAD request burned a v1 secret, 2026-11-20) — verified
 
 - `HEAD /api/v1/secret/:key` used to be rewritten to GET by the HEAD middleware, and the

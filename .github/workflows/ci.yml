@@ -96,8 +96,13 @@ jobs:
             -H 'content-type: application/json' \
             -d '{"secret":"ci-smoke","ttl":1800}' | jq -r .secret_key)
           test -n "$key"
-          test "$(curl -fsS http://127.0.0.1:3000/api/v3/guest/secret/$key | jq -r .secret_value)" = "ci-smoke"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/v3/guest/secret/$key)" = "404"
+          # GET is a non-consuming preview since K-35; only POST /reveal spends the secret.
+          test "$(curl -fsS http://127.0.0.1:3000/api/v3/guest/secret/$key | jq -r '.secret_value // empty')" = ""
+          test "$(curl -fsS -X POST http://127.0.0.1:3000/api/v3/guest/secret/$key/reveal \
+            -H 'content-type: application/json' -d '{}' | jq -r .secret_value)" = "ci-smoke"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            http://127.0.0.1:3000/api/v3/guest/secret/$key/reveal \
+            -H 'content-type: application/json' -d '{}')" = "404"
           npm --prefix e2e ci --no-audit --no-fund
           BASE_URL=http://127.0.0.1:3000 npm --prefix e2e test
           BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:accounts
