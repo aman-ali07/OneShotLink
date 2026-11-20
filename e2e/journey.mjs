@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import puppeteer from "puppeteer-core";
 
 const base = process.env.BASE_URL || "http://127.0.0.1:3000";
@@ -17,6 +19,7 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+let work;
 const browser = await puppeteer.launch({
   executablePath,
   headless: true,
@@ -107,7 +110,8 @@ try {
   });
 
   // File secrets: upload a binary file, reveal once, see the download UI.
-  const filePath = "/tmp/opencode/e2e-file.bin";
+  work = fs.mkdtempSync(path.join(os.tmpdir(), "ots-e2e-"));
+  const filePath = path.join(work, "e2e-file.bin");
   const fileBytes = Buffer.from([0x00, 0x01, 0xfe, 0xff, 0x41, 0x42]);
   fs.writeFileSync(filePath, fileBytes);
   await page.goto(`${base}/`, { waitUntil: "networkidle0" });
@@ -159,4 +163,5 @@ try {
   console.log(JSON.stringify({ ok: true, link, fileLink, wrongMessage, errors }, null, 2));
 } finally {
   await browser.close();
+  if (work) fs.rmSync(work, { recursive: true, force: true });
 }
