@@ -9,6 +9,14 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (the example env could boot with a known key, 2026-11-20) — verified
+
+- `.env.example` used `replace-with-openssl-rand-hex-32` as its `SECRET` placeholder. That
+  string is exactly 32 bytes, so `Config.validate!` accepted it and a copy-and-go deployment
+  ran with a public key. Both placeholders are now `CHANGE-ME`, which boot rejects.
+- A spec reads the committed example and asserts its `SECRET` fails validation; it was red
+  before the change. Suite 132 examples / 0 failures.
+
 ### Fixed (backups no longer lose owner receipts, 2026-11-20) — verified
 
 - `bin/ots backup` exported only `secret:object:*` plus `customer:*`. Owner receipt hashes

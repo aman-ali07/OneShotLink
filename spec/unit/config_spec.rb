@@ -38,6 +38,14 @@ RSpec.describe Onetime::Config do
     expect { validate("SECRET" => "short") }.to raise_error(described_class::Error, /at least 32 bytes/)
   end
 
+  it "ships an example SECRET that cannot boot by accident" do
+    example = File.read(File.expand_path("../../.env.example", __dir__))
+    placeholder = example[/^SECRET=(.*)$/, 1]
+
+    expect(placeholder).not_to be_nil
+    expect { validate("SECRET" => placeholder) }.to raise_error(described_class::Error, /at least 32 bytes/)
+  end
+
   it "rejects a DEFAULT_TTL outside TTL_OPTIONS" do
     expect { validate("DEFAULT_TTL" => "120") }.to raise_error(described_class::Error, /DEFAULT_TTL/)
   end
