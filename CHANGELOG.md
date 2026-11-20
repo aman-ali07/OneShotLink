@@ -9,6 +9,22 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Changed (premium frontend and site refresh, 2026-11-20) — verified
+
+- The SPA keeps its routes, API and identity but now uses a layered shell: a quiet technical
+  ground, a refined masthead with the OneShotLink mark, active navigation, and panels with
+  real hierarchy. Conceal and reveal are two-column compositions on desktop with an explicit
+  contract panel; the dashboard has a summary strip and grouped settings; auth screens share
+  the same language. Empty, loading and terminal states are finished rather than bare text.
+- The static landing page was widened into a product-style layout with a CSS product preview
+  and proof strip. Two inaccurate statements were corrected: the spec count (104 → 134) and
+  the FAQ, which claimed a v3 `GET` consumes — it is a non-consuming preview since K-35.
+- No new runtime dependency and no copied competitor identity. All e2e selectors, button
+  labels and localStorage guarantees were preserved: both committed journeys pass against a
+  live Puma, Vitest is 11/11, the build is clean (221 kB JS / 22 kB CSS), contrast is 12/12 AA
+  and the rebrand sweep is clean. Screenshots were reviewed at 375 px and 1280 px with no
+  horizontal overflow.
+
 ### Added (published crypto and single-use spec, 2026-11-20) — verified
 
 - `docs/CRYPTO_SPEC.md` documents the actual AES-256-GCM/HKDF parameters, Argon2id settings,
