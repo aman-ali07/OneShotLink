@@ -4,7 +4,7 @@ import AppHeader from "@/components/AppHeader.vue";
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col">
+  <div class="ots-ground flex min-h-screen flex-col">
     <a
       href="#main"
       class="sr-only rounded-md bg-surface px-4 py-2 text-sm font-semibold focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
@@ -12,7 +12,7 @@ import AppHeader from "@/components/AppHeader.vue";
       Skip to content
     </a>
     <AppHeader />
-    <main id="main" class="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6">
+    <main id="main" class="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:py-14">
       <RouterView />
     </main>
     <AppFooter />

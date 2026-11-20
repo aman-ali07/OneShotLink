@@ -38,9 +38,10 @@ async function submit() {
 </script>
 
 <template>
-  <section class="mx-auto max-w-md space-y-6">
+  <section class="ots-panel ots-enter mx-auto max-w-lg space-y-6 p-7 sm:p-9">
+    <p class="ots-eyebrow">Account / Create</p>
     <div class="space-y-2">
-      <h1 class="text-3xl font-bold tracking-tight">Create an account</h1>
+      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Create an account</h1>
       <p class="text-muted">
         Optional. You can share secrets without an account.
       </p>

@@ -33,9 +33,10 @@ async function submit() {
 </script>
 
 <template>
-  <section class="mx-auto max-w-md space-y-6">
+  <section class="ots-panel ots-enter mx-auto max-w-lg space-y-6 p-7 sm:p-9">
+    <p class="ots-eyebrow">Account / Sign in</p>
     <div class="space-y-2">
-      <h1 class="text-3xl font-bold tracking-tight">Sign in</h1>
+      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Sign in</h1>
       <p class="text-muted">See the secret links you have created.</p>
     </div>
 

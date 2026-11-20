@@ -9,7 +9,7 @@ verifiable command; no phase is called done on inspection alone.
 - Evidence: local inspection, 134 backend specs, public competitor pages.
 - Constraint: clean-room + REA unavailable recorded in the audit.
 
-## Phase 1 — Product: premium frontend in place (IN PROGRESS)
+## Phase 1 — Product: premium frontend in place (DONE)
 
 Goal: the same routes and API, a recognisably OneShotLink security product with layered
 composition, deliberate type, trust affordances, and finished states. No UI kit, no copied

@@ -37,8 +37,8 @@
         <a class="brand" href="/">OneShotLink</a>
         <nav class="site" aria-label="Primary">
           <a href="#how">How it works</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#faq">Questions</a>
+          <a class="optional" href="#pricing">Pricing</a>
+          <a class="optional" href="#faq">Questions</a>
           <a href="https://github.com/aman-ali07/OneShotLink">Source</a>
         </nav>
       </div>
@@ -46,10 +46,10 @@
 
     <main class="wrap">
       <p class="prealpha">
-        <strong>Pre-alpha.</strong> The app is packaged and tested (104 specs, CI on every
-        push) and runs in a hardened container. TLS, Redis auth, backups and the host
-        firewall are operator actions, and the preflight gate has to pass on your host
-        before you trust it with anything real.
+        <strong>Status.</strong> The app is packaged and tested (134 backend specs, CI on
+        every push) and runs in a hardened container. TLS on your real hostname, backups and
+        the host firewall are operator actions; the preflight gate must pass on your host
+        before you trust it with anything real. No third-party security audit yet.
       </p>
 
       <section aria-labelledby="hero">
@@ -65,6 +65,40 @@
         <p class="small">
           Two required environment variables. Your Redis. No account, no card, no telemetry.
         </p>
+      </section>
+
+      <section aria-labelledby="preview">
+        <h2 id="preview">A quiet interface for a sharp task</h2>
+        <p class="lede">
+          One job per screen. Clear words about what happens next. No upsell between you and
+          the secret.
+        </p>
+        <div class="preview" role="img" aria-label="Preview of the OneShotLink secret creation screen with a one-time link result and a short list of security guarantees">
+          <div class="preview-window">
+            <div class="preview-top">
+              <span class="dot" /><span class="dot" /><span class="dot" />
+              <span class="preview-url">app.your-domain.example / secret / new</span>
+            </div>
+            <div class="preview-body">
+              <p class="preview-eyebrow">01 / COMPOSE</p>
+              <p class="preview-title">Share a secret once</p>
+              <div class="preview-lines" aria-hidden="true">
+                <span class="line w90" /><span class="line w70" /><span class="line w80" />
+              </div>
+              <div class="preview-fields" aria-hidden="true">
+                <span class="field" /><span class="field short" />
+              </div>
+              <span class="preview-cta">Create the link</span>
+            </div>
+          </div>
+          <div class="preview-note">
+            <p class="preview-eyebrow">THE CONTRACT</p>
+            <p><strong>Encrypted at rest.</strong> Redis never sees plaintext.</p>
+            <p><strong>A preview cannot spend it.</strong> Confirmation is explicit.</p>
+            <p><strong>One view, then gone.</strong> The delete is atomic.</p>
+          </div>
+        </div>
+        <p class="proof">Atomic single-use reveal · Zero third-party requests · MIT licensed</p>
       </section>
 
       <section aria-labelledby="problem">
@@ -242,8 +276,9 @@ curl -fsS http://localhost:3000/health</code></pre>
           <dt>Will a chat preview burn my link?</dt>
           <dd>
             Not the share link: it renders a confirmation button and consumes nothing until the
-            recipient presses it. A direct <code>GET /api/v3/guest/secret/:key</code> does
-            consume, so treat the API as a reveal and not as a status check.
+            recipient presses it. In v3, <code>GET /api/v3/guest/secret/:key</code> is also a
+            valueless preview; only <code>POST …/reveal</code> consumes. The frozen v1
+            <code>GET</code> still consumes, so use v3 for new integrations.
           </dd>
 
           <dt>Do I need an account?</dt>
@@ -270,7 +305,7 @@ curl -fsS http://localhost:3000/health</code></pre>
           <dt>Is it audited?</dt>
           <dd>
             No. There has been no third-party security audit. What exists is a threat model in
-            the repository, 104 specs including the at-rest ciphertext check and the
+            the repository, 134 specs including the at-rest ciphertext check and the
             wrong-passphrase-does-not-consume case, and a load test that races eight reveals
             per secret.
           </dd>

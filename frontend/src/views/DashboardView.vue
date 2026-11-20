@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppAlert from "@/components/AppAlert.vue";
 import AppButton from "@/components/AppButton.vue";
@@ -28,6 +28,8 @@ const changing = ref(false);
 const deletePassword = ref("");
 const deleting = ref(false);
 const router = useRouter();
+const activeCount = computed(() => receipts.value.length);
+const protectedCount = computed(() => receipts.value.filter((r) => r.passphrase_required).length);
 
 function formatDate(seconds?: number): string {
   if (!seconds) return "";
@@ -117,9 +119,18 @@ onMounted(load);
 
 <template>
   <div class="space-y-8">
-    <section v-if="loading" class="text-muted">Loading your account…</section>
+    <section v-if="loading" class="ots-panel space-y-4 p-8" aria-live="polite" aria-busy="true">
+      <p class="ots-eyebrow">Account</p>
+      <div class="h-8 w-48 animate-pulse rounded bg-border" aria-hidden="true" />
+      <div class="h-4 w-72 animate-pulse rounded bg-border" aria-hidden="true" />
+      <div class="grid gap-3 pt-4 sm:grid-cols-3">
+        <div v-for="n in 3" :key="n" class="h-20 animate-pulse rounded-md bg-border" aria-hidden="true" />
+      </div>
+      <span class="sr-only">Loading your account…</span>
+    </section>
 
-    <section v-else-if="unauthenticated" class="mx-auto max-w-md space-y-4">
+    <section v-else-if="unauthenticated" class="ots-panel mx-auto max-w-md space-y-5 p-8">
+      <p class="ots-eyebrow">Account</p>
       <h1 class="text-3xl font-bold tracking-tight">Your account</h1>
       <AppAlert>Sign in to see the secret links you have created.</AppAlert>
       <div class="flex flex-wrap gap-3">
@@ -133,7 +144,8 @@ onMounted(load);
     <template v-else-if="customer">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="space-y-2">
-          <h1 class="text-3xl font-bold tracking-tight">Your account</h1>
+          <p class="ots-eyebrow">Account / Overview</p>
+          <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Your account</h1>
           <p class="text-muted">Signed in as {{ customer.email }}</p>
         </div>
         <AppButton variant="secondary" @click="logout">Sign out</AppButton>
@@ -141,13 +153,34 @@ onMounted(load);
 
       <AppAlert v-if="error" tone="danger">{{ error }}</AppAlert>
 
-      <section class="space-y-4" aria-labelledby="receipts-heading">
-        <div class="space-y-1">
-          <h2 id="receipts-heading" class="text-xl font-semibold">Recent links</h2>
-          <p class="text-sm text-muted">
-            Links you created. This list never contains the secret itself.
-          </p>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <div class="ots-panel p-5">
+          <p class="text-xs text-muted">Active links</p>
+          <p class="mt-2 text-2xl font-semibold text-text">{{ activeCount }}</p>
         </div>
+        <div class="ots-panel p-5">
+          <p class="text-xs text-muted">Passphrase protected</p>
+          <p class="mt-2 text-2xl font-semibold text-text">{{ protectedCount }}</p>
+        </div>
+        <div class="ots-panel p-5">
+          <p class="text-xs text-muted">Storage</p>
+          <p class="mt-2 text-sm font-semibold text-text">Expires automatically</p>
+        </div>
+      </div>
+
+      <section class="ots-panel overflow-hidden" aria-labelledby="receipts-heading">
+        <div class="flex items-center gap-3 border-b border-border px-6 py-4">
+          <span class="ots-eyebrow">Links</span>
+          <span class="ots-rule flex-1" aria-hidden="true" />
+          <span class="text-xs text-muted">Newest first</span>
+        </div>
+        <div class="space-y-4 px-6 py-6">
+          <div class="space-y-1">
+            <h2 id="receipts-heading" class="text-xl font-semibold">Recent links</h2>
+            <p class="text-sm text-muted">
+              Links you created. This list never contains the secret itself.
+            </p>
+          </div>
 
         <p v-if="receipts.length === 0" class="rounded-md border border-border bg-surface p-4 text-sm text-muted">
           No active links. Create one from the home page.
@@ -170,9 +203,11 @@ onMounted(load);
             </div>
           </li>
         </ul>
+        </div>
       </section>
 
-      <section class="max-w-md space-y-4" aria-labelledby="password-heading">
+      <div class="grid gap-6 lg:grid-cols-2">
+      <section class="ots-panel space-y-4 p-6" aria-labelledby="password-heading">
         <h2 id="password-heading" class="text-xl font-semibold">Change password</h2>
         <form class="space-y-3" @submit.prevent="updatePassword">
           <div class="space-y-2">
@@ -207,7 +242,7 @@ onMounted(load);
         </form>
       </section>
 
-      <section class="max-w-md space-y-4" aria-labelledby="delete-heading">
+      <section class="ots-panel space-y-4 p-6" aria-labelledby="delete-heading">
         <h2 id="delete-heading" class="text-xl font-semibold">Delete account</h2>
         <p class="text-sm text-muted">
           This removes your account, its sessions and your list of links. Secrets that have not
@@ -230,6 +265,7 @@ onMounted(load);
           </AppButton>
         </form>
       </section>
+      </div>
     </template>
   </div>
 </template>

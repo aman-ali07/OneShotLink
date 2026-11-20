@@ -76,74 +76,108 @@ function ttlLabel(seconds: number): string {
 </script>
 
 <template>
-  <div class="space-y-8">
-    <section v-if="phase === 'gone'" class="space-y-4" aria-labelledby="gone-heading">
-      <h1 id="gone-heading" class="text-3xl font-bold tracking-tight">This secret is gone</h1>
-      <p class="text-muted">
-        It was already opened, it expired, or it never existed. The server does not
-        say which.
-      </p>
-      <RouterLink to="/" class="inline-block text-sm font-semibold text-accent hover:underline">
-        Create a new secret
-      </RouterLink>
+  <div class="ots-enter mx-auto max-w-3xl">
+    <section v-if="phase === 'gone'" class="ots-panel overflow-hidden" aria-labelledby="gone-heading">
+      <div class="border-b border-border px-6 py-4 sm:px-8">
+        <span class="ots-eyebrow">Terminal state</span>
+      </div>
+      <div class="space-y-5 px-6 py-10 sm:px-8">
+        <div class="flex h-11 w-11 items-center justify-center rounded-full bg-border text-muted" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </div>
+        <h1 id="gone-heading" class="text-3xl font-bold tracking-tight">This secret is gone</h1>
+        <p class="max-w-lg leading-relaxed text-muted">
+          It was already opened, it expired, or it never existed. The server does not say which.
+        </p>
+        <RouterLink to="/" class="inline-block text-sm font-semibold text-accent hover:underline">
+          Create a new secret
+        </RouterLink>
+      </div>
     </section>
 
-    <section v-else-if="phase === 'revealed' && revealed" class="space-y-6" aria-labelledby="revealed-heading">
-      <div class="space-y-2">
-        <h1 id="revealed-heading" ref="revealHeading" tabindex="-1" class="text-3xl font-bold tracking-tight">
-          Your secret
-        </h1>
-        <p class="text-muted">Copy it now. It has been deleted from the server and cannot be shown again.</p>
+    <section v-else-if="phase === 'revealed' && revealed" class="ots-panel overflow-hidden" aria-labelledby="revealed-heading">
+      <div class="flex items-center gap-3 border-b border-border px-6 py-4 sm:px-8">
+        <span class="ots-eyebrow">The secret</span>
+        <span class="ots-rule flex-1" aria-hidden="true" />
+        <span class="text-xs text-muted">Shown once</span>
       </div>
-
-      <div class="space-y-3 rounded-md border border-border bg-surface p-4 shadow-card">
-        <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-sm">{{ revealed.secret_value }}</pre>
-        <CopyButton :text="revealed.secret_value" label="Copy secret" />
-      </div>
-
-      <AppAlert tone="success">
-        Permanently deleted on the server.
-        <span v-if="sharedOn(revealed.metadata.created_at)">
-          Shared on {{ sharedOn(revealed.metadata.created_at) }}, with a
-          {{ ttlLabel(revealed.metadata.ttl) }} lifetime.
-        </span>
-      </AppAlert>
-
-      <RouterLink to="/" class="inline-block text-sm font-semibold text-accent hover:underline">
-        Share a secret of your own
-      </RouterLink>
-    </section>
-
-    <section v-else class="space-y-6" aria-labelledby="reveal-heading">
-      <div class="space-y-2">
-        <h1 id="reveal-heading" class="text-3xl font-bold tracking-tight">A secret was shared with you</h1>
-        <p class="text-muted">It can be opened once. Opening it deletes it.</p>
-      </div>
-
-      <AppAlert>
-        Do not reload the page after revealing. Reloading will not show the secret again.
-      </AppAlert>
-
-      <form class="space-y-5" @submit.prevent="reveal">
-        <div v-if="phase === 'passphrase'" class="space-y-2">
-          <label for="reveal-passphrase" class="block text-sm font-semibold">Passphrase</label>
-          <input
-            id="reveal-passphrase"
-            ref="passphraseInput"
-            v-model="passphrase"
-            type="password"
-            autocomplete="current-password"
-            class="w-full rounded-md border border-border-input bg-surface px-3 py-2 text-sm"
-          />
-          <p class="text-xs text-muted">The sender should have given this to you separately.</p>
+      <div class="space-y-7 px-6 py-9 sm:px-8">
+        <div class="space-y-3">
+          <h1 id="revealed-heading" ref="revealHeading" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-4xl">
+            Your secret
+          </h1>
+          <p class="text-muted">Copy it now. It has been deleted from the server and cannot be shown again.</p>
         </div>
 
-        <AppAlert v-if="error" tone="danger">{{ error }}</AppAlert>
+        <div class="ots-inset space-y-4 p-5">
+          <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-sm text-text">{{ revealed.secret_value }}</pre>
+          <CopyButton :text="revealed.secret_value" label="Copy secret" />
+        </div>
 
-        <AppButton type="submit" :loading="loading">
-          {{ loading ? "Revealing…" : "Reveal secret" }}
-        </AppButton>
-      </form>
+        <AppAlert tone="success">
+          Permanently deleted on the server.
+          <span v-if="sharedOn(revealed.metadata.created_at)">
+            Shared on {{ sharedOn(revealed.metadata.created_at) }}, with a
+            {{ ttlLabel(revealed.metadata.ttl) }} lifetime.
+          </span>
+        </AppAlert>
+
+        <RouterLink to="/" class="inline-block text-sm font-semibold text-accent hover:underline">
+          Share a secret of your own
+        </RouterLink>
+      </div>
+    </section>
+
+    <section v-else class="ots-panel overflow-hidden" aria-labelledby="reveal-heading">
+      <div class="flex items-center gap-3 border-b border-border px-6 py-4 sm:px-8">
+        <span class="ots-eyebrow">03 / Open</span>
+        <span class="ots-rule flex-1" aria-hidden="true" />
+        <span class="text-xs text-muted">One-time link</span>
+      </div>
+      <div class="grid gap-8 px-6 py-9 sm:px-8 lg:grid-cols-[minmax(0,1fr)_15rem]">
+        <div class="space-y-6">
+          <div class="space-y-3">
+            <h1 id="reveal-heading" class="text-3xl font-bold tracking-tight sm:text-4xl">
+              A secret was shared with you
+            </h1>
+            <p class="text-muted">It can be opened once. Opening it deletes it.</p>
+          </div>
+
+          <AppAlert>
+            Your browser previewed this link without opening the secret. Nothing has been spent.
+            Do not reload after revealing — the value cannot be shown again.
+          </AppAlert>
+
+          <form class="space-y-5" @submit.prevent="reveal">
+            <div v-if="phase === 'passphrase'" class="space-y-2">
+              <label for="reveal-passphrase" class="block text-sm font-semibold">Passphrase</label>
+              <input
+                id="reveal-passphrase"
+                ref="passphraseInput"
+                v-model="passphrase"
+                type="password"
+                autocomplete="current-password"
+                class="ots-inset w-full px-3 py-2.5 text-sm"
+              />
+              <p class="text-xs text-muted">The sender should have given this to you separately.</p>
+            </div>
+
+            <AppAlert v-if="error" tone="danger">{{ error }}</AppAlert>
+
+            <AppButton type="submit" :loading="loading">
+              {{ loading ? "Revealing…" : "Reveal secret" }}
+            </AppButton>
+          </form>
+        </div>
+
+        <aside class="ots-inset h-fit space-y-3 p-5 text-sm text-muted" aria-label="Before you reveal">
+          <p class="font-semibold text-text">Before you reveal</p>
+          <p>Make sure you can store the value somewhere safe. After this confirmation there is no second view.</p>
+          <p class="text-xs">A passphrase, if one was set, is an extra check — not a second encryption key.</p>
+        </aside>
+      </div>
     </section>
   </div>
 </template>
