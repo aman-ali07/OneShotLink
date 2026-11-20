@@ -36,7 +36,7 @@ no accounts by design.
 | Container hardened | non-root UID 10001, read-only rootfs, `no-new-privileges`, only `/tmp` writable, no secrets in image |
 | Data survives restart | Redis AOF `appendfsync everysec`, named volume, and a real memory ceiling (`--maxmemory ${REDIS_MAXMEMORY:-256mb}`) so `noeviction` enforces something instead of letting the kernel OOM-kill Redis |
 | CI gate | backend specs, Vitest + typecheck/build, container build, Compose lifecycle smoke, committed browser E2E |
-| Dependency scanning | `bundler-audit` + `npm audit --audit-level=high` in the `security` CI job; both report 0 vulnerabilities. Fixed the findings: Puma 6.6.1→7.2.1 (2 high CVEs), zod 3→4.6.7 (1 high advisory) |
+| Dependency scanning | `bundler-audit` + `npm audit --audit-level=high` in the `security` CI job; both report 0 vulnerabilities. Fixed the findings: Puma 6.6.1→7.2.1 (T-74), zod 3→4.6.7 (T-74), and Puma 7.2.1→7.2.3 after four further advisories were disclosed (T-101, 2026-11-20). Re-audited with a fresh DB: 1379 advisories, 0 vulnerabilities |
 | OpenAPI published | `/api/v3/openapi.json` served; spec asserts every documented path is mounted and every `$ref` resolves |
 | Session revocation | password change and `customers reset-password` revoke other/all sessions; verified live and by spec |
 | Audit trail | append-only `audit:events` stream; identifiers only, never emails/passwords/secret values |

@@ -12,7 +12,7 @@ rather than the Gemfile constraint.
 | Layer | Technology | Version | Host availability | Rationale |
 | --- | --- | --- | --- | --- |
 | Language (backend) | Ruby | `>= 3.2` (`Gemfile`) | **not installed** | Matches the reference implementation; small runtime surface |
-| App server | Puma | `7.2.1` (resolved) | via Bundler in `ots-dev`/image | Rack-native, production default; 6.6.1 carried CVEs (T-74) |
+| App server | Puma | `7.2.3` (resolved) | via Bundler in `ots-dev`/image | Rack-native, production default; 6.6.1 carried CVEs (T-74), 7.2.1 carried four more (T-101) |
 | Rack | Rack | `~> 3.1` | via Bundler | Modern Rack 3 API |
 | Framework | Roda | `3.109.0` (resolved) | via Bundler | Tree-routing, low overhead; no Rails |
 | Datastore | Redis / Valkey | 7+ target | 8.10.3 local | TTL + atomic Lua primitives the product depends on |

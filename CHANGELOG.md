@@ -9,6 +9,17 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Security (Puma patch bump, 2026-11-20) — verified
+
+- A fresh `bundler-audit check --update` found four advisories against the locked Puma
+  7.2.1 (TLS cipher filter, accept-loop file-descriptor flood, slow-reader worker
+  retention, and `100 Continue` reactor stall). All are fixed in 7.2.2+.
+- `Gemfile` already declared `~> 7.2`, so only `Gemfile.lock` changed (7.2.1 → 7.2.3).
+  No new dependency and no server change; rationale in `docs/DECISIONS.md` D-015.
+- Verified after the bump: `bundler-audit check --update` reports 0 vulnerabilities across
+  1379 advisories, the production image builds and reports Puma 7.2.3, and the backend
+  suite still passes 119 examples / 0 failures. `npm audit --audit-level=high` reports 0.
+
 ### Changed (a 1-character passphrase was not an access gate, 2026-11-12) — verified
 
 - **Breaking for API clients:** `passphrase` must now be at least 8 bytes, or absent/empty

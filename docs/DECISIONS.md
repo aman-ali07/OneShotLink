@@ -230,3 +230,23 @@ explains the rule next to the field. 8 bytes is still short for a human-chosen p
 the honest ceiling is a longer minimum or a generated one, which is a copy/UX decision, not
 a code one. MFA, per-secret attempt budgets and passphrase-strength scoring remain out of
 scope (D-012, K-21).
+
+## D-015 — Patch inside the declared constraint; do not add a gem for a bump
+
+**Status:** accepted (2026-11-20)
+
+**Context.** A fresh `bundler-audit check --update` on 2026-11-20 found four advisories
+against the locked Puma 7.2.1 (GHSA-r885-m39c-939g, GHSA-rf6g-xhmp-gm7v,
+GHSA-x646-wp7c-h9mg, GHSA-xw3h-pgr9-3vg7). The `Gemfile` already declared `~> 7.2`, so
+this was a stale lockfile, not a missing dependency or a reason to change the server.
+
+**Decision.** Run `bundle update puma` inside the `ots-dev` image and commit only the
+resolved lockfile change (to 7.2.3). Keep `Gemfile`, the server choice (D-001), and the
+version constraint untouched. Re-run the full gates and rebuild the image in the same
+change.
+
+**Consequences.** No new dependency, so the "new gem needs an ADR + canonical check" rule
+does not fire; this decision records the reasoning anyway. The declared constraint is a
+range precisely so patch fixes can land without another product decision. `TECH_STACK.md`,
+`CHANGELOG.md`, `TASKS.md` and `KNOWN_ISSUES.md` carry the new resolved version; a future
+bump outside `~> 7.2` needs a fresh decision.
