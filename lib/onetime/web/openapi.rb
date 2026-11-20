@@ -25,6 +25,7 @@ module Onetime
             { "name" => "guest", "description" => "Anonymous secret lifecycle (v3)" },
             { "name" => "owner", "description" => "Session-scoped secret lifecycle (v3)" },
             { "name" => "account", "description" => "Simple-mode accounts" },
+            { "name" => "requests", "description" => "Incoming secret requests (v3)" },
             { "name" => "legacy", "description" => "v1 compatibility surface" }
           ],
           "paths" => paths,
@@ -56,6 +57,66 @@ module Onetime
               "meta",
               "Public configuration for the UI",
               responses: { "200" => json_ref("PublicConfig") }
+            )
+          },
+          "/api/v3/requests" => {
+            "post" => op(
+              "requests",
+              "Create a public link that accepts one secret",
+              body: "CreateRequestRequest",
+              security: [{ cookie: [] }],
+              responses: {
+                "201" => json_ref("CreateRequestResponse"),
+                "401" => json_ref("Error"),
+                "403" => json_ref("Error"),
+                "422" => json_ref("Error"),
+                "429" => rate_limited
+              }
+            ),
+            "get" => op(
+              "requests",
+              "List the signed-in customer's incoming requests",
+              security: [{ cookie: [] }],
+              responses: { "200" => json_ref("RequestList"), "401" => json_ref("Error") }
+            )
+          },
+          "/api/v3/requests/{key}" => {
+            "get" => op(
+              "requests",
+              "Describe a request without revealing any submitted secret",
+              params: [key_param],
+              responses: { "200" => json_ref("RequestPreview"), "404" => json_ref("Error") }
+            )
+          },
+          "/api/v3/requests/{key}/respond" => {
+            "post" => op(
+              "requests",
+              "Submit the one answer to an incoming request",
+              params: [key_param],
+              body: "RequestSubmit",
+              responses: {
+                "201" => json_ref("RequestSubmitResponse"),
+                "404" => json_ref("Error"),
+                "409" => json_ref("Error"),
+                "413" => json_ref("Error"),
+                "422" => json_ref("Error"),
+                "429" => rate_limited
+              }
+            )
+          },
+          "/api/v3/requests/{key}/reveal" => {
+            "post" => op(
+              "requests",
+              "Reveal the submitted secret once (owner only)",
+              params: [key_param],
+              body: "RevealRequest",
+              security: [{ cookie: [] }],
+              responses: {
+                "200" => json_ref("RevealResponse"),
+                "401" => json_ref("Error"),
+                "404" => json_ref("Error"),
+                "429" => rate_limited
+              }
             )
           },
           "/api/v3/guest/conceal" => {
@@ -350,6 +411,67 @@ module Onetime
                 "max_secret_bytes" => { "type" => "integer" },
                 "max_file_bytes" => { "type" => "integer" },
                 "version" => { "type" => "string" }
+              }
+            },
+            "CreateRequestRequest" => {
+              "type" => "object",
+              "properties" => {
+                "label" => { "type" => "string", "maxLength" => 120 },
+                "ttl" => { "type" => "integer" }
+              }
+            },
+            "RequestMetadata" => {
+              "type" => "object",
+              "properties" => {
+                "label" => { "type" => "string" },
+                "created_at" => { "type" => "integer" },
+                "ttl" => { "type" => "integer" }
+              }
+            },
+            "CreateRequestResponse" => {
+              "type" => "object",
+              "properties" => {
+                "request_key" => { "type" => "string" },
+                "metadata" => json_ref("RequestMetadata"),
+                "links" => {
+                  "type" => "object",
+                  "properties" => { "request" => { "type" => "string" } }
+                }
+              }
+            },
+            "RequestPreview" => {
+              "type" => "object",
+              "properties" => {
+                "fulfilled" => { "type" => "boolean" },
+                "metadata" => json_ref("RequestMetadata")
+              }
+            },
+            "RequestItem" => {
+              "allOf" => [
+                json_ref("RequestMetadata"),
+                {
+                  "type" => "object",
+                  "properties" => {
+                    "request_key" => { "type" => "string" },
+                    "fulfilled" => { "type" => "boolean" }
+                  }
+                }
+              ]
+            },
+            "RequestList" => {
+              "type" => "object",
+              "properties" => { "requests" => { "type" => "array", "items" => json_ref("RequestItem") } }
+            },
+            "RequestSubmit" => {
+              "type" => "object",
+              "required" => %w[secret],
+              "properties" => { "secret" => { "type" => "string", "minLength" => 1 } }
+            },
+            "RequestSubmitResponse" => {
+              "type" => "object",
+              "properties" => {
+                "ok" => { "type" => "boolean" },
+                "label" => { "type" => "string" }
               }
             },
             "ConcealRequest" => {

@@ -44,6 +44,28 @@ const ConcealResponseSchema = z.object({
   links: z.object({ secret: z.string().min(1) }),
 });
 
+const RequestMetadataSchema = z.object({
+  label: z.string(),
+  created_at: z.number().int().nullable().optional(),
+  ttl: z.number().int(),
+});
+
+const RequestPreviewSchema = z.object({
+  fulfilled: z.boolean(),
+  metadata: RequestMetadataSchema,
+});
+
+const RequestItemSchema = RequestMetadataSchema.extend({
+  request_key: z.string(),
+  fulfilled: z.boolean(),
+});
+
+const CreateRequestResponseSchema = z.object({
+  request_key: z.string().min(1),
+  metadata: RequestMetadataSchema,
+  links: z.object({ request: z.string().min(1) }),
+});
+
 const RevealResponseSchema = z.object({
   secret_value: z.string(),
   metadata: z.object({
@@ -58,6 +80,8 @@ export type PublicConfig = z.infer<typeof ConfigSchema>;
 export type ConcealResponse = z.infer<typeof ConcealResponseSchema>;
 export type RevealResponse = z.infer<typeof RevealResponseSchema>;
 export type Customer = z.infer<typeof CustomerSchema>;
+export type RequestPreview = z.infer<typeof RequestPreviewSchema>;
+export type RequestItem = z.infer<typeof RequestItemSchema>;
 export type Receipt = z.infer<typeof ReceiptSchema>;
 
 export class ApiError extends Error {
@@ -149,6 +173,42 @@ export function revealSecret(key: string, passphrase?: string): Promise<RevealRe
     `/api/v3/guest/secret/${encodeURIComponent(key)}/reveal`,
     RevealResponseSchema,
     { method: "POST", body },
+  );
+}
+
+export function getRequest(key: string, signal?: AbortSignal): Promise<RequestPreview> {
+  return request(`/api/v3/requests/${encodeURIComponent(key)}`, RequestPreviewSchema, {
+    method: "GET",
+    signal,
+  });
+}
+
+export function respondToRequest(key: string, secret: string): Promise<{ ok: boolean; label: string }> {
+  return request(
+    `/api/v3/requests/${encodeURIComponent(key)}/respond`,
+    z.object({ ok: z.boolean(), label: z.string() }),
+    { method: "POST", body: { secret } },
+  );
+}
+
+export function listRequests(): Promise<{ requests: RequestItem[] }> {
+  return request("/api/v3/requests", z.object({ requests: z.array(RequestItemSchema) }), {
+    method: "GET",
+  });
+}
+
+export function createRequest(label: string, ttl: number): Promise<z.infer<typeof CreateRequestResponseSchema>> {
+  return request("/api/v3/requests", CreateRequestResponseSchema, {
+    method: "POST",
+    body: { label, ttl },
+  });
+}
+
+export function revealRequest(key: string): Promise<RevealResponse> {
+  return request(
+    `/api/v3/requests/${encodeURIComponent(key)}/reveal`,
+    RevealResponseSchema,
+    { method: "POST", body: {} },
   );
 }
 

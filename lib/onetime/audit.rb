@@ -24,6 +24,9 @@ module Onetime
       customer.sessions_revoked
       secret.revealed
       secret.passphrase_failed
+      request.created
+      request.responded
+      request.revealed
       admin.role_changed
     ].freeze
 

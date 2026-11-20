@@ -154,6 +154,35 @@ A passphrase shorter than 8 bytes is rejected at create time with `422` and noth
 written. Pre-existing records created before that floor still reveal with their original
 passphrase.
 
+## 4b. Incoming secret requests (simple mode)
+
+An owner creates a public link with `POST /api/v3/requests` (`{"label":"…","ttl":1800}`) and
+gets a `request_key` plus `links.request` (`/request/<key>`). Anyone with that link can call
+`GET /api/v3/requests/:key` for a valueless preview and `POST …/respond` with
+`{"secret":"…"}` exactly once. The owner sees it in `GET /api/v3/requests` and calls
+`POST /api/v3/requests/:key/reveal` once to read it.
+
+```sh
+# Owner (session cookie + same-origin proof from a browser)
+curl -sS -X POST http://localhost:3000/api/v3/requests \
+  -H 'content-type: application/json' -H "Origin: http://localhost:3000" \
+  -b cookies.txt -d '{"label":"API key please","ttl":1800}'
+
+# Responder (public)
+curl -sS -X POST http://localhost:3000/api/v3/requests/<key>/respond \
+  -H 'content-type: application/json' -d '{"secret":"the answer"}'
+
+# Owner reveals once
+curl -sS -X POST http://localhost:3000/api/v3/requests/<key>/reveal \
+  -H 'content-type: application/json' -H "Origin: http://localhost:3000" \
+  -b cookies.txt -d '{}'
+```
+
+A second response is `409 conflict`; a second reveal is `404 not_found`. The answer is
+encrypted with AES-256-GCM before storage and is text-only with no passphrase — use an
+ordinary secret link when a passphrase is needed. `GET …/:key` never returns the answer, so
+chat previews cannot burn it.
+
 ## 5. Errors, limits and retries
 
 Every v3 error has the same envelope; keep `request_id` when reporting a problem:

@@ -306,6 +306,58 @@ module Onetime
         )
       end
 
+      # Incoming secret requests: owner-scoped creation/listing/reveal, and a
+      # public preview/respond pair. Submitted bytes are encrypted before they
+      # reach Redis and consumed with the same atomic script as ordinary secrets.
+      def create_request_payload(customer)
+        body = parse_json_body
+        result = Logic::CreateSecretRequest.new(
+          owner_id: customer[:id],
+          label: body["label"],
+          ttl: body["ttl"]
+        ).call
+        audit("request.created", actor_id: customer[:id])
+        json({
+          request_key: result[:request_key],
+          metadata: result[:metadata],
+          links: { request: "/request/#{result[:request_key]}" }
+        }, status: 201)
+      end
+
+      def list_requests_payload(customer)
+        json({ requests: Models::SecretRequest.list(customer[:id]) })
+      end
+
+      def request_preview_payload(key)
+        pair = Models::SecretRequest.fetch(key)
+        raise NotFound unless pair
+
+        record, = pair
+        json({
+          fulfilled: Store.redis.exists?(Models::SecretRequest.submission_key(key)),
+          metadata: {
+            label: record["label"],
+            created_at: record["created_at"].to_i,
+            ttl: record["ttl"].to_i
+          }
+        })
+      end
+
+      def respond_to_request_payload(key)
+        enforce_rate_limit!(:conceal)
+        body = parse_json_body
+        result = Logic::SubmitToRequest.new(key: key, secret: body["secret"]).call
+        audit("request.responded", detail: key)
+        json(result, status: 201)
+      end
+
+      def reveal_request_payload(key, customer)
+        enforce_rate_limit!(:reveal)
+        result = Logic::RevealRequestSubmission.new(key: key, owner_id: customer[:id]).call
+        audit("request.revealed", actor_id: customer[:id], detail: key)
+        json(result)
+      end
+
       def cookies
         @cookies ||= Rack::Utils.parse_cookies(env)
       end
@@ -662,6 +714,50 @@ module Onetime
                   detail: "receipts=#{removed[:receipts]} sessions=#{removed[:sessions]}"
                 )
                 json({ ok: true })
+              end
+
+              r.get(/.*/) { v3_not_found }
+              r.post(/.*/) { v3_not_found }
+            end
+
+            # Incoming requests: the owner manages them with a session, while
+            # the public link only previews and accepts one response.
+            r.on "requests" do
+              r.post true do
+                require_accounts!
+                verify_csrf!
+                customer = require_session!
+                enforce_rate_limit!(:signin)
+                create_request_payload(customer)
+              end
+
+              r.get true do
+                require_accounts!
+                customer = require_session!
+                list_requests_payload(customer)
+              end
+
+              r.on String do |key|
+                r.get true do
+                  require_accounts!
+                  request_preview_payload(key)
+                end
+
+                r.post "respond" do
+                  require_accounts!
+                  verify_csrf!
+                  respond_to_request_payload(key)
+                end
+
+                r.post "reveal" do
+                  require_accounts!
+                  verify_csrf!
+                  customer = require_session!
+                  reveal_request_payload(key, customer)
+                end
+
+                r.get(/.*/) { v3_not_found }
+                r.post(/.*/) { v3_not_found }
               end
 
               r.get(/.*/) { v3_not_found }

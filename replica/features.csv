@@ -14,7 +14,7 @@ Email/password accounts (simple mode),accounts,should,yes,no,Redis sessions + Ar
 Owner dashboard of active receipts,accounts,should,yes,no,inferred screen S09; no UI yet
 Email verification and password reset,accounts,should,yes,no,requires email delivery; deferred
 Custom domains for branded links,branding,should,yes,no,paid-plan feature; deferred (T-61)
-Incoming secret request links,collaboration,should,yes,no,paid-plan feature; deferred
+Incoming secret request links,collaboration,should,yes,yes,v3 owner-created links accept one encrypted text answer; owner reveals once (T-117). No passphrase on submissions
 Localized UI (16+ locales advertised),i18n,should,yes,no,English only in v1; i18n gem declared
 Light / dark / auto theme,ux,should,yes,no,follow prefers-color-scheme in design system
 Organizations / RBAC / SSO,teams,could,yes,no,Team Plus feature; deferred (T-60/T-61)

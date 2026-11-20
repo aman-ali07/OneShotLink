@@ -5,6 +5,7 @@ import RevealView from "@/views/RevealView.vue";
 import SignInView from "@/views/SignInView.vue";
 import SignUpView from "@/views/SignUpView.vue";
 import DashboardView from "@/views/DashboardView.vue";
+import RequestView from "@/views/RequestView.vue";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -14,6 +15,7 @@ export const router = createRouter({
     { path: "/signin", name: "signin", component: SignInView },
     { path: "/signup", name: "signup", component: SignUpView },
     { path: "/dashboard", name: "dashboard", component: DashboardView },
+    { path: "/request/:key", name: "request", component: RequestView },
     { path: "/:pathMatch(.*)*", name: "not-found", component: NotFoundView },
   ],
   scrollBehavior() {

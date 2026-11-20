@@ -6,7 +6,7 @@ verifiable command; no phase is called done on inspection alone.
 ## Phase 0 — Audit and comparison (DONE)
 
 - `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md`, this plan.
-- Evidence: local inspection, 138 backend specs, public competitor pages.
+- Evidence: local inspection, 142 backend specs, public competitor pages.
 - Constraint: clean-room + REA unavailable recorded in the audit.
 
 ## Phase 1 — Product: premium frontend in place (DONE)
@@ -57,8 +57,8 @@ identity, no new runtime dependency.
 
 ## Phase 4 — Deployment readiness (DONE, in-repo portion)
 
-- Full gate battery re-run and recorded in `docs/GO_LIVE_HANDOFF.md`: 138 specs / 0 failures,
-  12 Vitest, clean build, brand sweep clean, contrast 12/12 AA, parity 63.0 with 11/11
+- Full gate battery re-run and recorded in `docs/GO_LIVE_HANDOFF.md`: 142 specs / 0 failures,
+  12 Vitest, clean build, brand sweep clean, contrast 12/12 AA, parity 66.7 with 11/11
   must-haves, Compose config valid, image builds, both browser journeys green, load test
   100/100 revealed exactly once, TLS rehearsal `PREFLIGHT PASSED`, preflight self-test 5/5,
   bundler-audit and npm audit both 0 vulnerabilities.
@@ -90,9 +90,18 @@ identity, no new runtime dependency.
   plus a dedicated file journey, live curl, OpenAPI/API/SDK docs.
 - Still honest: this is server-side encryption; a file secret is not zero-knowledge.
 
+## Phase 7 — Incoming secret requests (DONE)
+
+- Backend: `SecretRequest` model with immutable request objects and `SET NX` submissions;
+  create/list/reveal for the owner, public preview/respond; `request.*` audit events;
+  OpenAPI paths and schemas.
+- Frontend: `/request/:key` responder view and dashboard create/list/copy/reveal controls.
+- Verification: 4 red→green specs (142 total), 12 Vitest, four browser journeys including a
+  new `e2e/requests.mjs`; parity 63.0 → 66.7. Text-only submissions, no passphrase: documented.
+
 ## Explicitly out of scope this release
 
-Incoming secret requests, webhooks, SSO/MFA/WebAuthn, client-side encryption,
+Webhooks, SSO/MFA/WebAuthn, client-side encryption,
 i18n locales, read counts >1, custom domains. They stay `no`/`skip` in the feature matrix.
 
 ## Change discipline

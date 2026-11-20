@@ -9,6 +9,20 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Added (incoming secret requests, 2026-11-20) — verified
+
+- An owner with a simple-mode account can create a public link asking for a secret. Anyone
+  with the link sends one answer; the owner reveals it once. The submission is encrypted
+  before storage and guarded with Redis `SET NX`, so two simultaneous responders cannot both
+  win. Preview never returns the answer, and reveal decrypts before the atomic delete.
+- Added `POST/GET /api/v3/requests`, `GET …/:key`, `POST …/:key/respond` and `POST …/:key/reveal`
+  with the matching OpenAPI schemas, API.md §5.3, SDK guide, audit events, a responder route
+  (`/request/:key`) and dashboard create/list/reveal controls. Submissions are text-only with
+  no passphrase — stated in the docs rather than implied otherwise.
+- Four integration specs were written red (404) then green. Suite 142 examples / 0 failures;
+  Vitest 12/12; four browser journeys including a new `e2e/requests.mjs` green on a live Puma.
+  Parity moved from 63.0 to 66.7 because this is a scored competitor feature.
+
 ### Added (authored product still, 2026-11-20) — verified
 
 - `docs/stageshow/` adds a Stageshow-authored recipient still (wide and compact) with its

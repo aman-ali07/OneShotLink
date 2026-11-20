@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node journey.mjs",
     "test:accounts": "node accounts.mjs",
-    "test:file": "node file.mjs"
+    "test:file": "node file.mjs",
+    "test:requests": "node requests.mjs"
   },
   "dependencies": {
     "puppeteer-core": "^24.10.0"

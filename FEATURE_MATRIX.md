@@ -20,7 +20,7 @@ are marked "not verified" rather than guessed.
 | Link preview does not consume | yes (GET = metadata) | not verified | not verified | not verified | not verified | Competitive advantage, keep |
 | File secrets | yes (v3 JSON/base64, 512 KiB, encrypted at rest, single-use download) | yes (paid) | yes (≤1 MB free) | yes | yes | Done — T-116; browser base64 rather than multipart, documented in API.md §5.1 |
 | Branding / custom domain | no (brand fixed, clean-room) | yes (paid) | yes (paid) | partial | self-hosted theme | deliberately deferred |
-| Secret request links (incoming) | no | yes (paid) | yes (paid) | no | no | P2 |
+| Secret request links (incoming) | yes (v3 owner-created link, one answer, one owner reveal) | yes (paid) | yes (paid) | no | no | Done — T-117; text answers only, no passphrase on submissions |
 | Accounts + dashboard | yes (simple mode) | yes | OIDC (paid) | yes (Bitwarden account) | no | SSO/MFA deferred (D-003) |
 | Audit trail / read receipts | yes (append-only events) | claimed | yes (paid) | enterprise | no | — |
 | API / SDK | OpenAPI + REST + [docs/SDK.md](docs/SDK.md) and 3 runnable examples | API (public docs) | CLI + REST | CLI/API | API-ish | **D-G1 resolved (P1):** SDK guide plus curl/TypeScript/Python examples executed against a live stack; no SDK package is claimed |

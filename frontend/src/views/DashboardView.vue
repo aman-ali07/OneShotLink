@@ -6,17 +6,28 @@ import AppButton from "@/components/AppButton.vue";
 import {
   ApiError,
   changePassword,
+  createRequest,
   deleteAccount,
   errorMessage,
   getAccount,
   listReceipts,
+  listRequests,
+  revealRequest,
   signOut,
   type Customer,
   type Receipt,
+  type RequestItem,
 } from "@/lib/api";
 
 const customer = ref<Customer | null>(null);
 const receipts = ref<Receipt[]>([]);
+const requests = ref<RequestItem[]>([]);
+const requestLabel = ref("");
+const requestTtl = ref(86400);
+const creatingRequest = ref(false);
+const requestError = ref("");
+const revealedRequest = ref<{ value: string; label: string } | null>(null);
+const revealingKey = ref("");
 const loading = ref(true);
 const unauthenticated = ref(false);
 const error = ref("");
@@ -48,9 +59,14 @@ async function load() {
   loading.value = true;
   error.value = "";
   try {
-    const [account, list] = await Promise.all([getAccount(), listReceipts()]);
+    const [account, list, incoming] = await Promise.all([
+      getAccount(),
+      listReceipts(),
+      listRequests(),
+    ]);
     customer.value = account.customer;
     receipts.value = list.receipts;
+    requests.value = incoming.requests;
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 401) {
       unauthenticated.value = true;
@@ -59,6 +75,43 @@ async function load() {
     }
   } finally {
     loading.value = false;
+  }
+}
+
+function requestLink(key: string): string {
+  return new URL(`/request/${key}`, window.location.origin).toString();
+}
+
+function copyRequestLink(key: string) {
+  void navigator.clipboard?.writeText(requestLink(key));
+}
+
+async function createIncomingRequest() {
+  requestError.value = "";
+  creatingRequest.value = true;
+  try {
+    const created = await createRequest(requestLabel.value, requestTtl.value);
+    requestLabel.value = "";
+    await load();
+    copyRequestLink(created.request_key);
+  } catch (cause) {
+    requestError.value = errorMessage(cause);
+  } finally {
+    creatingRequest.value = false;
+  }
+}
+
+async function openIncoming(item: RequestItem) {
+  revealingKey.value = item.request_key;
+  requestError.value = "";
+  try {
+    const result = await revealRequest(item.request_key);
+    revealedRequest.value = { value: result.secret_value, label: item.label };
+    await load();
+  } catch (cause) {
+    requestError.value = errorMessage(cause);
+  } finally {
+    revealingKey.value = "";
   }
 }
 
@@ -203,6 +256,80 @@ onMounted(load);
             </div>
           </li>
         </ul>
+        </div>
+      </section>
+
+      <section class="ots-panel overflow-hidden" aria-labelledby="requests-heading">
+        <div class="flex items-center gap-3 border-b border-border px-6 py-4">
+          <span class="ots-eyebrow">Incoming</span>
+          <span class="ots-rule flex-1" aria-hidden="true" />
+          <span class="text-xs text-muted">One answer per link</span>
+        </div>
+        <div class="space-y-5 px-6 py-6">
+          <div class="space-y-1">
+            <h2 id="requests-heading" class="text-xl font-semibold">Requests for a secret</h2>
+            <p class="text-sm text-muted">
+              Share a public link that lets someone send you one secret. You can open every answer once.
+            </p>
+          </div>
+
+          <form class="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]" @submit.prevent="createIncomingRequest">
+            <div class="space-y-2">
+              <label for="request-label" class="block text-sm font-semibold">What do you need?</label>
+              <input
+                id="request-label"
+                v-model="requestLabel"
+                type="text"
+                maxlength="120"
+                class="ots-inset w-full px-3 py-2.5 text-sm"
+                placeholder="e.g. Your API key"
+              />
+            </div>
+            <div class="space-y-2">
+              <label for="request-ttl" class="block text-sm font-semibold">Expires</label>
+              <select id="request-ttl" v-model.number="requestTtl" class="ots-inset px-3 py-2.5 text-sm">
+                <option v-for="option in [1800, 43200, 86400, 259200]" :key="option" :value="option">
+                  {{ ttlLabel(option) }}
+                </option>
+              </select>
+            </div>
+            <AppButton type="submit" :loading="creatingRequest">Create link</AppButton>
+          </form>
+
+          <AppAlert v-if="requestError" tone="danger">{{ requestError }}</AppAlert>
+
+          <div v-if="revealedRequest" class="ots-inset space-y-3 p-4" aria-live="polite">
+            <p class="text-sm font-semibold">Secret for {{ revealedRequest.label }}</p>
+            <pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-sm">{{ revealedRequest.value }}</pre>
+            <AppButton variant="secondary" type="button" @click="revealedRequest = null">Done</AppButton>
+          </div>
+
+          <p v-if="requests.length === 0" class="ots-inset p-4 text-sm text-muted">
+            No request links yet. Create one above and send the link to the person who owes you a secret.
+          </p>
+          <ul v-else class="divide-y divide-border rounded-md border border-border bg-surface">
+            <li v-for="item in requests" :key="item.request_key" class="flex flex-wrap items-center justify-between gap-3 p-4">
+              <div class="space-y-1">
+                <p class="font-semibold text-text">{{ item.label }}</p>
+                <p class="text-xs text-muted">
+                  {{ item.fulfilled ? "Answer received" : "Waiting for an answer" }} · Expires in {{ ttlLabel(item.ttl) }}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <AppButton variant="secondary" type="button" @click="copyRequestLink(item.request_key)">
+                  Copy link
+                </AppButton>
+                <AppButton
+                  v-if="item.fulfilled"
+                  type="button"
+                  :loading="revealingKey === item.request_key"
+                  @click="openIncoming(item)"
+                >
+                  Reveal answer
+                </AppButton>
+              </div>
+            </li>
+          </ul>
         </div>
       </section>
 

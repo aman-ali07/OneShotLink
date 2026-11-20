@@ -259,7 +259,29 @@ corrupt record leaves it intact (D-013). The response is `no-store`.
 If the request carries a valid session, the owner receipt is created on either conceal
 route and is removed from the owner index by the same atomic reveal.
 
-### 5.3 Sessions (simple mode)
+### 5.3 Incoming secret requests (simple mode)
+
+An owner creates a public link; anyone with the link sends **one** secret; the owner opens
+that answer once. Creation, listing and reveal require a session; preview and respond are
+public. Requests need `AUTH_MODE=simple` (they return `403`/`501` like other owner routes).
+
+| Route | Auth | Body | Success |
+| --- | --- | --- | --- |
+| `POST /api/v3/requests` | session + CSRF proof | `{"label":"API key please","ttl":1800}` (label ≤ 120 bytes, optional) | `201 {"request_key":"…","metadata":{"label":…,"created_at":…,"ttl":…},"links":{"request":"/request/<key>"}}` |
+| `GET /api/v3/requests` | session | — | `200 {"requests":[{request_key,label,created_at,ttl,fulfilled}]}` (newest 50) |
+| `GET /api/v3/requests/:key` | public | — | `200 {"fulfilled":false,"metadata":{"label":…,"created_at":…,"ttl":…}}` — never returns the submitted value |
+| `POST /api/v3/requests/:key/respond` | public | `{"secret":"…"}` | `201 {"ok":true,"label":"…"}`; a second answer is `409 conflict` |
+| `POST /api/v3/requests/:key/reveal` | session + CSRF proof | `{}` | `200 {"secret_value":"…","metadata":{"kind":"text","filename":null,"label":…,"created_at":…,"ttl":…}}`; replay is `404` |
+
+The submission is encrypted with the same AES-256-GCM path as ordinary secrets and stored
+under `request:secret:<key>` with `SET NX`, so exactly one responder wins a race. Reveal
+decrypts *before* the atomic compare-and-delete, so a rotated `SECRET` cannot destroy the
+answer. Unknown, expired and already-revealed keys all answer the same `404`. Submitted
+secrets are text only and have **no passphrase**; use an ordinary secret link when a
+passphrase is needed. Audit events use the stable names `request.created`,
+`request.responded` and `request.revealed`.
+
+### 5.4 Sessions (simple mode)
 
 All return `403 forbidden` when `AUTH_MODE=disabled`, `501 not_configured` when `full`.
 

@@ -20,7 +20,7 @@ rule (`AGENTS.md`, `PRODUCTION_READINESS.md` §Verdict) still forbids calling th
 | Frontend unit | `npm --prefix frontend run test` | **12 passed** (Vitest 5.1.0) |
 | Frontend typecheck + build | `npm --prefix frontend run typecheck && npm --prefix frontend run build` | clean `vue-tsc`; 212.69 kB JS / 14.21 kB CSS |
 | Rebrand gate | `script/brand-sweep.sh` | clean |
-| Feature parity | `parity.py replica/features.csv` | **63.0 / 100**, must-haves **11 / 11** |
+| Feature parity | `parity.py replica/features.csv` | **66.7 / 100**, must-haves **11 / 11** |
 | Compose config | `SECRET=… REDIS_PASSWORD=… docker compose config --quiet` | OK |
 | Image build | `docker build -t ots-prod:final-check .` | built `8180a4d41b81` |
 | TLS rehearsal (app side of T-70) | `script/tls-rehearsal.sh` | `PREFLIGHT PASSED (1 skipped)` — validated chain, HSTS, headers, cookie flags, HTTP→HTTPS redirect |
@@ -65,11 +65,11 @@ The three-pillar pass added `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md` and
   filename and a 512 KiB decoded ceiling; the SPA has a Text/File switch and a browser-side
   download button. API.md, OpenAPI and the SDK guide were updated in the same change. v1 is
   untouched.
-- **Evidence at the file-secret tree:** 138 backend examples / 0 failures, 12 Vitest, clean
-  build (225.65 kB JS / 22.46 kB CSS), three browser journeys (text, accounts, file) green on
+- **Evidence at the file-secret tree:** 142 backend examples / 0 failures, 12 Vitest, clean
+  build (225.65 kB JS / 22.46 kB CSS), four browser journeys (text, accounts, file, requests) green on
   a live stack, brand sweep clean, 12/12 AA contrast pairs, parity 63.0 with 11/11 must-haves,
-  Compose config valid. File secrets are an unscored "not in the original" row, so the parity
-  number did not move even though `replica/features.csv` now marks the capability `yes`.
+  Compose config valid. File secrets are an unscored "not in the original" row; incoming
+  secret requests are a scored `should` row and moved parity from 63.0 to 66.7.
   Screenshots at 375 px and 1280 px were reviewed with zero horizontal overflow.
 
 Phase 4 (deployment readiness) is unchanged: the items below still need an operator and a
@@ -79,11 +79,11 @@ real host. No deploy was performed.
 
 | Gate | Result |
 | --- | --- |
-| `bundle exec rspec` (Docker, Redis DB 15) | **138 examples, 0 failures** |
+| `bundle exec rspec` (Docker, Redis DB 15) | **142 examples, 0 failures** |
 | Vitest / typecheck / build | **12 passed**; clean; 225.65 kB JS / 22.46 kB CSS |
 | `script/brand-sweep.sh` | clean |
 | Contrast check (`replica/design/tokens.json`) | **12 pairs, 0 failing AA** |
-| `parity.py replica/features.csv` | **63.0 / 100**, must-haves **11 / 11** |
+| `parity.py replica/features.csv` | **66.7 / 100**, must-haves **11 / 11** |
 | `docker compose config --quiet` | OK |
 | `docker build -t ots-prod:phase4 .` | built `709cc557e47d` |
 | Three browser journeys | lifecycle `ok: true`, accounts `ok`, file `{"ok":true,"bytes":8,"replay":"404"}` |
@@ -95,6 +95,16 @@ real host. No deploy was performed.
 The in-repo portion of Phase 4 is complete. It does **not** close T-70/T-71: a real hostname,
 a public certificate chain, a green preflight on that host and the per-host firewall rule are
 still operator actions. All verification containers and stacks were torn down.
+
+## Incoming secret requests (T-117)
+
+Owner-created public links accept exactly one encrypted text answer; the owner reveals it
+once. Creation/listing/reveal require a session, preview/respond are public, and the
+submission is guarded by `SET NX` so two responders cannot both win. Audit events use the
+stable `request.*` names. The SPA has a responder route (`/request/:key`) and dashboard
+create/list/reveal controls. Added API.md §5.3, OpenAPI paths/schemas, SDK guide, and a fourth
+browser journey (`e2e/requests.mjs`): `{"ok":true,...,"errors":[]}` against a live Puma. No
+passphrase on submitted answers — documented, not hidden.
 
 ## Open items — all require a human or a real host
 
