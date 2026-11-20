@@ -9,6 +9,18 @@ M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked 
 
 ## [Unreleased]
 
+### Fixed (the origin check trusted client-supplied forwarded headers, 2026-11-20) — verified
+
+- `verify_request_origin!` built its expected origin from `request.scheme/host/port`. Rack 3
+  derives those from `X-Forwarded-*` headers regardless of trust, so a request carrying
+  `X-Forwarded-Host: evil.example` and a matching `Origin` was accepted as same-site —
+  reproduced as a successful cross-site signup (`201`). The expected origin now comes from
+  operator-controlled `Config.base_url`, with URI default ports normalised.
+- A regression spec with hostile forwarded headers was written first and watched fail
+  (`201` → `403`), then green. Live over Puma: hostile signup → `403`, legitimate signup
+  → `201`, both browser journeys pass. Full suite 134 examples / 0 failures. The protected
+  `app.rb` path was edited only with explicit operator approval.
+
 ### Fixed (the example env could boot with a known key, 2026-11-20) — verified
 
 - `.env.example` used `replace-with-openssl-rand-hex-32` as its `SECRET` placeholder. That

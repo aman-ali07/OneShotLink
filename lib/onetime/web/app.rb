@@ -378,7 +378,10 @@ module Onetime
         end
 
         uri = URI.parse(origin)
-        expected = "#{request.scheme}://#{request.host}:#{request.port}"
+        # Rack derives request.scheme/host/port from client-supplied X-Forwarded-*
+        # headers, so they are not a trustworthy definition of our own origin.
+        base = URI.parse(Onetime::Config.base_url)
+        expected = "#{base.scheme}://#{base.host}:#{base.port}"
         actual = "#{uri.scheme}://#{uri.host}:#{uri.port}"
         raise Forbidden, "Cross-site request rejected." unless actual == expected
       rescue URI::InvalidURIError

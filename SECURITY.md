@@ -51,7 +51,7 @@ inside the trust boundary but are assumed readable by an attacker only together 
 | Opaque sessions with sliding TTL; SHA-256 Redis key | `Models::Session` | Verified: signout deletes the key; absent session is `401` |
 | Session cookie hardening | `set_session_cookie` | Verified: `HttpOnly`, `SameSite=Lax`, `Secure` when `SSL=true`, path `/` |
 | CSRF proof for cookie-authenticated mutations | `App#verify_csrf!` | Verified: cross-site proof absent → `403 forbidden`; same-origin conceal creates an owner receipt |
-| Login/signup origin proof | `App#verify_request_origin!` | `Sec-Fetch-Site: cross-site` or an `Origin` with a different scheme, host or port → `403` before any session cookie is set; headerless API clients (curl, CLI) still work |
+| Login/signup origin proof | `App#verify_request_origin!` | `Sec-Fetch-Site: cross-site` or an `Origin` with a different scheme, host or port → `403` before any session cookie is set; headerless API clients (curl, CLI) still work. The expected origin is derived from operator-controlled `Config.base_url`, never Rack's `X-Forwarded-*`-derived `request.*`, so hostile forwarded headers cannot steer it (K-45) |
 | Owner isolation | `Customer`, `Secret.owner_index`, receipts route | Verified: one customer cannot list another's receipts; reveal removes the receipt |
 | Env-only configuration | `lib/onetime/config.rb` | Verified |
 

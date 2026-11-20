@@ -37,7 +37,9 @@ RSpec.describe "Simple-mode accounts" do
   end
 
   def simple
-    with_env("AUTH_MODE" => "simple") { yield }
+    # The origin check now uses the operator-configured host, not Rack's
+    # header-derived request.host, so the two must agree in this suite.
+    with_env("AUTH_MODE" => "simple", "HOST" => "example.org") { yield }
   end
 
   describe "signup" do
@@ -109,6 +111,20 @@ RSpec.describe "Simple-mode accounts" do
       end
     end
 
+    it "refuses an Origin steered by untrusted forwarded headers" do
+      simple do
+        post_json("/api/v3/signup", account_payload("forwarded@example.com"),
+                  { "HTTP_ORIGIN" => "https://evil.example",
+                    "HTTP_X_FORWARDED_HOST" => "evil.example",
+                    "HTTP_X_FORWARDED_PROTO" => "https",
+                    "HTTP_X_FORWARDED_PORT" => "443" })
+
+        expect(last_response.status).to eq(403)
+        expect(last_response.headers["Set-Cookie"]).to be_nil
+        expect(Onetime::Models::Customer.find_by_email("forwarded@example.com")).to be_nil
+      end
+    end
+
     it "refuses an Origin that matches the host but not the port" do
       simple do
         post_json("/api/v3/signup", account_payload("port@example.com"),
@@ -172,8 +188,9 @@ RSpec.describe "Simple-mode accounts" do
     end
 
     it "sets Secure when SSL is enabled" do
-      with_env("AUTH_MODE" => "simple", "SSL" => "true") do
-        signup
+      with_env("AUTH_MODE" => "simple", "SSL" => "true", "HOST" => "example.org") do
+        post_json("/api/v3/signup", { email: "secure@example.com", password: PASSWORD },
+                  { "HTTP_ORIGIN" => "https://example.org" })
         expect(last_response.headers["Set-Cookie"]).to include("secure")
       end
     end
