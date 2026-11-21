@@ -58,6 +58,15 @@ jobs:
         with:
           ruby-version: "3.3"
           bundler-cache: true
+      # hardening_spec exercises statically served SPA assets; build them here
+      # instead of skipping that assertion when the jobs run in parallel.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm --prefix frontend ci --no-audit --no-fund
+      - run: npm --prefix frontend run build
       - run: bundle exec rspec
 
   frontend:
