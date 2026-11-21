@@ -9,8 +9,9 @@
 > hostname) — app-side checks pass on the staging hostname, but no production-host preflight is
 > recorded; T-71 (Redis isolation) — **NOT ACHIEVED**, substitute controls only (TLS + token AUTH,
 > no IP allowlist/ACL/Private Link), and any `preflight.sh --skip-redis` PASS proves nothing about
-> isolation; K-46 (scheduled, signed webhook worker) — **OPEN**, no workflow applied and no
-> signed-delivery proof. This is a free-tier beta, **not "production ready"**. The passphrase is an
+> isolation; K-46 (scheduled, signed webhook worker) — **CLOSED for staging only** (signed POST,
+> HMAC and replay proven on staging; production scheduling is not authorized). This is a free-tier
+> beta, **not "production ready"**. The passphrase is an
 > access gate, not a second encryption key; **no "zero-knowledge" or "server cannot decrypt" claim
 > is made** (D-012). Public launch remains **NO-GO**.
 
@@ -87,11 +88,11 @@ This was a **test race**, not an application defect. `e2e/journey.mjs` now waits
 re-enable before both passphrase submissions; the full journey then passed. This change is
 tracked in T-146.
 
-## 4. Gates NOT closed (do not claim as tested)
+## 4. Gate status (do not overclaim)
 
 | Gate | Status | Why |
 |---|---|---|
-| K-46 scheduled, signed webhook worker | **OPEN** | `.github/workflows/ops-free-tier.yml` is absent — only the staging template `deploy/free-tier/ops-free-tier.staging.yml` exists. Queue depth is 0 and the webhook E2E only proves queue/listing, not a signed POST, HMAC verification, replay idempotency or liveness alerts |
+| K-46 scheduled, signed webhook worker | **CLOSED for staging** | Workflow applied and merged (PR #2), `staging` environment with all four secrets, `SECRET` verified by decrypt test. Run `44945858274`: `claimed=3 delivered=1 retrying=0 failed=2 skipped=0` (two failures were deliveries encrypted under the earlier rotated key). Receiver captured one POST with `X-OneShotLink-Event: secret.created`, delivery id, and `X-OneShotLink-Signature` matching the independently computed HMAC-SHA256 exactly. Replay run `claimed=0 delivered=0`; receiver still has 2 requests (one local probe + one delivery); delivery record `status: delivered`, `attempts: 1`, `response_code: 200` |
 | Cold-start measurement | **NOT RUN** | Requires leaving the service idle >15 min, then timestamped `/health` probes; the service was continuously exercised during verification. Procedure is in the integration plan; run before final sign-off |
 | Provider quota over-limit | **UNVERIFIED** | Upstash Free behavior above 500k commands/month is not documented; `CONFIG GET maxmemory-policy` returned no value on managed Redis |
 | Redis network isolation (T-71) | **NOT ACHIEVED** | Upstash Free has no IP allowlist/ACL/Private Link; TLS + token only |
@@ -101,7 +102,12 @@ tracked in T-146.
 ## 5. Result
 
 All **executed** staging gates passed: build, boot, health, TLS/HSTS/cookies, eight browser
-journeys, API passphrase contract, a11y with negative control, datastore migration marker, and
-backup/restore. The two functional gaps are K-46 worker proof and the cold-start measurement; the
-security gates T-70/T-71 remain operator-owned. **Staging is functionally usable for beta
-testing; public launch stays NO-GO.**
+journeys, API passphrase contract, a11y with negative control, datastore migration marker,
+backup/restore, and K-46 signed delivery + HMAC + replay. CI was also fixed during this stage:
+`.github/workflows/ci.yml` now builds SPA assets before the backend specs; local proof was
+`307 examples, 0 failures` and CI run `44944157486` passed Backend, Frontend, Dependency scanning
+and Container smoke test.
+
+Remaining gaps: cold-start measurement, Upstash quota over-limit behaviour, and the operator-owned
+T-70/T-71 production gates. **Staging is functionally usable for beta testing; public launch stays
+NO-GO.**
