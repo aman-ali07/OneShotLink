@@ -12,6 +12,19 @@ older entries are point-in-time snapshots; the current total is recorded in `TES
 No user-visible *application* changes since `0.2.0`; the sections below record deployment
 and documentation preparation.
 
+### Stage 17 staging verification (2026-11-22) — executed, not public
+
+- Deployed the merged free-tier config to a Render Free staging service and an Upstash Redis Free
+  database (`oneshotlink_redis_DB`, ap-south-1). First boot failed on a missing dashboard `SECRET`;
+  fixed by setting the documented environment contract. Health, root and config endpoints return 200.
+- `STAGING_TEST_REPORT.md` records real output: preflight PASSED (1 skipped), eight browser journeys,
+  API passphrase contract, 0 WCAG 2.2 AA violations across 40 states with a negative control,
+  restore drill PASSED, and `schema:version=1`.
+- Fixed a remote-latency race in `e2e/journey.mjs` (submit button still disabled when the test typed
+  and clicked again). The application behaved correctly; the test now waits for the button.
+- Open gates: K-46 worker proof (workflow not applied), cold-start measurement, Upstash over-limit
+  behaviour, and Redis network isolation. Public launch remains NO-GO.
+
 ### Stage 17 Phase 0 (2026-11-22) — documented, not deployed
 
 - Added `docs/STAGING_PHASE0.md`: the staging topology, the explicit public-but-unadvertised /

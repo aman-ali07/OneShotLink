@@ -1,0 +1,140 @@
+# PROPOSED GitHub Actions workflow — copy to .github/workflows/ops-free-tier.yml ONLY
+# after operator approval (protected path). It is stored here, not applied.
+# Actions are pinned to the full SHAs already used by .github/workflows/ci.yml, plus
+# actions/upload-artifact@v4 = ea165f8d65b6e75b540449e92b4886f43607fa02 (resolved from
+# the GitHub API on 2026-11-21). No secret is passed on argv or printed.
+name: ops-free-tier
+on:
+  schedule:
+    - cron: "17,47 * * * *"     # off-hour minutes; :00 is the high-load window
+    - cron: "23 3 * * *"        # daily backup
+  workflow_dispatch:            # manual migrate, worker proof, or backup drill
+    inputs:
+      task:
+        description: "Which one-off job to run"
+        required: true
+        default: migrate
+        type: choice
+        options: [migrate, webhooks, backup]
+
+permissions:
+  contents: read
+
+# GitHub's default queue: single cancels an existing pending run. Keep pending runs.
+concurrency:
+  group: ots-ops-${{ github.ref }}
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    # One-off: run manually once after provisioning Redis and BEFORE the first web deploy.
+    # Migrate.apply! is idempotent (SET NX schema:version) and never rewrites secret bytes.
+    if: github.event_name == 'workflow_dispatch' && inputs.task == 'migrate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging      # configure required reviewers in the GitHub UI
+    env:
+      SECRET: ${{ secrets.SECRET }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Inspect then apply the schema migration
+        run: |
+          set -euo pipefail
+          bundle exec ruby bin/ots migrate --dry-run
+          bundle exec ruby bin/ots migrate
+          # Record the marker; never print a secret value.
+          REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli -u "$REDIS_URL" GET schema:version
+
+  webhooks:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule != '23 3 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.task == 'webhooks')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging
+    permissions:
+      contents: read
+      issues: write              # only this job opens liveness issues
+    env:
+      SECRET: ${{ secrets.SECRET }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      WEBHOOK_ALLOW_PRIVATE: ""  # keep the SSRF guard on
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Drain queued deliveries (bounded retries)
+        run: |
+          set -e
+          for attempt in 1 2 3; do
+            if timeout 120 bundle exec ruby bin/ots webhooks:work 20; then exit 0; fi
+            echo "worker attempt $attempt failed; backing off" >&2
+            sleep $((attempt * 10))
+          done
+          exit 1
+      - name: Alert on sustained queue depth
+        if: failure()
+        run: |
+          # rediss:// works with redis-cli TLS; never print the token.
+          depth=$(REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli -u "$REDIS_URL" ZCARD webhook:queue 2>/dev/null || echo unknown)
+          echo "webhook queue depth: $depth"
+          if [ "$depth" != "unknown" ] && [ "$depth" -gt 200 ]; then
+            existing=$(gh issue list --label webhook-liveness --state open --json number --jq length)
+            if [ "$existing" = "0" ]; then
+              gh issue create --label webhook-liveness \
+                --title "Webhook queue backlog (depth $depth)" \
+                --body "Scheduled worker did not drain the queue; check run logs."
+            fi
+          fi
+      # Liveness of MISSING runs is checked outside this workflow: compare the
+      # last successful run timestamp via the GitHub API (see README §5).
+
+  backup:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '23 3 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.task == 'backup')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    concurrency:                 # a worker run must not displace a pending backup
+      group: ots-ops-backup-${{ github.ref }}
+      queue: max
+      cancel-in-progress: false
+    env:
+      SECRET: ${{ secrets.SECRET }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Export and client-side encrypt
+        run: |
+          set -euo pipefail
+          umask 077
+          bundle exec ruby bin/ots backup --out /tmp/dump.json
+          # openssl enc has no AEAD ciphers; GPG symmetric AES256 is the canonical
+          # integrity-protected, zero-cost tool. Passphrase comes from stdin, not argv.
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes \
+            --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 \
+            -o /tmp/dump.json.gpg /tmp/dump.json
+          rm -f /tmp/dump.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ots-backup-${{ github.run_id }}
+          path: /tmp/dump.json.gpg
+          retention-days: 7       # artifacts default to 90 days; keep this short
