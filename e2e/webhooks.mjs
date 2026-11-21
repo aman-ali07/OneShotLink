@@ -7,7 +7,7 @@ const password = "e2e correct horse hooks";
 const url = "https://example.com/oneshotlink-hook";
 
 const browser = await puppeteer.launch({
-  executablePath: "/usr/bin/google-chrome",
+  executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome",
   headless: true,
   args: ["--no-sandbox", "--disable-dev-shm-usage"],
 });
@@ -36,8 +36,6 @@ try {
       { timeout: 10000 },
     );
   } catch (cause) {
-    console.error("DEBUG=" + (await page.$eval("main", (el) => el.textContent)));
-    console.error("ERRORS=" + JSON.stringify(errors));
     throw cause;
   }
   const secret = await page.$eval(".ots-inset .break-all", (el) => el.textContent.trim());
@@ -51,6 +49,26 @@ try {
   });
   assert.equal(me.count, 1, "endpoint was not listed by the API");
   assert.equal(me.hasSecret, false, "listing leaked the signing secret");
+
+  // Creating a secret emits secret.created for the subscribed endpoint; the
+  // deliveries panel must show it, proving the event path end to end.
+  await page.evaluate(async () => {
+    const res = await fetch("/api/v3/guest/conceal", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ secret: "webhook-fixture", ttl: 1800 }),
+    });
+    if (!res.ok) throw new Error(`conceal failed: ${res.status}`);
+  });
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent.includes("View deliveries"));
+    if (!button) throw new Error("View deliveries button missing");
+    button.click();
+  });
+  await page.waitForFunction(
+    () => document.body.textContent.includes("secret.created"),
+    { timeout: 10000 },
+  );
 
   const storage = await page.evaluate(() => JSON.stringify(localStorage));
   assert.equal(storage, "{}", "localStorage should stay empty");

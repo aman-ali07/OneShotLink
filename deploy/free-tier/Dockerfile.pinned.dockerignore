@@ -1,0 +1,32 @@
+# Build-context allowlist for deploy/free-tier/Dockerfile.pinned (proposed).
+# Docker reads this file when the context is the repo root and the Dockerfile is
+# selected with `-f deploy/free-tier/Dockerfile.pinned`.
+.git
+.github
+.env
+.env.*
+!.env.example
+node_modules
+frontend/node_modules
+e2e/node_modules
+frontend/dist
+public/app
+spec
+coverage
+tmp
+log
+*.log
+.DS_Store
+# Development/operator material that the runtime image never needs.
+.claude
+.serena
+docs
+site
+examples
+e2e
+*.md
+# Keep only the one design token the frontend build imports.
+replica/*
+!replica/design
+replica/design/*
+!replica/design/tokens.css

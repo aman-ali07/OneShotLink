@@ -18,6 +18,22 @@ RSpec.describe Onetime::Web::App do
     )
   end
 
+  it "rate limits unauthenticated meta routes so health probes cannot exhaust Redis quota" do
+    with_env("RATE_LIMIT_META" => "2") do
+      2.times do
+        get "/health"
+        expect(last_response.status).to eq(200)
+      end
+
+      get "/health"
+      expect(last_response.status).to eq(429)
+      expect(last_response.headers["Retry-After"]).to match(/\A\d+\z/)
+
+      get "/api/v3/config"
+      expect(last_response.status).to eq(429) # same scope covers every meta route
+    end
+  end
+
   it "reports 503 when Redis is unreachable" do
     allow(Onetime::Store).to receive(:healthy?).and_return(false)
     get "/health"
@@ -38,6 +54,23 @@ RSpec.describe Onetime::Web::App do
     expect(last_response.headers["Permissions-Policy"]).to include("camera=()")
     expect(last_response.headers["Cross-Origin-Opener-Policy"]).to eq("same-origin")
     expect(last_response.headers["Strict-Transport-Security"]).to be_nil
+  end
+
+  it "keeps no-store and Pragma on error responses" do
+    get "/api/v3/guest/secret/no-such-key-for-headers"
+
+    expect(last_response.status).to eq(404)
+    expect(last_response.headers["Cache-Control"]).to eq("no-store")
+    expect(last_response.headers["Pragma"]).to eq("no-cache")
+  end
+
+  it "keeps HSTS on error responses when SSL is enabled" do
+    with_env("SSL" => "true") do
+      get "/api/v3/guest/secret/no-such-key-for-headers"
+
+      expect(last_response.status).to eq(404)
+      expect(last_response.headers["Strict-Transport-Security"]).to eq("max-age=31536000; includeSubDomains")
+    end
   end
 
   it "sets HSTS only when SSL is enabled" do
@@ -87,7 +120,7 @@ RSpec.describe Onetime::Web::App do
       post "/api/v1/share", { secret: "during an outage", ttl: 1800 }
 
       expect(last_response.status).to eq(503)
-      expect(JSON.parse(last_response.body)).to have_key("message")
+      expect(JSON.parse(last_response.body).keys).to eq(["message"])
       expect(last_response.headers["Retry-After"]).to match(/\A\d+\z/)
     end
   end

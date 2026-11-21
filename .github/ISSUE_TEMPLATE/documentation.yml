@@ -1,0 +1,29 @@
+name: Documentation
+description: Report a stale, missing, or incorrect document
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: input
+    id: file
+    attributes:
+      label: File / section
+      description: "e.g. SECURITY.md §3, README.md quickstart"
+    validations:
+      required: true
+  - type: textarea
+    id: stale
+    attributes:
+      label: What is wrong or stale?
+      description: Include evidence — a code line, command output, or the status document that disagrees.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed wording
+  - type: checkboxes
+    id: confirm
+    attributes:
+      options:
+        - label: "No secret material is included in this report."
+          required: true

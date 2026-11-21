@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# frozen_string_literal: true
 #
 # Rehearse the TLS go-live checklist (T-70) without owning a domain.
 #
@@ -62,7 +61,8 @@ printf 'subjectAltName=DNS:%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignat
   "$DOMAIN" > "$work/ext.cnf"
 openssl x509 -req -in "$work/srv.csr" -CA "$work/ca.crt" -CAkey "$work/ca.key" \
   -CAcreateserial -days 2 -sha256 -extfile "$work/ext.cnf" -out "$work/srv.crt" 2>/dev/null
-chmod 644 "$work/srv.key" "$work/srv.crt" "$work/ca.crt"
+chmod 600 "$work/srv.key"
+chmod 644 "$work/srv.crt" "$work/ca.crt"
 echo "   issued $DOMAIN from a throwaway CA"
 
 cat > "$work/Caddyfile" <<EOF

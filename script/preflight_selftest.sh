@@ -21,7 +21,20 @@ ROOT="$PWD"
 HTTPS_PORT="${PF_HTTPS_PORT:-9443}"
 HTTP_PORT="${PF_HTTP_PORT:-9080}"
 DOMAIN="preflight.selftest.invalid"
-NET="oneshotlink_frontend"
+# Never touch the production Compose project: this self-test brings a stack up
+# and tears it down with `down -v`, which deletes its volumes.
+PROJECT="${PF_COMPOSE_PROJECT:-otspreflight-selftest}"
+if [ "$PROJECT" = "oneshotlink" ]; then
+  echo "PF_COMPOSE_PROJECT must differ from the production project" >&2
+  exit 2
+fi
+# Even with a separate project, refuse to run alongside a live deployment: a
+# mistaken project override should never be able to delete someone's secrets.
+if docker ps --format '{{index .Labels "com.docker.compose.project"}}' 2>/dev/null | grep -qx oneshotlink; then
+  echo "refusing to run: the production Compose project has running containers" >&2
+  exit 2
+fi
+NET="${PROJECT}_frontend"
 CADDY="preflight-selftest-caddy"
 WORK="$(mktemp -d)"
 
@@ -34,7 +47,7 @@ info() { printf '\n== %s ==\n' "$1"; }
 
 cleanup() {
   docker rm -f "$CADDY" >/dev/null 2>&1
-  SECRET=x REDIS_PASSWORD=y docker compose down -v --remove-orphans >/dev/null 2>&1
+  SECRET=x REDIS_PASSWORD=y docker compose -p "$PROJECT" down -v --remove-orphans >/dev/null 2>&1
   rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -81,7 +94,7 @@ if [ "$REDIS_SUBNET" = "10.77.13.0/24" ]; then
   exit 2
 fi
 
-docker compose up -d >/dev/null 2>&1 || { echo "compose up failed" >&2; exit 1; }
+docker compose -p "$PROJECT" up -d >/dev/null 2>&1 || { echo "compose up failed" >&2; exit 1; }
 
 healthy=0
 for _ in $(seq 1 60); do
@@ -108,7 +121,7 @@ done
 define_preflight() { # define_preflight <extra args...>; prints output, returns rc
   local out rc
   out=$(HOST="https://$DOMAIN:$HTTPS_PORT" HTTP_URL="http://$DOMAIN:$HTTP_PORT" \
-    PREFLIGHT_ALLOW_SIGNUP=1 "$ROOT/script/preflight.sh" \
+    REDIS_NETWORK="${PROJECT}_backend" PREFLIGHT_ALLOW_SIGNUP=1 "$ROOT/script/preflight.sh" \
     --cacert "$WORK/cert.pem" \
     --resolve "$DOMAIN:$HTTPS_PORT:127.0.0.1" \
     --resolve "$DOMAIN:$HTTP_PORT:127.0.0.1" "$@" 2>&1) && rc=0 || rc=$?

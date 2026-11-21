@@ -18,9 +18,9 @@ const variantClass = computed(() => {
     case "ghost":
       return "bg-transparent text-accent hover:bg-surface";
     case "danger":
-      return "bg-danger text-white hover:opacity-90";
+      return "bg-danger text-on-danger hover:bg-danger-hover";
     default:
-      return "bg-accent text-on-accent hover:opacity-90";
+      return "bg-accent text-on-accent hover:bg-accent-hover";
   }
 });
 </script>
@@ -31,8 +31,11 @@ const variantClass = computed(() => {
     :disabled="disabled || loading"
     :aria-busy="loading || undefined"
     :class="[
-      'inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition',
-      'disabled:cursor-not-allowed disabled:opacity-50',
+      'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition',
+      // A translucent disabled button made its label fail WCAG contrast
+      // (#ffffff on a 50%-opacity accent). Keep the disabled state legible:
+      // muted text on the border surface passes AA.
+      'disabled:cursor-not-allowed disabled:opacity-100 disabled:border-border disabled:bg-border disabled:text-muted',
       variantClass,
     ]"
   >

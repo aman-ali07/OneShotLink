@@ -1,0 +1,75 @@
+# syntax=docker/dockerfile:1.7
+# PROPOSED production image for the ₹0 free-tier stack. NOT applied to the protected
+# top-level Dockerfile. Apply only after operator approval; the root Dockerfile stays
+# the one used by CI and by `docker compose`.
+#
+# Base images pinned to digests resolved from the registry tags on 2026-11-21:
+#   node:24-bookworm-slim -> sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+#   ruby:3.3-slim         -> sha256:37d45ed5edf175280231e7361ac53bdccdcd476147a74d70cd44b8a7704ef85e
+# The lockfiles (Gemfile.lock: ruby 3.3.13p207 / bundler 2.5.22;
+# frontend/package-lock.json lockfileVersion 3) are copied and used verbatim.
+# Residual: apt package versions come from Debian bookworm and are not pinned; for
+# bit-for-bit rebuilds years later, point apt at a dated snapshot.debian.org repo.
+
+ARG NODE_BASE=node@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+ARG RUBY_BASE=ruby@sha256:37d45ed5edf175280231e7361ac53bdccdcd476147a74d70cd44b8a7704ef85e
+
+FROM ${NODE_BASE} AS assets
+
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json ./frontend/
+RUN npm --prefix frontend ci --no-audit --no-fund
+COPY frontend ./frontend
+# The only replica/ input the frontend build needs (verified against the root Dockerfile).
+COPY replica/design/tokens.css ./replica/design/tokens.css
+RUN npm --prefix frontend run build && test -f public/app/index.html
+
+FROM ${RUBY_BASE} AS gems
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ENV BUNDLE_PATH=/usr/local/bundle \
+    BUNDLE_WITHOUT=test \
+    BUNDLE_JOBS=4
+# Pin bundler to the version recorded in Gemfile.lock before installing gems.
+RUN gem install bundler -v 2.5.22 --no-document
+COPY Gemfile Gemfile.lock ./
+RUN bundle _2.5.22_ config set without test \
+    && bundle _2.5.22_ install \
+    && rm -rf /usr/local/bundle/cache
+
+FROM ${RUBY_BASE} AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl libssl3 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 ots \
+    && useradd --uid 10001 --gid ots --no-create-home --shell /usr/sbin/nologin ots
+
+WORKDIR /app
+ENV RACK_ENV=production \
+    BUNDLE_PATH=/usr/local/bundle \
+    BUNDLE_WITHOUT=test \
+    PORT=3000
+
+COPY --from=gems /usr/local/bundle /usr/local/bundle
+COPY Gemfile Gemfile.lock ./
+COPY config.ru ./
+COPY config ./config
+COPY lib ./lib
+COPY bin ./bin
+# `script/` is deliberately NOT copied: neither bin/ots nor lib/ references it
+# (repo-wide grep, 2026-11-21). Ops scripts stay on the host / in the Actions runner.
+COPY --from=assets /app/public/app ./public/app
+RUN mkdir -p tmp /backups && chown -R ots:ots /app /backups
+
+USER ots
+EXPOSE 3000
+# 60 s start period: Render Free can take ~1 min to wake and reconnect to Redis TLS.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null || exit 1
+
+CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]

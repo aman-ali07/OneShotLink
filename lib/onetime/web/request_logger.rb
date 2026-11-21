@@ -10,6 +10,10 @@ module Onetime
       SAFE_PATH = %r{[^[:print:]]}
       SECRET_PATH = %r{(/api/v[13]/(?:guest/)?secret/)[^/]+}
       UI_SECRET_PATH = %r{(\A/secret/)[^/]+}
+      # Incoming request links are bearer capabilities too: the key lets anyone
+      # read the label or occupy the single submission slot.
+      REQUEST_PATH = %r{(/api/v3/requests/)[^/]+}
+      UI_REQUEST_PATH = %r{(\A/request/)[^/]+}
 
       def initialize(app, logger: Onetime.logger)
         @app = app
@@ -35,6 +39,7 @@ module Onetime
         # Secret keys are bearer credentials. Keep them out of logs even though
         # the rest of the path is useful for routing/status diagnostics.
         path = path.gsub(SECRET_PATH, '\\1<redacted>').gsub(UI_SECRET_PATH, '\\1<redacted>')
+                   .gsub(REQUEST_PATH, '\\1<redacted>').gsub(UI_REQUEST_PATH, '\\1<redacted>')
 
         duration = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round(2)
         request_id = headers["X-Request-Id"] || env["onetime.request_id"] || "-"

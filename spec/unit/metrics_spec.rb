@@ -47,7 +47,8 @@ RSpec.describe Onetime::Metrics do
     expect(body).to include("onetime_redis_memory_used_bytes 800")
     expect(body).to include("onetime_redis_memory_max_bytes 1000")
     expect(body).to include("onetime_redis_memory_used_ratio 0.800000")
-    expect(body).to include(%(onetime_version_info{version="#{Onetime::VERSION}"} 1))
+    # SA-19: never fingerprint the exact build via a public scrape.
+    expect(body).not_to include("onetime_version_info")
     # Every non-comment line must be `name{labels} value`.
     body.lines.reject { |line| line.start_with?("#") || line.strip.empty? }.each do |line|
       expect(line).to match(/\A[a-z_]+\{?.*\}? -?[\d.]+\n\z/)

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from "vue";
+import { copyText } from "@/lib/clipboard";
 
 const props = withDefaults(defineProps<{ text: string; label?: string }>(), {
   label: "Copy",
@@ -8,30 +9,8 @@ const props = withDefaults(defineProps<{ text: string; label?: string }>(), {
 const state = ref<"idle" | "copied" | "failed">("idle");
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-function fallbackCopy(value: string): boolean {
-  const area = document.createElement("textarea");
-  area.value = value;
-  area.setAttribute("readonly", "");
-  area.style.position = "fixed";
-  area.style.opacity = "0";
-  document.body.appendChild(area);
-  area.select();
-  const ok = document.execCommand("copy");
-  document.body.removeChild(area);
-  return ok;
-}
-
 async function copy() {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(props.text);
-    } else if (!fallbackCopy(props.text)) {
-      throw new Error("copy failed");
-    }
-    state.value = "copied";
-  } catch {
-    state.value = "failed";
-  }
+  state.value = (await copyText(props.text)) ? "copied" : "failed";
 
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => {
@@ -48,7 +27,7 @@ onBeforeUnmount(() => {
   <div class="flex items-center gap-2">
     <button
       type="button"
-      class="inline-flex min-h-9 items-center rounded-md border border-border-input bg-surface px-3 py-1.5 text-sm font-medium text-text hover:bg-bg"
+      class="inline-flex min-h-11 items-center rounded-md border border-border-input bg-surface px-3 py-1.5 text-sm font-medium text-text hover:bg-bg"
       @click="copy"
     >
       {{ state === "copied" ? "Copied" : label }}

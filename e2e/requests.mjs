@@ -7,7 +7,7 @@ const password = "e2e correct horse request";
 const secret = `request-answer-${Date.now()}`;
 
 const browser = await puppeteer.launch({
-  executablePath: "/usr/bin/google-chrome",
+  executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome",
   headless: true,
   args: ["--no-sandbox", "--disable-dev-shm-usage"],
 });
@@ -24,6 +24,8 @@ const clickButton = async (page, text) => {
 
 try {
   const page = await browser.newPage();
+  const width = Number(process.env.E2E_WIDTH || 1280);
+  await page.setViewport({ width, height: width <= 480 ? 800 : 900 });
   const errors = [];
   page.on("pageerror", (e) => errors.push(`pageerror:${e.message}`));
   page.on("console", (m) => {
@@ -60,21 +62,31 @@ try {
   await page.click("button[type=submit]");
   await page.waitForSelector("#request-sent-heading", { timeout: 10000 });
 
+  // A fulfilled-but-unrevealed link is "taken", and a second answer gets 409.
+  await page.goto(`${base}/request/${key}`, { waitUntil: "networkidle0" });
+  await page.waitForSelector("#request-taken-heading", { timeout: 10000 });
+  const secondAnswer = await page.evaluate(async (requestKey) => {
+    const res = await fetch(`/api/v3/requests/${encodeURIComponent(requestKey)}/respond`, {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ secret: "a second answer" }),
+    });
+    return res.status;
+  }, key);
+  assert.equal(secondAnswer, 409, "second answer was not rejected with 409");
+
   await page.goto(`${base}/dashboard`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => document.body.textContent.includes("Answer received"), { timeout: 10000 });
   await clickButton(page, "Reveal answer");
-  try {
-    await page.waitForFunction((value) => document.body.textContent.includes(value), { timeout: 10000 }, secret);
-  } catch (cause) {
-    console.error("DEBUG_MAIN=" + (await page.$eval("main", (el) => el.textContent)));
-    console.error("DEBUG_ERRORS=" + JSON.stringify(errors));
-    throw cause;
-  }
+  // Do not dump the DOM here: it contains the submitted secret and CI logs
+  // must never echo it. The timeout error itself is enough to diagnose.
+  await page.waitForFunction((value) => document.body.textContent.includes(value), { timeout: 10000 }, secret);
 
   const storage = await page.evaluate(() => JSON.stringify(localStorage));
   assert.equal(storage, "{}", "localStorage should stay empty");
   assert.deepEqual(errors, [], `browser errors: ${errors.join(" | ")}`);
-  console.log(JSON.stringify({ ok: true, key, secret, errors }, null, 2));
+  // Never echo the submitted answer: CI logs must not contain secret material.
+  console.log(JSON.stringify({ ok: true, key, errors }, null, 2));
 } finally {
   await browser.close();
 }

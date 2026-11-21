@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OneShotLink — zero-budget topology</title>
+<style>
+  /* Stageshow still for the deployment-architecture conversation. One focal
+     window: the ₹0 topology. One satellite: the evidence gate. Real words only
+     where the story needs them; the rest is quiet structure and filler bars. */
+  :root{
+    --ink:#1d2430;--ink-2:#4a5566;--ink-3:#8a94a4;--line:#e3e7ee;
+    --line-faint:#eef1f5;--surface:#fff;--canvas:#f7f8fa;
+    --accent:#0f766e;--accent-soft:#e7f4f2;--ok:#1f7a4d;--ok-soft:#e7f5ec;
+    --warn:#a8620a;--warn-soft:#fdf1e2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#fff}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .stage{position:relative;width:1030px;height:560px;overflow:hidden;margin:0 auto}
+  .window{position:absolute;left:92px;top:30px;width:1120px;height:700px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(25,35,55,.16);overflow:hidden}
+  .chrome{height:38px;display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);background:#fcfcfd}
+  .dots{display:flex;gap:6px}.dot{width:9px;height:9px;border-radius:50%;background:#d8dde5}
+  .brand{font-size:12px;font-weight:650}.crumb{font-size:12px;color:var(--ink-3)}
+  .chrome-pill{width:86px;height:20px;border-radius:6px;background:#eef1f5;margin-left:auto}
+  .body{display:flex;height:calc(100% - 38px)}
+  .sidebar{width:160px;flex:none;border-right:1px solid var(--line);padding:18px 10px;background:var(--canvas)}
+  .nav{display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:7px;font-size:12px;color:var(--ink-2)}
+  .nav.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .nav i{width:12px;height:12px;border-radius:4px;background:#cdd5e0;flex:none}.nav.on i{background:var(--accent)}
+  .side-label{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);padding:18px 10px 8px}
+  .main{flex:1;min-width:0;padding:22px 26px}
+  .eyebrow{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .title{font-size:19px;font-weight:650;letter-spacing:-.02em;margin:6px 0 4px}
+  .sub{font-size:12px;color:var(--ink-3);margin-bottom:20px}
+  .lane{display:flex;align-items:center;gap:14px;max-width:740px;height:74px;border:1px solid var(--line);border-radius:10px;padding:0 16px;margin-bottom:10px;background:#fcfdfd}
+  .lane .icon{width:32px;height:32px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+  .lane .name{font-size:13px;font-weight:600;width:112px;flex:none}
+  .lane .detail{font-size:12px;color:var(--ink-2);flex:1}
+  .lane .tag{font-size:10px;font-weight:700;color:var(--ok);background:var(--ok-soft);border-radius:10px;padding:5px 9px;white-space:nowrap}
+  .lane .tag.wait{color:var(--warn);background:var(--warn-soft)}
+  .meta{margin-top:18px;max-width:740px;display:flex;gap:26px}
+  .meta-item{display:flex;flex-direction:column;gap:6px}
+  .meta-item .k{font-size:10px;color:var(--ink-3);letter-spacing:.05em;text-transform:uppercase}
+  .meta-item .bar{height:8px;border-radius:4px;background:#eef1f5}
+  .satellite{position:absolute;left:28px;bottom:28px;width:268px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(25,35,55,.16);padding:16px 18px 12px}
+  .sat-title{font-size:12px;font-weight:650;margin-bottom:10px}
+  .sat-line{display:flex;gap:9px;align-items:center;height:27px;font-size:11.5px;color:var(--ink-2)}
+  .sat-line .mark{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+  .sat-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-faint);margin-top:8px;padding-top:10px;font-size:11px;color:var(--ink-3)}
+  .sat-foot b{color:var(--warn);font-size:11px}
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="window">
+      <div class="chrome">
+        <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span class="brand">OneShotLink</span><span class="crumb">/ deploy / zero budget</span>
+        <span class="chrome-pill"></span>
+      </div>
+      <div class="body">
+        <aside class="sidebar">
+          <div class="nav on"><i></i>Topology</div>
+          <div class="nav"><i></i>Providers</div>
+          <div class="nav"><i></i>Security</div>
+          <div class="side-label">Gates</div>
+          <div class="nav"><i></i>T-70 TLS</div>
+          <div class="nav"><i></i>T-71 Redis</div>
+          <div class="nav"><i></i>K-46 worker</div>
+        </aside>
+        <div class="main">
+          <div class="eyebrow">Deployment architecture</div>
+          <div class="title">Four services, ₹0 per month</div>
+          <div class="sub">Prepared from first-party docs. Nothing deployed; gates need live evidence.</div>
+
+          <div class="lane">
+            <span class="icon">RW</span><span class="name">Render Free</span>
+            <span class="detail">Dockerfile · Puma · managed TLS</span><span class="tag wait">T-70 pending</span>
+          </div>
+          <div class="lane">
+            <span class="icon">DB</span><span class="name">Upstash Free</span>
+            <span class="detail">rediss:// · AUTH · eviction off · no card</span><span class="tag wait">T-71 pending</span>
+          </div>
+          <div class="lane">
+            <span class="icon">CI</span><span class="name">GitHub Actions</span>
+            <span class="detail">external worker · retries · queue alerts</span><span class="tag wait">K-46 pending</span>
+          </div>
+          <div class="lane">
+            <span class="icon">WWW</span><span class="name">Cloudflare Pages</span>
+            <span class="detail">static site · privacy and terms</span><span class="tag">ready</span>
+          </div>
+
+          <div class="meta">
+            <div class="meta-item"><span class="k">Build</span><span class="bar" style="width:96px"></span></div>
+            <div class="meta-item"><span class="k">Datastore</span><span class="bar" style="width:74px"></span></div>
+            <div class="meta-item"><span class="k">Spend</span><span class="bar" style="width:54px"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="satellite">
+      <div class="sat-title">Evidence gate · 2026-11-21</div>
+      <div class="sat-line"><span class="mark"></span>provider quotas re-verified 2026-11-21</div>
+      <div class="sat-line"><span class="mark"></span>no app rewrite; CLI worker off-host</div>
+      <div class="sat-line"><span class="mark"></span>backend suite green · 34 Vitest · 8 journeys</div>
+      <div class="sat-line"><span class="mark"></span>deployed gates: none verified</div>
+      <div class="sat-foot"><span>Public launch</span><b>NO-GO</b></div>
+    </div>
+  </div>
+</body>
+</html>

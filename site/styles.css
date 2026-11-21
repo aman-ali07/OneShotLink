@@ -3,6 +3,7 @@
    zero third-party requests. Contrast verified with replica-design/contrast.py. */
 
 :root {
+  color-scheme: light;
   --bg: #fafaf9;
   --surface: #ffffff;
   --border: #e7e5e4;
@@ -43,7 +44,8 @@ header.site .wrap {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   min-height: 64px;
 }
 
@@ -55,17 +57,59 @@ header.site .wrap {
 }
 
 nav.site a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 8px;
   color: var(--muted);
   text-decoration: none;
   font-size: 14px;
-  margin-left: 16px;
+  margin-left: 8px;
 }
 
 nav.site a:hover { color: var(--text); text-decoration: underline; }
 
 @media (max-width: 640px) {
-  nav.site a { margin-left: 10px; font-size: 12px; white-space: nowrap; }
-  nav.site a.optional { display: none; }
+  /* Let the header wrap instead of overflowing at 320px (WCAG 1.4.10). */
+  nav.site a { margin-left: 4px; padding: 0 6px; font-size: 12px; }
+  /* Keep Pricing reachable at 320px; the header wraps rather than hiding
+     a navigation item. */
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* WCAG 2.4.1: bypass the shared header on all three static pages. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 100;
+  padding: 10px 14px;
+  background: var(--surface, #fff);
+  border: 2px solid var(--accent, #0f766e);
+  border-radius: 6px;
+  color: var(--text);
+  font-weight: 600;
+}
+.skip-link:focus {
+  left: 8px;
+}
+
+.planned {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 main { padding: 64px 0 0; }

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OneShotLink — final release readiness</title>
+<style>
+  :root { --ink:#1d2430; --ink-2:#4a5566; --ink-3:#8a94a4; --line:#e3e7ee; --line-faint:#eef1f5;
+          --surface:#fff; --accent:#2563eb; --accent-soft:#eaf0ff; --ok:#1f7a4d; --ok-soft:#e7f5ec; --warn:#a8620a; }
+  * { box-sizing:border-box; } html, body { margin:0; background:#fff; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
+  .stage { position:relative; width:1030px; height:560px; overflow:hidden; }
+  .window { position:absolute; left:54px; top:32px; width:726px; height:520px; background:var(--surface);
+            border:1px solid var(--line); border-radius:12px; box-shadow:0 18px 50px rgba(25,35,55,.14); overflow:hidden; }
+  .chrome { height:38px; display:flex; align-items:center; gap:12px; padding:0 14px; border-bottom:1px solid var(--line); background:#fcfcfd; }
+  .dots { display:flex; gap:6px; } .dot { width:9px; height:9px; border-radius:50%; background:#d8dde5; }
+  .crumb { font-size:12px; color:var(--ink-3); }
+  .main { padding:26px 28px; }
+  .eyebrow { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); }
+  h1 { font-size:23px; letter-spacing:-.02em; margin:12px 0 8px; }
+  .lead { font-size:12.5px; color:var(--ink-2); line-height:1.6; max-width:520px; margin:0 0 18px; }
+  .row { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line-faint); font-size:12.5px; }
+  .row:last-child { border-bottom:0; } .row b { color:var(--ok); }
+  .sat { position:absolute; left:752px; top:100px; width:250px; background:var(--surface);
+         border:1px solid var(--line); border-radius:10px; box-shadow:0 14px 38px rgba(25,35,55,.13); padding:16px; }
+  .sat h2 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin:0 0 12px; }
+  .item { font-size:11.5px; padding:7px 0; border-bottom:1px solid var(--line-faint); }
+  .item:last-child { border-bottom:0; } .item span { color:var(--ink-3); }
+  .foot { position:absolute; left:54px; top:520px; width:726px; font-size:11px; color:var(--ink-3); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="window">
+    <div class="chrome">
+      <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <span class="crumb">OneShotLink / Final release review</span>
+    </div>
+    <div class="main">
+      <p class="eyebrow">Release / Evidence summary</p>
+      <h1>Every in-repo gate passes. Host gates do not exist yet.</h1>
+      <p class="lead">Six parallel release reviewers reconciled the evidence; copy actions and counts re-verified in the final pass. All code-level requirements are verified with command output; operator and human gates remain explicitly open.</p>
+      <div class="row"><span>Backend suite · 30 files · per-file runs</span><b>307 / 0</b></div>
+      <div class="row"><span>Vitest · 8 files</span><b>35 / 0</b></div>
+      <div class="row"><span>Browser journeys · desktop + mobile</span><b>8 / 8</b></div>
+      <div class="row"><span>Axe · 4 viewports · negative control</span><b>0 violations</b></div>
+      <div class="row"><span>Production build · compose · examples · brand</span><b>green</b></div>
+    </div>
+  </div>
+  <div class="sat">
+    <h2>Release blockers</h2>
+    <div class="item">T-70 real TLS hostname <span>operator, no evidence</span></div>
+    <div class="item">T-71 Redis host firewall <span>operator, no evidence</span></div>
+    <div class="item">K-46 worker scheduling <span>operator, webhooks off</span></div>
+    <div class="item">Protected-path sign-off <span>human signature</span></div>
+    <div class="item">Release artifact uncommitted <span>human decision</span></div>
+  </div>
+  <p class="foot">Product decision: code-level GO, public launch NO-GO. Do not deploy until operator evidence is attached to RELEASE_CHECKLIST.md.</p>
+</div>
+</body>
+</html>

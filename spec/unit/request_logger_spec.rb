@@ -25,6 +25,13 @@ RSpec.describe Onetime::Web::RequestLogger do
     expect(log_for("/api/v3/guest/secret/abcdef123456")).not_to include("abcdef123456")
   end
 
+  it "redacts incoming request keys as well as secret keys" do
+    expect(log_for("/api/v3/requests/reqkey123456")).to include("path=/api/v3/requests/<redacted>")
+    expect(log_for("/api/v3/requests/reqkey123456/reveal")).to include("/requests/<redacted>/reveal")
+    expect(log_for("/request/reqkey123456")).to include("path=/request/<redacted>")
+    expect(log_for("/api/v3/requests/reqkey123456")).not_to include("reqkey123456")
+  end
+
   it "skips asset noise but still logs API errors" do
     messages = []
     logger = Object.new

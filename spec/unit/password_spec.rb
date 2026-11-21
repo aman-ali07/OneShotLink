@@ -15,6 +15,14 @@ RSpec.describe Onetime::Password do
     expect(described_class.verify(hash, "nope")).to be(false)
   end
 
+  it "refuses to verify a password longer than 256 bytes" do
+    # A matching oversized value must still be rejected: the cap exists so an
+    # unauthenticated caller cannot drive Argon2id with a ~1 MiB body.
+    long = "x" * 257
+    hash = described_class.create(long)
+    expect(described_class.verify(hash, long)).to be(false)
+  end
+
   it "returns false for malformed hashes instead of raising" do
     expect(described_class.verify("not-a-hash", password)).to be(false)
     expect(described_class.verify(nil, password)).to be(false)

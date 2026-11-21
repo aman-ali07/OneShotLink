@@ -14,7 +14,7 @@
     <meta property="og:title" content="OneShotLink — share a secret once" />
     <meta
       property="og:description"
-      content="A one-time secret service you run yourself. Encrypted at rest, deleted on first open, no account needed on either end."
+      content="A one-time secret service you run yourself. Encrypted at rest, deleted after a single reveal, no account needed on either end."
     />
     <!-- Relative on purpose: no domain is registered yet (replica/deploy.md B2).
          Scrapers need an absolute URL, so the operator makes this absolute at deploy. -->
@@ -25,6 +25,9 @@
     <meta property="og:image:alt" content="OneShotLink — share a secret once." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="/og.png" />
+    <!-- Set this to the deployed app origin when site/ is served at the apex.
+         Empty means the app is on this origin (local dev / single-host deploy). -->
+    <meta name="ots-app-url" content="" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png" />
@@ -32,21 +35,22 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site">
       <div class="wrap">
         <a class="brand" href="/">OneShotLink</a>
         <nav class="site" aria-label="Primary">
           <a href="#how">How it works</a>
           <a class="optional" href="#pricing">Pricing</a>
-          <a class="optional" href="#faq">Questions</a>
+          <a href="#faq">Questions</a>
           <a href="https://github.com/aman-ali07/OneShotLink">Source</a>
         </nav>
       </div>
     </header>
 
-    <main class="wrap">
+    <main id="main" tabindex="-1" class="wrap">
       <p class="prealpha">
-        <strong>Status.</strong> The app is packaged and tested (134 backend specs, CI on
+        <strong>Free-tier beta — go-live pending.</strong> The app is packaged and tested (300+ backend specs, CI on
         every push) and runs in a hardened container. TLS on your real hostname, backups and
         the host firewall are operator actions; the preflight gate must pass on your host
         before you trust it with anything real. No third-party security audit yet.
@@ -59,7 +63,10 @@
           read in the source, and a recipient who never needs an account.
         </p>
         <p class="actions">
-          <a class="button" href="#how">Install it</a>
+          <!-- Default is this origin; deploy sets <meta name="ots-app-url"> to
+               the real app origin so the CTA is never a dead link. -->
+          <a class="button" id="create-cta" href="/">Create a secret</a>
+          <a class="button secondary" href="#how">Install it</a>
           <a class="button secondary" href="#faq">What the server can read</a>
         </p>
         <p class="small">
@@ -73,11 +80,11 @@
           One job per screen. Clear words about what happens next. No upsell between you and
           the secret.
         </p>
-        <div class="preview" role="img" aria-label="Preview of the OneShotLink secret creation screen with a one-time link result and a short list of security guarantees">
-          <div class="preview-window">
+        <div class="preview">
+          <div class="preview-window" role="img" aria-label="Preview of the OneShotLink secret creation screen with a one-time link result">
             <div class="preview-top">
               <span class="dot" /><span class="dot" /><span class="dot" />
-              <span class="preview-url">app.your-domain.example / secret / new</span>
+              <span class="preview-url">app.your-domain.example /</span>
             </div>
             <div class="preview-body">
               <p class="preview-eyebrow">01 / COMPOSE</p>
@@ -217,8 +224,8 @@ curl -fsS http://localhost:3000/health</code></pre>
               <tr>
                 <th scope="col">&nbsp;</th>
                 <th scope="col">Community</th>
-                <th scope="col">Managed</th>
-                <th scope="col">Deployment review</th>
+                <th scope="col">Managed <span class="planned">Planned</span></th>
+                <th scope="col">Deployment review <span class="planned">Planned</span></th>
               </tr>
             </thead>
             <tbody>
@@ -305,7 +312,7 @@ curl -fsS http://localhost:3000/health</code></pre>
           <dt>Is it audited?</dt>
           <dd>
             No. There has been no third-party security audit. What exists is a threat model in
-            the repository, 134 specs including the at-rest ciphertext check and the
+            the repository, 300+ specs including the at-rest ciphertext check and the
             wrong-passphrase-does-not-consume case, and a load test that races eight reveals
             per secret.
           </dd>
@@ -334,5 +341,28 @@ curl -fsS http://localhost:3000/health</code></pre>
         </span>
       </div>
     </footer>
+    <script>
+      // The marketing origin and the app origin differ in the documented
+      // free-tier deploy. One config point keeps the primary CTA real on both.
+      (function () {
+        var meta = document.querySelector('meta[name="ots-app-url"]');
+        var app = meta && meta.getAttribute("content") ? meta.getAttribute("content").trim() : "";
+        var cta = document.getElementById("create-cta");
+        // Only an absolute http(s) origin is a valid deploy setting. A relative
+        // value would silently point at the marketing origin; a javascript: or
+        // protocol-relative value would turn a trusted CTA into a script/open
+        // redirect sink. This page has no CSP of its own, so validate here.
+        if (app && cta && /^https?:\/\//i.test(app)) {
+          try {
+            var parsed = new URL(app);
+            if ((parsed.protocol === "https:" || parsed.protocol === "http:") && parsed.hostname) {
+              cta.href = parsed.origin + "/";
+            }
+          } catch (e) {
+            // Leave the same-origin default in place for malformed values.
+          }
+        }
+      })();
+    </script>
   </body>
 </html>

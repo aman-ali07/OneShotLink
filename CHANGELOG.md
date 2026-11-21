@@ -4,10 +4,408 @@ All notable changes to this project will be documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
-Entries marked **verified** were exercised by a passing spec or a live request. The M0 and
-M1 core runs in this file were executed on 2026-11-11; unbuilt areas are marked planned.
+Entries marked **verified** were exercised by a passing spec or a live request. Spec counts in
+older entries are point-in-time snapshots; the current total is recorded in `TESTING.md`.
 
 ## [Unreleased]
+
+No user-visible *application* changes since `0.2.0`; the sections below record deployment
+and documentation preparation.
+
+### Stage 17 Phase 0 (2026-11-22) — documented, not deployed
+
+- Added `docs/STAGING_PHASE0.md`: the staging topology, the explicit public-but-unadvertised /
+  synthetic-data waiver for operator acceptance, the verified reasons Cloudflare Access cannot
+  gate an `onrender.com` hostname and a Render private service has no URL, and the remaining
+  human gates (accounts/credentials, exact subdomain claimability, workflow approval).
+- Added `deploy/free-tier/ops-free-tier.staging.yml` as a staging-named workflow template outside
+  the protected `.github/workflows/` path; apply only after approval.
+- No provider account, staging resource, credential, public exposure, or `STAGING_TEST_REPORT.md`
+  was created in this phase.
+
+### Final release-readiness review (2026-11-21) — verified
+
+- Browser journey now exercises the primary copy actions (`Copy link`, `Copy secret`) with
+  `role=status` assertions, closing a real-browser coverage gap.
+- Release checklist completed as an evidence ledger: final counts, residual security findings and
+  waivers, migration/backup/env/deployment evidence, and the fresh-clone blocker are all recorded.
+- Working-tree parity recomputed to 78.8/100 (11/11 must-haves); file/image-secret row corrected to
+  `partial`; stale spec counts reconciled across status documents.
+- Final verdict: **NO-GO** — the release artifact is uncommitted and T-70/T-71/K-46 and human
+  sign-offs remain open. Nothing was deployed.
+
+### Open-source release preparation (2026-11-21) — verified
+
+- Added `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue/PR templates and a private
+  vulnerability-reporting section in `SECURITY.md`; promoted a real `0.2.0` release boundary in
+  `CHANGELOG.md` and reconciled current-state claims across README, API, architecture, database,
+  product and roadmap docs.
+- OpenAPI now documents the webhook-delivery `404` and the `503` responses on Redis-backed
+  request/webhook routes, pinned by a contract spec.
+- Verified setup from a clean working-tree snapshot (`npm ci`, 35 tests, build, RSpec sample,
+  browser journey and axe gate), checked all documentation links and scanned for committed secrets.
+- The release tree is now staged (`git add -A`); a fresh snapshot built from the git index passes
+  build, 35 Vitest tests, 307 backend specs and a non-root image build. Commit, tag, private
+  vulnerability reporting and go/no-go sign-off remain human actions; nothing was pushed, tagged
+  or deployed. See `OPEN_SOURCE_READINESS.md` §4.
+
+### Free-tier deployment preparation (2026-11-21) — documented, not deployed
+
+- Added `deploy/free-tier/` with a 47-key production environment contract, a proposed
+  digest-pinned production image (bundler pinned to the lockfile, 60 s health start period,
+  dev scripts and planning prose excluded from the build context), a proposed SHA-pinned
+  GitHub Actions workflow for migration/worker/backup, and a non-deploying verification script.
+- No protected path was edited: the root `Dockerfile`, Compose, Puma, `config.ru` and CI workflow
+  are unchanged; the new image and workflow require operator approval before being applied.
+- `bash deploy/free-tier/verify.sh` passes 15 checks (env coverage, no active dev-only values,
+  YAML parse, SHA pins, lockfiles, digest pins, Compose config). Two clean builds produced
+  identical dependency/asset content; image IDs differ only because the legacy builder records
+  directory mtimes, so the check reports content reproducibility and documents the BuildKit
+  requirement for bit-for-bit IDs.
+- T-70, T-71 and K-46 are still operator-owned and public launch remains NO-GO.
+
+## [0.2.0] — 2026-11-21
+
+Initial open-source release candidate. Highlights, all verified by specs or live requests:
+
+- One-time secret lifecycle in v1 (legacy form + JSON) and v3 (native JSON), including a
+  non-consuming metadata preview, atomic compare-and-delete consume, TTL expiry and binary
+  file secrets up to 512 KiB.
+- Optional simple-mode accounts with owner receipts, 30-day non-sensitive retention, owner
+  burn, incoming secret requests and signed webhooks with an operator-scheduled worker.
+- Vue 3 + TypeScript SPA with a passphrase access gate (not encryption), strict CSP, WCAG 2.2 AA
+  axe gate and eight headless browser journeys at desktop and phone widths.
+- Hardened non-root image, Compose with authenticated Redis on an internal network, CI,
+  dependency scanning, metrics with bearer auth, backups/restore, in-place key rotation and an
+  OpenAPI 3.1 document.
+- **Go-live verdict: NO-GO** until the operator proves TLS on a real hostname (T-70) and the
+  per-host Redis firewall rule (T-71); those cannot be satisfied by a commit.
+
+### Historical work log for this release (point-in-time; counts superseded by `TESTING.md`)
+
+### Engineering quality review (2026-11-21) — verified
+
+- Fixed a navigation bug: `/secret/:key` now re-peeks the new link when the router reuses the
+  RevealView component, instead of showing an empty idle screen.
+- Removed dead code with no callers: an AbortController shim in ConcealView, an unused jsdom
+  ambient declaration, `Config.auth_enabled?`, and `Store.get_json`/`set_json` (plus the example
+  that only tested them).
+- Consolidated the duplicated webhook `Delivery` type and reused canonical key-prefix constants
+  in key rotation; corrected stale comments and current-state docs (v3 MAC, receipt index,
+  removed i18n gems, axe package decision, `.rspec` warning wording).
+- Reverified everything: 306 backend examples, 35 frontend tests, 8 browser journeys, 0 a11y
+  violations, clean typecheck/build and brand sweep. Human/operator actions remain documented in
+  `ENGINEERING_REVIEW.md` §4; nothing was deployed.
+
+### Free-tier infrastructure research (2026-11-21) — documented, not deployed
+
+- `PROVIDER_COMPARISON.md` now records live-verified first-party limits (fetched 2026-11-21)
+  for Render Free, Upstash Redis Free, GitHub Actions, Cloudflare, Aiven Valkey Free and the
+  rejected alternatives, with a source-by-source verification log and an explicit UNVERIFIED
+  list. No card, no auto-upgrade and no domain purchase remain hard constraints.
+- `FREE_TIER_DEPLOYMENT_PLAN.md` keeps the ₹0 topology (Render Free + Upstash Free + GitHub
+  Actions + Cloudflare Pages) but adds two decisive findings: Render may suspend a Free service
+  for heavy public-internet egress such as *accessing an external database*, and Upstash eviction
+  — if enabled — randomly drops TTL keys first and can destroy live secrets. Both are now
+  operational gates; Aiven Valkey Free is the recorded datastore fallback.
+- Corrections from three parallel `.claude/` reviews: `/metrics` failed-token attempts **are**
+  throttled (`app.rb:676-683`); "no replica redundancy" overstated the Free plan; Free-plan
+  behaviour above 500k commands/month is UNVERIFIED; T-71 is **not** reproduced on Upstash Free
+  (TLS + token only, no IP allowlist/ACL/Private Link); Cloudflare Logpush records full
+  secret-key paths by default; and the proposed scheduled workflow had a `queue: single`
+  backup-displacement bug, an always-true `hashFiles` guard and tag-pinned actions. None of these
+  are shipped application-code defects.
+- `@stageshow` topology still refreshed and re-rendered at 1030×560 with zero page errors.
+  **No deployment, account creation, key rotation, restore or workflow change was performed.**
+
+
+### Independent audit — second reviewer (2026-11-21) — verified
+
+- `Password.verify` rejects inputs over 256 bytes, closing an unauthenticated Argon2id
+  amplification path on sign-in and both credential-mutating routes (create already capped).
+- Backup restore also refuses a missing TTL on `request:object:` entries, so a tampered backup
+  cannot plant an immortal request link.
+- The webhook worker lock moved from a predictable `/tmp` name to a private 0700 runtime
+  directory with `umask 077`, removing a local symlink/truncation attack.
+- Performance: `Webhook.emit` (1+4N Redis round trips → 3 batches for any N), `Webhook.list` and
+  `SecretRequest.list` (per-row reads → pipelines) are batched; the load-test script reuses
+  connections and reports honest counters. A 400-secret/40-thread soak still reveals **400/400
+  exactly once**. See `SECURITY_AUDIT.md` §19 and `PERFORMANCE.md` §8.
+
+### Independent pre-release security + performance audit (2026-11-21) — verified
+
+- Reveal now rejects non-string or over-256-byte passphrases with `422` before hashing or spending
+  a guess, matching the create-side byte cap.
+- The marketing page's CTA origin setting now accepts only absolute `http(s)` origins, so a
+  deploy-time `javascript:`/protocol-relative value cannot turn the trusted button into a sink.
+- Backup pre-flight also refuses TTL-less receipt, delivery and queue entries, preventing a
+  tampered backup from planting non-expiring PII records.
+- `script/host-firewall.sh` validates both CIDRs with `ipaddress` and no longer uses `eval` on
+  root-applied rules; the metrics verification token is read from stdin instead of the argv;
+  throwaway harness Redis binds loopback and the TLS rehearsal key is mode `0600`.
+- `Webhook.emit` pipelines queue pruning and endpoint lookup, removing one Redis round trip from
+  the conceal/reveal hot path.
+- Documented measured performance and its limits in `PERFORMANCE.md`; no critical/high exploitable
+  issue found, dev-only npm advisories waived with evidence, and the go-live verdict stays NO-GO
+  until operator TLS/firewall gates are signed.
+
+### Final QA automation pass (2026-11-21) — verified
+
+- Backup restore now refuses secret-bearing entries whose TTL is **missing**, not just zero, and
+  matches the namespace by key so a substituted backup cannot file a secret under another
+  section. Previously `nil.to_i == 0` produced a bare `SET` and an immortal record.
+- Error responses now keep `Cache-Control: no-store`, `Pragma: no-cache` and HSTS. Roda rebuilds
+  the response in its error handler, which had dropped those headers from every 4xx/5xx —
+  including the 404 for a consumed link.
+- `AUTH_MODE=full` now answers `POST /api/v1/share` with the frozen v1 `{"message":...}` envelope
+  instead of the v3 `{"error":...}` shape.
+- Browser-journey integrity: the deleted-account sign-in check now waits for the actual error
+  alert, the mobile 44 px gate counts collapsed 0 px controls as failures, and the file replay
+  status is measured instead of hard-coded.
+- Dark-mode muted text now meets WCAG 2.2 AA (4.07:1 → passing) after rebuilding the SPA with
+  the corrected token. Added binary and salt-swap crypto invariants plus a timestamp formatter
+  test. Totals: **303 backend examples, 34 frontend tests, 8 browser journeys, 40 a11y states,
+  0 failures/violations**. See `TEST_REPORT.md`.
+
+### QA automation pass (2026-11-21) — verified
+
+- Fixed a byte-vs-code-unit mismatch: native `minlength` on the passphrase and signup password
+  fields blocked valid multi-byte values (e.g. a 9-byte CJK passphrase) before the app's byte
+  rule ran. Both fields now let the application validate; browser journeys assert the byte rule.
+- Fixed the dashboard's request-link flow reporting "Link created and copied" even when both
+  clipboard paths failed; it now reports an honest, danger-toned failure with a fallback.
+- Fixed a request-submission edge: a Redis `TTL` of `0` no longer gives the answer the request's
+  full lifetime, which could leave an encrypted orphan after the request expired.
+- Reveal now rejects non-string passphrases with `422` before spending the per-secret guess
+  budget, so malformed requests cannot lock a secret for the whole 900 s window.
+- Backup restore now refuses secret entries with no TTL instead of resurrecting them as
+  immortal records.
+- Added 6 backend regression examples, 2 Dashboard unit tests, a multi-byte passphrase browser
+  journey, `sessionStorage` assertions and 7 dark-theme accessibility states. Totals: 293
+  backend examples, 30 frontend tests, 8 browser journeys, 0 a11y violations. Status docs and
+  stale spec counts reconciled (K-47 resolved; CRYPTO_SPEC/DATABASE/ARCHITECTURE corrected).
+
+### Developer experience and self-hosting readiness (2026-11-21) — verified
+
+- `/api/v3/openapi.json` now documents the required `/metrics` bearer token, its 429 path,
+  403/501 for every cookie-secured route, and a frozen v1-share request schema.
+- `API.md`, `DEPLOYMENT.md`, `README.md`, `TESTING.md`, `docs/SDK.md` and
+  `PRODUCTION_READINESS.md` reconciled: current spec counts, parity score, env-var tables
+  (including `METRICS_TOKEN`, `REDIS_SUBNET`, `APP_PORT`), CSRF-correct signout example and a
+  per-secret passphrase budget note. A dated handoff memo is explicitly marked historical.
+- Compose now forwards every documented override (`REDIS_TIMEOUT`, reconnect attempts, Puma
+  thread/worker settings, overridable `REDIS_URL`) and `script/test-examples.sh` is gated in CI
+  alongside the file, requests and webhook journeys.
+- `ApiError` carries `X-Request-Id` for support correlation. All three SDK quickstarts pass
+  against a throwaway stack. Product-engineering still: `docs/developer-onboarding-posture.*`.
+
+### Developer experience and self-hosting readiness (2026-11-21) — verified
+
+- Fixed machine-contract defects: seven schema-position `$ref`s that hid generated models,
+  missing error-code enum, v1 GET's destructive contract, and metrics bearer auth in OpenAPI.
+- The per-secret passphrase budget now emits the documented `X-RateLimit-*` headers and a
+  `Retry-After` matching its 900 s window; API.md §1/§5.2 lists every scope and default.
+- Six runnable examples (guest, passphrase, file, owner burn) in curl/TypeScript/Python are
+  executed by `script/test-examples.sh` and CI. SDK support matrix, retry/idempotency rules and
+  D-018 (hand-written examples now, generated clients later) are documented.
+- Self-hosting fixes: Compose healthcheck no longer inherits the host `PORT`, `.env.example`
+  Redis URL matches Compose, `.env.example`/Compose default parity is gated by a spec, and
+  deployment docs cover build prerequisites, stored data, backup PII and the schema marker.
+- Stale "file secrets / OpenAPI not built" copy corrected; eight browser journeys and eight
+  example scripts are now reflected in the docs. Product-engineering still:
+  `docs/developer-readiness.html` + `.png`.
+
+### Frontend integration completion (2026-11-21) — verified
+
+- Every relevant view now uses real APIs: receipt `status` is rendered (already viewed /
+  destroyed / waiting), owner burn is exposed through `DELETE /api/v3/secret/:key`, and
+  webhook deliveries are listed per endpoint. A non-consuming `GET` preview detects spent,
+  invalid and passphrase-protected links before any reveal POST.
+- Added explicit invalid-link and destroyed/already-viewed states; request links reset when
+  the route key changes; plaintext drafts are cleared after create, burn and failed answers.
+- Fixed screen-reader focus on the request error panel, keyboard access to scrollable secret
+  previews, the File tab's touch target, and object-URL download lifetime.
+- The a11y gate audits 320/768/1280 widths; create → reveal → gone, accounts, requests, file
+  and webhook journeys pass at desktop and 320 px. Backend 285 examples / 28 Vitest tests,
+  typecheck and build are green. Product-engineering still: `docs/frontend-integration-posture.*`.
+
+### Frontend wiring closeout (2026-11-21) — verified
+
+- Dashboard: receipt status now drives "already viewed / destroyed by you / waiting to be opened"
+  badges, owner burn is confirmed before `DELETE`, webhook removal and account deletion use
+  two-step confirmation, and a session expiring mid-view redirects to sign-in. `AUTH_MODE=full`
+  renders an honest "Accounts unavailable" panel with no retry loop.
+- Conceal submit has a synchronous double-submit guard; wrong passphrases are cleared for a
+  one-type retry (now asserted by `e2e/journey.mjs`); `Retry-After` is surfaced in messages.
+- Static pages: the hero CTA points at the app origin placeholder (operator substitutes it),
+  all three pages have skip links, the privacy table is keyboard-scrollable, and stale spec
+  counts and an inaccurate "deleted on first open" line were corrected.
+- New `e2e/mobile.mjs` (`npm --prefix e2e run test:mobile`) drives create → reveal → gone at
+  375/320 px, the passphrase path, signup → dashboard → request → responder, and the static
+  skip link: **20 checks, 0 overflow, 0 browser errors**. Cross-component still:
+  `docs/frontend-wiring-pass.*`.
+
+### Developer readiness and self-hosting pass (2026-11-21) — verified
+
+- Five parallel `.claude/` reviews (API design, documentation, Docker, SDK planning,
+  integration testing) re-read the shipped contract against source. Fixed the API status
+  banner, added a single rate-limit table, list-cap/non-idempotency/CORS/versioning notes and
+  a precise 413 rule in `API.md`; OpenAPI now documents 501 on every operation, 429 on
+  rate-limited reads and 413/422 on owner conceal, with specs.
+- `.env.example` now uses the Compose service DNS for `REDIS_URL` (a copied localhost value
+  produced a permanently unhealthy stack) and states that an empty/short `METRICS_TOKEN`
+  fails boot. `DEPLOYMENT.md` gained the token in its env table and deploy-day sequence,
+  corrected the signup/signin bucket split, replaced stale image-tag rollback with the
+  documented rebuild procedure, and removed garbled §9 text.
+- `docs/SDK.md` gained an honest status banner, webhook signature verifiers (Python/Node),
+  a `Retry-After` backoff recipe, a compatibility matrix, exact lifecycle/burn semantics and
+  a portable file snippet. All three quickstarts now read TTL from `/api/v3/config`.
+- New `script/verify-deployment.sh`: one command for health/config, six SDK examples, seven
+  browser journeys and the axe gate, with opt-in mobile/metrics/restore steps. Observed
+  **11 checks, 0 failed** on a live stack; isolated restore drill and authenticated
+  `/metrics` (200 with token, 404 without, boot fails with a short token) verified.
+- Fixed example-harness image selection (a stale local production image made the examples
+  fail with 422), the webhook worker's author-specific default path, and an intermittent
+  axe contrast sample by auditing under reduced motion. Reconciled current spec counts
+  to **285 backend examples / 28 Vitest tests**. Product-engineering still:
+  `docs/developer-readiness.*`.
+
+### Zero-cost resolution of open decisions (2026-11-21) — verified
+
+- Passphrase guessing is bounded per secret (5 guesses / 900 s) using the existing Redis
+  limiter; a wrong guess still never consumes the record (D-012b).
+- Audit events no longer store raw IPs. A 12-hex HMAC reference rotates daily, while the
+  60-second limiter keys remain the abuse control (D-retention).
+- Webhook queue entries and delivery records expire after 7 days; stale members are pruned
+  atomically on claim, with the existing 3-attempt cap (D-queue).
+- Public request preview/respond now work in the default `AUTH_MODE=disabled`, with
+  `:reveal`/`:respond` rate limits and one-answer `SET NX` semantics (C2).
+- Free TLS documented (Caddy + Let's Encrypt); `script/host-firewall.sh` emits restrictive
+  nftables/ufw rules, is dry-run by default and refuses world-open SSH. TLS rehearsal passed
+  7 assertions; real DNS, certificate and firewall changes remain server-owner actions.
+- Trade-offs and limitations recorded in `docs/DECISIONS.md`. No paid service added.
+
+### Receipt lifecycle, owner burn and scoped deliveries (2026-11-21) — verified
+
+- **D-receipt (operator decision D-017):** the payload is permanently destroyed on reveal;
+  a non-sensitive receipt with status `new → previewed → revealed → burned` remains for
+  30 days, then Redis expires it. The owner index carries the same retention TTL and stale
+  members are pruned by the receipts listing.
+- New owner-only `DELETE /api/v3/secret/:key` burns an unrevealed secret without returning
+  or decrypting it. Session + CSRF proof, a dedicated `RATE_LIMIT_BURN` scope, owner scoping
+  with a uniform `404`, and the same atomic compare-and-delete as reveal. No plaintext,
+  passphrase, key or bearer key reaches the receipt, audit stream or logs.
+- `GET /api/v3/webhooks/:id/deliveries` now lists only that endpoint's deliveries and
+  answers `404` for an unknown or foreign id (B8).
+- New `secret.burned` audit event, `RATE_LIMIT_BURN=10` env default, OpenAPI burn path and
+  receipt `status`. Eight new red→green examples; three older specs that expected the
+  receipt to be deleted on reveal were updated to the retained-receipt contract. Backend
+  suite **228 examples, 0 failures**.
+
+### Missing backend functionality (2026-11-21) — verified
+
+- Backups now export and restore inbound requests and webhook state (format 2, format 1 still
+  restorable) and reject keys planted under `customer:sessions:*`.
+- Inbound request objects carry an HMAC over their authorization fields; a tampered
+  `owner_id`/`label` now fails closed, and key rotation renews that MAC.
+- An answer cannot outlive its request: submissions use the request's remaining TTL, and the
+  fulfilled request is removed from the owner index on reveal.
+- OpenAPI documents the degraded-health body, the `{id}` webhook path, rate limits and its own
+  endpoint; all 13 contract specs pass.
+- New `ots conceal` / `ots reveal` commands use the public v3 API with stdin/env input, no
+  secret in argv and no second Redis write path. Verified live: reveal once, replay `404`.
+- Full backend suite: **213 examples, 0 failures**. No API or datastore rewrite; Redis-only,
+  JSON-string records and verify→decrypt→consume ordering preserved.
+
+### Backend gap pass (2026-11-21) — verified
+
+- Audit events no longer contain raw incoming-request keys. Those keys are bearer
+  capabilities: the access log redacted them, but the long-lived audit stream did not. The
+  event detail now stores a truncated SHA-256 reference instead.
+- Operators can read the audit stream with `ots audit [--limit N]`, and privilege changes made
+  through `ots customers set-role` are recorded as `admin.role_changed`.
+- Owner indexes (`customer:<id>:secrets` and `customer:<id>:requests`) now carry a sliding TTL,
+  so a dormant account no longer accumulates stale members indefinitely.
+- Verified with red→green specs for audit redaction, CLI commands and index TTLs; complete
+  backend suite **213 examples, 0 failures** on an isolated Redis DB 15.
+
+### API contract fidelity (2026-11-21) — verified
+
+- The served OpenAPI document now tells the truth about frozen v1: every error response
+  (401/404/413/422/429/503) uses the legacy `{"message": ...}` envelope, with the form body
+  documented alongside JSON. Generated v1 clients no longer misparse 429/503.
+- The "documented paths are mounted" gate now detects the actual catch-all 404 body, and a
+  negative control proves it fails on a bogus path. `/metrics` is documented, and the one
+  3.0-style `nullable` keyword was replaced with an OpenAPI 3.1 null type.
+- Verified: six new contract assertions failed before the fix and pass after; live v1 429 and
+  503 bodies contain only `message`. Backend suite **213 examples, 0 failures**.
+
+### Backend substrate and security gates (2026-11-21) — verified
+
+- **Redis migrations:** `schema:version` is now owned by `Onetime::Migrate` with a
+  read-only `ots migrate --dry-run` and an idempotent `ots migrate`. It refuses a corrupt
+  or newer marker and never rewrites stored secret records (T-66).
+- **A receipt-cleanup failure no longer burns the value after a successful reveal.** The
+  cleanup is best-effort: it logs a warning (class only, never the secret key) and counts
+  the failure; the plaintext is still delivered once (SA-06 / B7).
+- **Dropped audit writes are visible.** The rescue path keeps `request_id`/`actor_id` and
+  increments a counter, so a dropped security event can be alerted on (SA-16 / B6).
+- **The metadata-MAC downgrade path is closed.** Records with a missing/invalid v2 MAC,
+  including one whose passphrase gate was stripped in Redis, are refused without being
+  consumed (P0-5).
+- New alertable metric: `onetime_best_effort_failures_total{operation="cleanup"|"audit"}`.
+- Backend suite: **188 examples, 0 failures** (was 180); every change above has a spec
+  that was seen failing before the fix.
+
+### Frontend design system and quality gates (2026-11-21) — verified
+
+- Header uses the canonical single-stroke chain mark from `site/favicon.svg`; app and site
+  chrome share one opaque paper surface.
+- 44px hit areas on buttons, copy controls, nav, footer and mode switches; a 320px header
+  overflow and concatenated footer links were found in the browser and fixed.
+- Per-route document titles, focus recovery on terminal states, clipboard announcements,
+  a wrong-passphrase field that clears for one-type retry, and a "Hide secret" action.
+- Account entry points disappear when `AUTH_MODE=disabled` instead of offering a 403 login.
+- Design tokens now name the shipped type, spacing and semantic colour scales; component
+  rules live in `@layer components`; `DESIGN_SYSTEM.md` matches the code (light-only in v1).
+- New automated WCAG 2.2 AA gate (`npm --prefix e2e run test:a11y`, D-016): 11 states, 0
+  violations; negative control detects an injected `image-alt` violation. Wired into CI.
+- Component tests with `@vue/test-utils` + jsdom: 20 Vitest tests green (D-016). No new
+  runtime dependency; dark theme deliberately skipped.
+
+### Protected-path hardening follow-up (2026-11-21) — verified
+
+- Session revocation no longer degrades after one `SESSION_TTL`: the per-customer session
+  index is re-added and slid atomically on every request, and `revoke_all` is one transaction.
+  A stolen cookie kept alive by activity can no longer survive a password change.
+- Rate limits are split into nine scopes. Webhook creation/deletion, password change, account
+  deletion and signout are now limited; a burst in one flow cannot lock out another.
+- `Content-Type` must be exactly `application/json` for JSON bodies; static assets carry the
+  same CSP/nosniff/frame/referrer headers as API responses; the SECRET error says "bytes".
+- `script/preflight_selftest.sh` runs under its own Compose project and can no longer
+  `down -v` the production stack. Compose defaults to loopback-only publishing, hides the
+  Redis password from process arguments, and CI actions are pinned to commit SHAs.
+- Verified: session regression specs red → green, `docker compose config --quiet`, `bash -n`,
+  YAML parse, a full `script/preflight_selftest.sh` run (`PREFLIGHT SELFTEST PASSED`,
+  5 assertions), and the full backend suite `180 examples / 0 failures`.
+
+### Security hardening (2026-11-21) — verified
+
+- Webhook destinations are resolved and validated once at creation; delivery dials the
+  stored public IP via `Net::HTTP#ipaddr` so DNS rebinding cannot redirect a callback to an
+  internal service. IPv4-mapped IPv6 addresses are treated as their IPv4 targets.
+- Key rotation now re-encrypts in-flight secret-request submissions and webhook signing
+  secrets as well as secret records, using a hash-field compare-and-swap.
+- New secret records carry an HMAC over the passphrase hash and display metadata, verified
+  before reveal; a Redis writer can no longer strip the passphrase gate undetectably.
+  v1/unsigned records are rejected outright (no legacy read window).
+- Backups are written `0600`; restore refuses to overwrite live keys unless `--force` is
+  passed and rejects keys outside the restorable namespaces.
+- Incoming request keys are redacted from request logs; HEAD rejections carry the hardened
+  headers and a request ID; webhook retries and account-owned data cleanup were repaired.
+- The Lua consume script no longer has an empty-value delete escape hatch.
+- Verified: red phase `34 examples / 8 failures`, final suite `168 examples / 0 failures`.
+  See [SECURITY_AUDIT.md](SECURITY_AUDIT.md) for findings, fixes and remaining risks.
 
 ### Added (signed webhooks, 2026-11-20) — verified
 
@@ -870,4 +1268,5 @@ OpenAPI document, LICENSE. See [TASKS.md](TASKS.md) and [KNOWN_ISSUES.md](KNOWN_
 
 Initial scaffold checkpoint. No runtime behavior is verified; do not deploy.
 
-[Unreleased]: https://github.com/aman-ali07/OneShotLink/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/aman-ali07/OneShotLink/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/aman-ali07/OneShotLink/compare/v0.1.0...v0.2.0

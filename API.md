@@ -2,8 +2,10 @@
 
 > **Status: secret lifecycle and simple-mode accounts implemented (M3).**
 > Health, config, v1 share/reveal, v3 guest/owner conceal/reveal, sessions, account
-> routes, and owner receipts work and are covered by integration specs. Colonel,
-> OpenAPI, and v2 are **not implemented**; those sections remain contracts. Shapes are
+> routes, and owner receipts work and are covered by integration specs. The OpenAPI 3.1
+> document is served at `GET /api/v3/openapi.json` and contract-checked by specs.
+> Colonel and v2 are **not implemented**; those paths are listed as deferred in §6 and are not
+> mounted. Shapes are
 > frozen once shipped; v1 must remain backward compatible.
 
 Base URL: `https://<HOST>` (or `http://` when `SSL=false`). All v3 bodies are JSON;
@@ -14,7 +16,7 @@ requests must send `Content-Type: application/json`. v1 accepts
 
 | Topic | Rule |
 | --- | --- |
-| Auth | Session cookie `ots_session` (opaque, `HttpOnly`, `SameSite=Lax`, `Secure` when `SSL=true`, 14-day sliding TTL). v1 endpoints do not require auth. Account and owner routes require a session in `AUTH_MODE=simple`; in `disabled` they return `403 forbidden`, and in `full` they return `501 not_configured` rather than degrading. |
+| Auth | Session cookie `ots_session` (opaque, `HttpOnly`, `SameSite=Lax`, `Secure` when `SSL=true`, 14-day sliding TTL). v1 endpoints do not require auth. Account routes and the owner burn/request/webhook routes return `403 forbidden` in `AUTH_MODE=disabled`; the owner secret conceal/reveal/preview aliases allow anonymous access in that mode (a session is used only to attach an owner receipt). All `/api` routes return `501 not_configured` in `AUTH_MODE=full` rather than degrading. |
 | CSRF | v3 mutations require `Content-Type: application/json`. Cookie-authenticated requests must carry same-origin proof (`Sec-Fetch-Site: same-origin` or an `Origin` matching the full scheme, host and port); without it they are `403`. Signup/signin are also checked when a browser proof is present, so a cross-site forced login cannot bind a victim's session — headerless API clients are unaffected. No v1 endpoint reads the session cookie. |
 | IDs | Opaque; `secret_key` is the only public secret identifier. |
 | Errors (v3) | `{"error":{"code":"...","message":"...","request_id":"..."}}` |
@@ -24,22 +26,55 @@ requests must send `Content-Type: application/json`. v1 accepts
 | Caching | All secret/reveal responses: `Cache-Control: no-store`, `Pragma: no-cache`. |
 | Rate limit | `429` + `Retry-After`. Every rate-limited response also carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (seconds until the window resets). Successful requests within a limit carry the same `X-RateLimit-*` headers. |
 | Request ID | `X-Request-Id` echoed/generated; used in logs instead of payloads |
+| Browser clients | Same-origin only: the app sends no `Access-Control-*` headers. Serve your UI from the same origin or put a same-origin reverse proxy in front of the API. Headerless server clients are unaffected. |
+
+### Rate limits
+
+All budgets are per client identity (proxies are only trusted from `TRUSTED_PROXIES`) and use a
+fixed Redis window of `RATE_LIMIT_WINDOW` seconds (default 60), **except** the per-secret
+passphrase budget, which uses `RATE_LIMIT_PASSPHRASE_WINDOW` (default 900). A `429` carries
+`Retry-After` and `X-RateLimit-*`; `503 service_unavailable` (Redis down/at `maxmemory`) also
+carries `Retry-After` but is not a rate limit and must not be counted as one.
+
+| Scope | Applies to | Default | Window |
+| --- | --- | --- | --- |
+| `conceal` | `POST /api/v3/guest/conceal`, `POST /api/v3/secret/conceal` | 30 | 60 s |
+| `reveal` | guest/owner reveal POSTs, `GET /api/v3/requests/:key`, and the two GET secret previews (`/api/v3/guest/secret/:key`, `/api/v3/secret/:key`) | 60 | 60 s |
+| `passphrase` | wrong passphrase guesses, keyed by opaque secret id (D-012b) | 5 | 900 s |
+| `signin` / `signup` | sign-in and sign-up — **separate buckets** | 10 each | 60 s |
+| `request` / `respond` | create incoming request / submit an answer | 10 each | 60 s |
+| `webhook` / `webhook_read` | mutate endpoints / list deliveries (`GET /api/v3/webhooks/:id/deliveries`); the endpoint list itself is session-scoped only | 10 each | 60 s |
+| `password` / `delete` / `burn` / `signout` | account mutations | 5 / 3 / 10 / 10 | 60 s |
+| `metrics` / `metrics_auth` | successful scrapes / failed token attempts | 5 each | 60 s |
+| `meta` | unauthenticated `/health`, `/api/v3/config`, OpenAPI probes | 300 | 60 s |
+
+`AUTH_MODE=full` returns `501 not_configured` for **every** `/api` path, including v1; it never
+falls back to anonymous behaviour.
+
+### Versioning and compatibility
+
+`v1` is frozen: existing paths and response shapes stay backward compatible, with no
+planned removal. `v3` is additive — new routes and optional fields can appear, but existing
+fields do not change meaning. A future deprecation would be announced and would use
+`Deprecation`/`Sunset` headers; none are in use today.
 
 ### Error codes
 
 | Code | HTTP | When |
 | --- | --- | --- |
-| `validation_error` | 422 | Bad TTL, empty/oversized secret, malformed body, bad passphrase length |
+| `validation_error` | 422 | Bad TTL, empty secret, malformed body, bad passphrase length, bad `kind`/`filename` (oversized bodies are `413`) |
 | `not_found` | 404 | Unknown, expired, or already-consumed secret |
 | `unauthorized` | 401 | No/invalid session where auth is required |
 | `passphrase_required` | 401 | Secret is protected; no passphrase supplied |
 | `invalid_passphrase` | 401 | Passphrase supplied and wrong (secret is not consumed) |
 | `invalid_credentials` | 401 | Sign-in failed (email unknown or password wrong; same response for both) |
 | `forbidden` | 403 | Authenticated but not allowed; auth disabled for account routes |
+| `conflict` | 409 | The request already has an answer, or a concurrent create lost the race |
+| `email_taken` | 409 | Signup email is already registered (case-insensitive) |
 | `rate_limited` | 429 | Limit exceeded |
-| `payload_too_large` | 413 | Body over `MAX_SECRET_BYTES` (1 MiB default) |
+| `payload_too_large` | 413 | The secret value exceeds `max_secret_bytes` (1 MiB default); the HTTP read cap is `max_secret_bytes + 16 KiB` to leave room for JSON overhead |
 | `not_configured` | 501 | `AUTH_MODE=full` route, unimplemented feature |
-| `service_unavailable` | 503 | Redis is unreachable. Temporary; the response carries `Retry-After` and the request can be retried once storage is back |
+| `service_unavailable` | 503 | Redis is unreachable or at maxmemory. Temporary; the response carries `Retry-After` and the request can be retried once storage has capacity |
 | `internal_error` | 500 | Crypto failure or an unexpected bug; generic message only |
 
 ## 2. Public configuration
@@ -62,7 +97,7 @@ requests must send `Content-Type: application/json`. v1 accepts
 
 | Route | Response |
 | --- | --- |
-| `GET /health` | `200 {"status":"ok","redis":"ok","version":"0.1.0"}` or `503 {"status":"degraded","redis":"error"}` |
+| `GET /health` | `200 {"status":"ok","redis":"ok","version":"0.1.0"}` or `503 {"status":"degraded","redis":"error","version":"0.1.0"}` |
 | `GET /api/v3/health` | Same body, API-shaped |
 
 Health checks must not reveal Redis URL, keyspace size, or configuration values.
@@ -71,13 +106,21 @@ Health checks must not reveal Redis URL, keyspace size, or configuration values.
 
 | Route | Response |
 | --- | --- |
-| `GET /metrics` | `200` Prometheus text exposition, or `404` when `METRICS_ENABLED` is off (default) |
+| `GET /metrics` | `200` Prometheus text exposition, or `404` when `METRICS_ENABLED` is off (default) or the scrape token is missing/wrong |
 
-Disabled by default because the series reveal traffic volume. Series:
-`onetime_up`, `onetime_redis_up`, `onetime_version_info`,
+Disabled by default because the series reveal traffic volume. When enabled, a
+**bearer token is mandatory**: send `Authorization: Bearer <METRICS_TOKEN>` (at least
+32 bytes). A missing or wrong token returns the same uniform `404`; more than
+`RATE_LIMIT_METRICS_AUTH` failures per window return `429`. Configure the scrape
+target with that header — Prometheus supports `authorization` in `scrape_configs`.
+The exact build version is deliberately not published in the exposition.
+
+Series:
+`onetime_up`, `onetime_redis_up`,
 `onetime_requests_total{family,status}`, `onetime_errors_total`,
 `onetime_request_duration_seconds_{sum,count}{family}`, and
-`onetime_redis_memory_{used_bytes,max_bytes,used_ratio}`.
+`onetime_redis_memory_{used_bytes,max_bytes,used_ratio}`, and
+`onetime_best_effort_failures_total{operation}` where `operation` is `cleanup`, `audit` or `other`.
 
 `family` is a fixed, bounded label (`health`, `metrics`, `web`, `api_v1`,
 `api_v3_guest`, `api_v3`, `other`) — never a secret key or raw path. Counters are
@@ -94,7 +137,7 @@ Form-encoded, anonymous, no session. Rate limits still apply (per IP).
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `secret` | string | yes | 1 byte – 1 MiB |
-| `passphrase` | string | no | 8–256 chars; an empty string means no passphrase (D-014) |
+| `passphrase` | string | no | 8–256 bytes; an empty string means no passphrase (D-014) |
 | `ttl` | integer | no | Must be in `TTL_OPTIONS`; default `DEFAULT_TTL` |
 
 `200`:
@@ -142,6 +185,18 @@ Both form-encoded and JSON bodies are accepted; JSON must send
 
 Guest routes work with `AUTH_MODE=disabled|simple`. Authenticated routes set an owner and
 require a session.
+
+Three cross-cutting properties of the v3 surface:
+
+- **Creates are not idempotent.** Retrying a timed-out `POST` (conceal, request, webhook)
+  creates a second resource and spends another rate-limit slot. Deduplicate on the returned
+  `secret_key`/`request_key`/`id`. Webhook *deliveries* are idempotent by `delivery id`, which
+  is a separate guarantee.
+- **List endpoints are fixed slices**, not paginated: receipts, incoming requests and webhook
+  endpoints return at most the newest 50, and support no `page`/`per_page`/filter parameters.
+  Do not treat a short list as the complete set.
+- **Secrets are not end-to-end encrypted.** The passphrase is an access gate checked by the
+  server before the atomic delete; the server can decrypt revealed values (D-012).
 
 ### 5.1 Conceal
 
@@ -250,6 +305,7 @@ Errors (on the `reveal` POST):
 
 - `401 passphrase_required` — no passphrase sent; the secret still exists.
 - `401 invalid_passphrase` — wrong passphrase; the secret still exists.
+- `422 validation_error` — non-string or over-256-byte passphrase; no guess is spent.
 - `404 not_found` — unknown, expired, or already consumed (indistinguishable by design).
 - `429 rate_limited`.
 
@@ -257,13 +313,27 @@ The record is consumed **before** the response is sent, and only after the passp
 check and the decryption have succeeded — a wrong passphrase, a rotated `SECRET` or a
 corrupt record leaves it intact (D-013). The response is `no-store`.
 If the request carries a valid session, the owner receipt is created on either conceal
-route and is removed from the owner index by the same atomic reveal.
+route. Reveal permanently deletes the payload with the atomic consume; the receipt stays as
+`revealed` with non-sensitive metadata for 30 days (D-017). A public `GET` preview marks it
+`previewed` without consuming or decrypting anything, and cannot downgrade a terminal
+status.
+
+**Owner burn (D-017):** `DELETE /api/v3/secret/:key` destroys an unrevealed secret without
+returning it. It requires a session and CSRF/origin proof, is rate-limited by
+`RATE_LIMIT_BURN` (default 10 per `RATE_LIMIT_WINDOW`), and is owner-scoped — a foreign or
+unknown key answers the same `404`. Success is
+`200 {"ok":true,"metadata":{"identifier":"…","status":"burned"}}`; the payload is gone, the
+receipt becomes `burned` with the same 30-day retention, and a replay is `404`. No plaintext
+or bearer key appears in the response, audit stream, or logs; the audit event is
+`secret.burned`.
 
 ### 5.3 Incoming secret requests (simple mode)
 
 An owner creates a public link; anyone with the link sends **one** secret; the owner opens
 that answer once. Creation, listing and reveal require a session; preview and respond are
-public. Requests need `AUTH_MODE=simple` (they return `403`/`501` like other owner routes).
+public capabilities (C2) and work in the default `AUTH_MODE=disabled` — they are rate-limited
+(`:reveal` for preview, `:respond` for answering), validated, and accept only one answer via
+`SET NX`. Only owner-side creation/listing/reveal need `AUTH_MODE=simple`.
 
 | Route | Auth | Body | Success |
 | --- | --- | --- | --- |
@@ -291,13 +361,16 @@ All return `403 forbidden` when `AUTH_MODE=disabled`, `501 not_configured` when 
 | `POST /api/v3/signin` | `{"email":"...","password":"..."}` | `200` same customer body, sets cookie |
 | `POST /api/v3/signout` | `{}` | `200 {"ok":true}`, clears cookie and deletes the session key |
 | `GET /api/v3/account/me` | — | `200 {"customer":{...}}` or `401 unauthorized` |
-| `GET /api/v3/account/receipts` | — | `200 {"receipts":[{identifier,secret_ttl,created_at,passphrase_required,kind,secret_url}]}` (newest 50, stale entries pruned) |
+| `GET /api/v3/account/receipts` | — | `200 {"receipts":[{identifier,secret_ttl,created_at,passphrase_required,kind,status,secret_url}]}` (newest 50, stale entries pruned; `status` is `new\|previewed\|revealed\|burned`) |
 | `POST /api/v3/account/password` | `{"current_password":"...","new_password":"..."}` | `200 {"ok":true}`; wrong current password is `401 invalid_credentials` |
 | `DELETE /api/v3/account` | `{"password":"..."}` | `200 {"ok":true}`, clears the cookie and removes the customer record, its email index, every session and every receipt. A wrong password is `401 invalid_credentials` and deletes nothing. Secrets still inside their TTL keep working for their recipients until they expire |
 
-Signup and sign-in share the `RATE_LIMIT_SIGNIN` limit (default 10 per window). Duplicate
-emails return `409 email_taken`. Email lookup is case-insensitive and normalized; raw
-emails are never written into Redis keys.
+Signup and sign-in use separate buckets (`RATE_LIMIT_SIGNUP` and `RATE_LIMIT_SIGNIN`,
+each default 10 per window) so a burst in one flow cannot lock out the other. Webhook
+creation/deletion, password change, account deletion, signout and request creation also
+have their own `RATE_LIMIT_*` settings; every limited response carries `429`, `Retry-After`
+and `X-RateLimit-*`. Duplicate emails return `409 email_taken`. Email lookup is
+case-insensitive and normalized; raw emails are never written into Redis keys.
 
 Login failures are always `401 {"error":{"code":"invalid_credentials"}}`; do not reveal
 whether the email exists. Passwords/tokens never appear in responses or logs.
@@ -311,8 +384,8 @@ dashboard shows.
 | Route | Auth | Body | Success |
 | --- | --- | --- | --- |
 | `POST /api/v3/webhooks` | session + CSRF proof | `{"url":"https://hooks.example.com/ots","events":["secret.revealed"]}` | `201` with `id`, `url`, `events`, `enabled`, `created_at` and `signing_secret` (**returned once**) |
-| `GET /api/v3/webhooks` | session | — | `200 {"webhooks":[…]}` — never includes `signing_secret` |
-| `GET /api/v3/webhooks/:id/deliveries` | session | — | `200 {"deliveries":[{id,event,status,attempts,response_code,created_at}]}` |
+| `GET /api/v3/webhooks` | session | — | `200 {"webhooks":[…]}` — newest 50, never includes `signing_secret` |
+| `GET /api/v3/webhooks/:id/deliveries` | session | — | `200 {"deliveries":[{id,event,status,attempts,response_code,created_at}]}`; only that endpoint's deliveries, `404` for an unknown/foreign id (B8) |
 | `DELETE /api/v3/webhooks/:id` | session + CSRF proof | — | `200 {"ok":true}` |
 
 Event names: `secret.created`, `secret.revealed`, `request.created`, `request.responded`,
@@ -349,7 +422,12 @@ SSO/MFA, and v2 are **out of scope** until [TASKS.md](TASKS.md) Phase 5:
 clients; there is no committed copy to drift out of date. A spec asserts that every
 documented path is actually mounted and every `$ref` resolves, and the document must only
 describe implemented routes — deferred routes are omitted, not stubbed. Every
-Redis-backed route documents `503 service_unavailable` alongside its own codes.
+Redis-backed route documents `503 service_unavailable`, including the incoming-request
+operations and the webhook list; the webhook delivery listing also documents `404` for a foreign
+or unknown endpoint id. `/api/v3/openapi.json` is authoritative. Frozen v1
+error responses reference the legacy `{"message":...}` envelope (including 429 and 503), and
+v1 share documents both JSON and form bodies; the mount gate detects the generic catch-all
+404 body by code and message, with a bogus-path negative control proving the gate has teeth.
 
 ## 8. Examples
 

@@ -7,9 +7,15 @@
     "test:accounts": "node accounts.mjs",
     "test:file": "node file.mjs",
     "test:requests": "node requests.mjs",
-    "test:webhooks": "node webhooks.mjs"
+    "test:webhooks": "node webhooks.mjs",
+    "test:states": "node states.mjs",
+    "test:a11y": "node a11y.mjs",
+    "test:mobile": "node mobile.mjs"
   },
   "dependencies": {
     "puppeteer-core": "^24.10.0"
+  },
+  "devDependencies": {
+    "axe-core": "^4.14.1"
   }
 }

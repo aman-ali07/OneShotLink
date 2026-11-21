@@ -1,19 +1,27 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { accountsEnabled } from "@/lib/authMode";
+import { copyText } from "@/lib/clipboard";
+import { defaultTtl, ttlOptions } from "@/lib/config";
+import { dateTimeLabel, ttlLabel } from "@/lib/format";
 import AppAlert from "@/components/AppAlert.vue";
 import AppButton from "@/components/AppButton.vue";
+import CopyButton from "@/components/CopyButton.vue";
 import {
   ApiError,
+  burnSecret,
   changePassword,
   createRequest,
   createWebhook,
   deleteWebhook,
   deleteAccount,
   errorMessage,
+  type Delivery,
   getAccount,
   listReceipts,
   listRequests,
+  listWebhookDeliveries,
   listWebhooks,
   revealRequest,
   signOut,
@@ -31,16 +39,26 @@ const WEBHOOK_EVENTS = [
   "request.revealed",
 ] as const;
 
+const accountsOn = ref(true);
 const customer = ref<Customer | null>(null);
 const receipts = ref<Receipt[]>([]);
 const requests = ref<RequestItem[]>([]);
 const requestLabel = ref("");
+// Both come from /api/v3/config in onMounted; never hardcode an operator's TTL allowlist.
 const requestTtl = ref(86400);
+const requestTtlOptions = ref<number[]>([]);
 const creatingRequest = ref(false);
 const requestError = ref("");
+const requestNote = ref("");
+const requestNoteTone = ref<"success" | "danger">("success");
 const revealedRequest = ref<{ value: string; label: string } | null>(null);
 const revealingKey = ref("");
+const burningKey = ref("");
+const receiptError = ref("");
+const receiptNote = ref("");
 const webhooks = ref<Webhook[]>([]);
+const deliveries = ref<Record<string, Delivery[]>>({});
+const loadingDeliveries = ref("");
 const hookUrl = ref("");
 const hookEvents = ref<string[]>(["secret.revealed"]);
 const addingHook = ref(false);
@@ -48,9 +66,15 @@ const hookError = ref("");
 const newSigningSecret = ref("");
 const loading = ref(true);
 const unauthenticated = ref(false);
+// AUTH_MODE=full is deliberately unimplemented (501). It is permanent, so it
+// gets an honest "unavailable" panel instead of a retry that can never work.
+const unavailable = ref("");
 const error = ref("");
+const confirmHookId = ref("");
+const confirmDelete = ref(false);
 const actionError = ref("");
 const actionNote = ref("");
+const deliveryError = ref("");
 const currentPassword = ref("");
 const newPassword = ref("");
 const changing = ref(false);
@@ -61,21 +85,25 @@ const activeCount = computed(() => receipts.value.length);
 const protectedCount = computed(() => receipts.value.filter((r) => r.passphrase_required).length);
 
 function formatDate(seconds?: number): string {
-  if (!seconds) return "";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(seconds * 1000),
-  );
+  return seconds ? dateTimeLabel(seconds) : "";
 }
 
-function ttlLabel(seconds: number): string {
-  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)} h`;
-  return `${Math.round(seconds / 86400)} d`;
+// A session can expire while the dashboard is open. Route every action's 401
+// to a fresh sign-in instead of leaving a dead view with a raw error string.
+function handleActionError(cause: unknown): string {
+  if (cause instanceof ApiError && cause.status === 401 && cause.code === "unauthorized") {
+    customer.value = null;
+    unauthenticated.value = true;
+    void router.push({ path: "/signin", query: { redirect: "/dashboard" } });
+    return "";
+  }
+  return errorMessage(cause);
 }
 
 async function load() {
   loading.value = true;
   error.value = "";
+  unavailable.value = "";
   try {
     const [account, list, incoming, hooks] = await Promise.all([
       getAccount(),
@@ -88,7 +116,12 @@ async function load() {
     requests.value = incoming.requests;
     webhooks.value = hooks.webhooks;
   } catch (cause) {
-    if (cause instanceof ApiError && cause.status === 401) {
+    // 401 = signed out; 403 = accounts disabled (every account route refuses).
+    // Both must render the honest "accounts are off / sign in" panel, not a
+    // generic retry screen.
+    if (cause instanceof ApiError && cause.status === 501) {
+      unavailable.value = "Accounts are not configured on this instance. Sharing still needs no account.";
+    } else if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
       unauthenticated.value = true;
     } else {
       error.value = errorMessage(cause);
@@ -102,20 +135,26 @@ function requestLink(key: string): string {
   return new URL(`/request/${key}`, window.location.origin).toString();
 }
 
-function copyRequestLink(key: string) {
-  void navigator.clipboard?.writeText(requestLink(key));
+async function copyRequestLink(key: string): Promise<boolean> {
+  return copyText(requestLink(key));
 }
 
 async function createIncomingRequest() {
   requestError.value = "";
+  requestNote.value = "";
+  requestNoteTone.value = "success";
   creatingRequest.value = true;
   try {
     const created = await createRequest(requestLabel.value, requestTtl.value);
     requestLabel.value = "";
     await load();
-    copyRequestLink(created.request_key);
+    const copied = await copyRequestLink(created.request_key);
+    requestNoteTone.value = copied ? "success" : "danger";
+    requestNote.value = copied
+      ? "Link created and copied. Give it to the person who owes you a secret."
+      : "Copy failed — link created. Use the Copy link button in the list below.";
   } catch (cause) {
-    requestError.value = errorMessage(cause);
+    requestError.value = handleActionError(cause);
   } finally {
     creatingRequest.value = false;
   }
@@ -129,9 +168,54 @@ async function openIncoming(item: RequestItem) {
     revealedRequest.value = { value: result.secret_value, label: item.label };
     await load();
   } catch (cause) {
-    requestError.value = errorMessage(cause);
+    requestError.value = handleActionError(cause);
   } finally {
     revealingKey.value = "";
+  }
+}
+
+// The status field is the owner-side record of what happened to a link. It lets
+// the dashboard show "already viewed"/"burned" instead of a meaningless row.
+function receiptStatus(receipt: Receipt): string {
+  return receipt.status ?? "new";
+}
+
+const TERMINAL_STATUSES = ["revealed", "burned"];
+
+async function burnLink(receipt: Receipt) {
+  if (!window.confirm("Destroy this secret now? The link stops working immediately and cannot be undone.")) {
+    return;
+  }
+  burningKey.value = receipt.identifier;
+  receiptError.value = "";
+  receiptNote.value = "";
+  try {
+    await burnSecret(receipt.identifier);
+    receiptNote.value = "Secret destroyed. The link no longer works.";
+    await load();
+  } catch (cause) {
+    receiptError.value = handleActionError(cause);
+  } finally {
+    burningKey.value = "";
+  }
+}
+
+async function toggleDeliveries(id: string) {
+  if (deliveries.value[id]) {
+    const next = { ...deliveries.value };
+    delete next[id];
+    deliveries.value = next;
+    return;
+  }
+  deliveryError.value = "";
+  loadingDeliveries.value = id;
+  try {
+    const result = await listWebhookDeliveries(id);
+    deliveries.value = { ...deliveries.value, [id]: result.deliveries };
+  } catch (cause) {
+    deliveryError.value = handleActionError(cause);
+  } finally {
+    loadingDeliveries.value = "";
   }
 }
 
@@ -148,24 +232,27 @@ async function addHook() {
     hookUrl.value = "";
     await load();
   } catch (cause) {
-    hookError.value = errorMessage(cause);
+    hookError.value = handleActionError(cause);
   } finally {
     addingHook.value = false;
   }
 }
 
 async function removeHook(id: string) {
+  // Two-step confirmation: removing a webhook discards its signing secret.
+  if (confirmHookId.value !== id) {
+    confirmHookId.value = id;
+    hookError.value = "";
+    return;
+  }
+  confirmHookId.value = "";
   hookError.value = "";
   try {
     await deleteWebhook(id);
     await load();
   } catch (cause) {
-    hookError.value = errorMessage(cause);
+    hookError.value = handleActionError(cause);
   }
-}
-
-function copyText(value: string) {
-  void navigator.clipboard?.writeText(value);
 }
 
 function toggleHookEvent(event: string) {
@@ -200,7 +287,7 @@ async function updatePassword() {
     newPassword.value = "";
     actionNote.value = "Password updated.";
   } catch (cause) {
-    actionError.value = errorMessage(cause);
+    actionError.value = handleActionError(cause);
   } finally {
     changing.value = false;
   }
@@ -213,20 +300,46 @@ async function removeAccount() {
     actionError.value = "Enter your password to delete the account.";
     return;
   }
+  if (!confirmDelete.value) {
+    confirmDelete.value = true;
+    actionNote.value = "Press again to permanently delete this account, its sessions and its receipts.";
+    return;
+  }
 
   deleting.value = true;
   try {
     await deleteAccount({ password: deletePassword.value });
     await router.push("/");
   } catch (cause) {
-    actionError.value = errorMessage(cause);
+    actionError.value = handleActionError(cause);
   } finally {
     deleting.value = false;
     deletePassword.value = "";
   }
 }
 
-onMounted(load);
+onMounted(async () => {
+  accountsOn.value = await accountsEnabled();
+  try {
+    const [options, configuredDefault] = await Promise.all([ttlOptions(), defaultTtl()]);
+    requestTtlOptions.value = options;
+    requestTtl.value = options.includes(configuredDefault) ? configuredDefault : (options[0] ?? 86400);
+  } catch {
+    // Keep the documented defaults when /config is unavailable.
+  }
+  await load();
+});
+
+onBeforeUnmount(() => {
+  // Revealed answers, signing secrets and passwords must not outlive the view.
+  revealedRequest.value = null;
+  newSigningSecret.value = "";
+  currentPassword.value = "";
+  newPassword.value = "";
+  deletePassword.value = "";
+  confirmDelete.value = false;
+  confirmHookId.value = "";
+});
 </script>
 
 <template>
@@ -243,21 +356,25 @@ onMounted(load);
 
     <section v-else-if="unauthenticated" class="ots-panel mx-auto max-w-md space-y-5 p-8">
       <p class="ots-eyebrow">Account</p>
-      <h1 class="text-3xl font-bold tracking-tight">Your account</h1>
-      <AppAlert>Sign in to see the secret links you have created.</AppAlert>
-      <div class="flex flex-wrap gap-3">
+      <h1 class="ots-title-compact">Your account</h1>
+      <AppAlert v-if="accountsOn">Sign in to see the secret links you have created.</AppAlert>
+      <AppAlert v-else tone="success">
+        Accounts are off on this instance. Sharing needs no account — create a link instead.
+      </AppAlert>
+      <div v-if="accountsOn" class="flex flex-wrap gap-3">
         <AppButton @click="router.push({ path: '/signin', query: { redirect: '/dashboard' } })">
           Sign in
         </AppButton>
         <AppButton variant="secondary" @click="router.push('/signup')">Create account</AppButton>
       </div>
+      <AppButton v-else @click="router.push('/')">Create a link</AppButton>
     </section>
 
     <template v-else-if="customer">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="space-y-2">
           <p class="ots-eyebrow">Account / Overview</p>
-          <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Your account</h1>
+          <h1 class="ots-title">Your account</h1>
           <p class="text-muted">Signed in as {{ customer.email }}</p>
         </div>
         <AppButton variant="secondary" @click="logout">Sign out</AppButton>
@@ -267,7 +384,7 @@ onMounted(load);
 
       <div class="grid gap-3 sm:grid-cols-3">
         <div class="ots-panel p-5">
-          <p class="text-xs text-muted">Active links</p>
+          <p class="text-xs text-muted">Links created</p>
           <p class="mt-2 text-2xl font-semibold text-text">{{ activeCount }}</p>
         </div>
         <div class="ots-panel p-5">
@@ -294,8 +411,11 @@ onMounted(load);
             </p>
           </div>
 
+          <AppAlert v-if="receiptError" tone="danger">{{ receiptError }}</AppAlert>
+          <AppAlert v-if="receiptNote" tone="success">{{ receiptNote }}</AppAlert>
+
         <p v-if="receipts.length === 0" class="rounded-md border border-border bg-surface p-4 text-sm text-muted">
-          No active links. Create one from the home page.
+          No links yet. <RouterLink to="/" class="font-semibold text-accent hover:underline">Create one from the home page</RouterLink>.
         </p>
 
         <ul v-else class="divide-y divide-border rounded-md border border-border bg-surface">
@@ -312,7 +432,23 @@ onMounted(load);
                 <template v-if="receipt.created_at">· Created {{ formatDate(receipt.created_at) }}</template>
                 <template v-if="receipt.passphrase_required">· Passphrase required</template>
               </p>
+              <p class="text-xs font-semibold" :class="TERMINAL_STATUSES.includes(receiptStatus(receipt)) ? 'text-muted' : 'text-accent'">
+                {{
+                  receiptStatus(receipt) === 'revealed' ? 'Already viewed — destroyed' :
+                  receiptStatus(receipt) === 'burned' ? 'Destroyed by you' :
+                  receiptStatus(receipt) === 'previewed' ? 'Link opened, not yet viewed' : 'Waiting to be opened'
+                }}
+              </p>
             </div>
+            <AppButton
+              v-if="!TERMINAL_STATUSES.includes(receiptStatus(receipt))"
+              type="button"
+              variant="danger"
+              :loading="burningKey === receipt.identifier"
+              @click="burnLink(receipt)"
+            >
+              {{ burningKey === receipt.identifier ? 'Destroying…' : 'Destroy now' }}
+            </AppButton>
           </li>
         </ul>
         </div>
@@ -340,6 +476,7 @@ onMounted(load);
                 v-model="requestLabel"
                 type="text"
                 maxlength="120"
+                required
                 class="ots-inset w-full px-3 py-2.5 text-sm"
                 placeholder="e.g. Your API key"
               />
@@ -347,7 +484,7 @@ onMounted(load);
             <div class="space-y-2">
               <label for="request-ttl" class="block text-sm font-semibold">Expires</label>
               <select id="request-ttl" v-model.number="requestTtl" class="ots-inset px-3 py-2.5 text-sm">
-                <option v-for="option in [1800, 43200, 86400, 259200]" :key="option" :value="option">
+                <option v-for="option in requestTtlOptions" :key="option" :value="option">
                   {{ ttlLabel(option) }}
                 </option>
               </select>
@@ -356,10 +493,12 @@ onMounted(load);
           </form>
 
           <AppAlert v-if="requestError" tone="danger">{{ requestError }}</AppAlert>
+          <AppAlert v-if="requestNote" :tone="requestNoteTone">{{ requestNote }}</AppAlert>
 
           <div v-if="revealedRequest" class="ots-inset space-y-3 p-4" aria-live="polite">
             <p class="text-sm font-semibold">Secret for {{ revealedRequest.label }}</p>
             <pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-sm">{{ revealedRequest.value }}</pre>
+            <CopyButton :text="revealedRequest.value" label="Copy answer" />
             <AppButton variant="secondary" type="button" @click="revealedRequest = null">Done</AppButton>
           </div>
 
@@ -375,9 +514,7 @@ onMounted(load);
                 </p>
               </div>
               <div class="flex flex-wrap gap-2">
-                <AppButton variant="secondary" type="button" @click="copyRequestLink(item.request_key)">
-                  Copy link
-                </AppButton>
+                <CopyButton :text="requestLink(item.request_key)" label="Copy link" />
                 <AppButton
                   v-if="item.fulfilled"
                   type="button"
@@ -422,9 +559,10 @@ onMounted(load);
             <fieldset class="space-y-2">
               <legend class="text-sm font-semibold">Events</legend>
               <div class="flex flex-wrap gap-3">
-                <label v-for="event in WEBHOOK_EVENTS" :key="event" class="flex items-center gap-2 text-xs text-muted">
+                <label v-for="event in WEBHOOK_EVENTS" :key="event" class="flex min-h-11 items-center gap-2 text-xs text-muted">
                   <input
                     type="checkbox"
+                    class="h-5 w-5"
                     :checked="hookEvents.includes(event)"
                     @change="toggleHookEvent(event)"
                   />
@@ -436,12 +574,13 @@ onMounted(load);
           </form>
 
           <AppAlert v-if="hookError" tone="danger">{{ hookError }}</AppAlert>
+          <AppAlert v-if="deliveryError" tone="danger">{{ deliveryError }}</AppAlert>
 
           <div v-if="newSigningSecret" class="ots-inset space-y-3 p-4" aria-live="polite">
             <p class="text-sm font-semibold">Copy this signing secret now</p>
             <p class="break-all font-mono text-xs text-text">{{ newSigningSecret }}</p>
             <div class="flex gap-2">
-              <AppButton type="button" variant="secondary" @click="copyText(newSigningSecret)">Copy secret</AppButton>
+              <CopyButton :text="newSigningSecret" label="Copy secret" />
               <AppButton type="button" variant="secondary" @click="newSigningSecret = ''">Done</AppButton>
             </div>
             <p class="text-xs text-muted">It is encrypted in Redis and is not shown again.</p>
@@ -451,12 +590,32 @@ onMounted(load);
             No endpoints yet. Add one to receive lifecycle events.
           </p>
           <ul v-else class="divide-y divide-border rounded-md border border-border bg-surface">
-            <li v-for="hook in webhooks" :key="hook.id" class="flex flex-wrap items-center justify-between gap-3 p-4">
-              <div class="min-w-0 space-y-1">
-                <p class="break-all font-mono text-sm text-text">{{ hook.url }}</p>
-                <p class="text-xs text-muted">{{ hook.events.join(' · ') }}</p>
+            <li v-for="hook in webhooks" :key="hook.id" class="space-y-3 p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="min-w-0 space-y-1">
+                  <p class="break-all font-mono text-sm text-text">{{ hook.url }}</p>
+                  <p class="text-xs text-muted">{{ hook.events.join(' · ') }}</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <AppButton type="button" variant="secondary" :loading="loadingDeliveries === hook.id"
+                             @click="toggleDeliveries(hook.id)">
+                    {{ deliveries[hook.id] ? 'Hide deliveries' : 'View deliveries' }}
+                  </AppButton>
+                  <AppButton type="button" variant="danger" @click="removeHook(hook.id)">
+                    {{ confirmHookId === hook.id ? "Confirm remove" : "Remove" }}
+                  </AppButton>
+                </div>
               </div>
-              <AppButton type="button" variant="danger" @click="removeHook(hook.id)">Remove</AppButton>
+              <div v-if="deliveries[hook.id]" class="ots-inset p-3" aria-live="polite">
+                <p v-if="deliveries[hook.id]!.length === 0" class="text-xs text-muted">No deliveries yet.</p>
+                <ul v-else class="divide-y divide-border">
+                  <li v-for="delivery in deliveries[hook.id]" :key="delivery.id" class="flex flex-wrap justify-between gap-2 py-2 text-xs">
+                    <span class="font-mono text-text">{{ delivery.event }}</span>
+                    <span class="text-muted">{{ delivery.status }} · {{ delivery.attempts }} attempt(s) ·
+                      {{ delivery.response_code ?? '—' }} · {{ dateTimeLabel(delivery.created_at) }}</span>
+                  </li>
+                </ul>
+              </div>
             </li>
           </ul>
         </div>
@@ -517,11 +676,27 @@ onMounted(load);
             />
           </div>
           <AppButton type="submit" variant="danger" :loading="deleting">
-            {{ deleting ? "Deleting…" : "Delete my account" }}
+            {{ deleting ? "Deleting…" : confirmDelete ? "Confirm deletion" : "Delete my account" }}
           </AppButton>
         </form>
       </section>
       </div>
     </template>
+
+    <section v-else-if="unavailable" class="ots-panel mx-auto max-w-md space-y-5 p-8">
+      <p class="ots-eyebrow">Account</p>
+      <h1 class="ots-title-compact">Accounts unavailable</h1>
+      <AppAlert tone="danger">{{ unavailable }}</AppAlert>
+      <AppButton variant="secondary" @click="router.push('/')">Share a secret instead</AppButton>
+    </section>
+
+    <section v-else class="ots-panel mx-auto max-w-md space-y-5 p-8">
+      <p class="ots-eyebrow">Account</p>
+      <h1 class="ots-title-compact">Your account</h1>
+      <AppAlert tone="danger">
+        {{ error || "Your account could not be loaded. Try again." }}
+      </AppAlert>
+      <AppButton @click="load()">Try again</AppButton>
+    </section>
   </div>
 </template>

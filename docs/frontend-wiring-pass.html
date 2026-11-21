@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OneShotLink — frontend wiring pass</title>
+<style>
+  :root{
+    --ink:#1d2430; --ink-2:#4a5566; --ink-3:#8a94a4; --line:#e3e7ee; --line-faint:#eef1f5;
+    --surface:#fff; --canvas:#f7f8fa; --accent:#0f766e; --accent-soft:#e8f4f2;
+    --ok:#1f7a4d; --ok-soft:#e7f5ec; --warn:#a8620a; --warn-soft:#fdf1e2;
+  }
+  *{box-sizing:border-box} html,body{margin:0;background:#fff}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .stage{position:relative;width:1030px;height:560px;overflow:hidden}
+  /* One window, cropped hard: it fills most of the stage and runs off the bottom. */
+  .window{position:absolute;left:56px;top:30px;width:790px;height:640px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(25,35,55,.14);overflow:hidden}
+  .chrome{height:38px;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--line);background:#fcfcfd}
+  .dots{display:flex;gap:6px}.dot{width:9px;height:9px;border-radius:50%;background:#d8dde5}
+  .crumb{font-size:12px;color:var(--ink-3)} .crumb b{color:var(--ink);font-weight:600}
+  .pill{width:88px;height:20px;border-radius:6px;background:#eef1f5;margin-left:auto}
+  .shell{display:flex;height:600px}
+  .rail{width:152px;flex:none;border-right:1px solid var(--line-faint);padding:16px 12px;background:#fcfcfd}
+  .brand{font-size:12px;font-weight:650;margin:0 0 18px 6px}
+  .rail-item{height:30px;border-radius:6px;margin:4px 0;display:flex;align-items:center;padding:0 10px;font-size:12px;color:var(--ink-3)}
+  .rail-item.on{background:var(--accent-soft);color:var(--accent);font-weight:650}
+  .main{flex:1;min-width:0;padding:22px 24px}
+  .head{display:flex;align-items:baseline;margin-bottom:18px}
+  .title{font-size:17px;font-weight:650;letter-spacing:-.02em}.sub{font-size:12px;color:var(--ink-3);margin-left:10px}
+  .tabbar{display:flex;gap:20px;border-bottom:1px solid var(--line);margin-bottom:16px}
+  .tab{font-size:12px;color:var(--ink-3);padding-bottom:9px}.tab.on{color:var(--accent);font-weight:650;border-bottom:2px solid var(--accent)}
+  .stat{font-size:12px;color:var(--ink-2);margin-bottom:10px}.stat b{color:var(--ink)}
+  .th,.row{display:grid;grid-template-columns:1fr 132px 90px;align-items:center;gap:12px;max-width:600px}
+  .th{height:26px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--line)}
+  .row{height:56px;border-bottom:1px solid var(--line-faint)}
+  .link{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink)}
+  .bar{height:7px;border-radius:4px;background:#e7ebf1}.bar.w90{width:90%}.bar.w72{width:72%}.bar.w80{width:80%}
+  .status{font-size:11px;font-weight:600;padding:4px 8px;border-radius:999px;white-space:nowrap;text-align:center}
+  .st-viewed{color:var(--ink-2);background:#eef1f5}.st-live{color:var(--ok);background:var(--ok-soft)}
+  .burn{font-size:11px;font-weight:650;color:var(--warn);background:var(--warn-soft);border-radius:6px;height:26px;line-height:26px;text-align:center}
+  .burn.off{color:var(--ink-3);background:#f4f6f8}
+  /* The satellite is a second, smaller object straddling the hero's edge. */
+  .sat{position:absolute;right:28px;bottom:26px;width:250px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(25,35,55,.18);padding:16px 18px 12px}
+  .sat-title{font-size:12px;font-weight:650;margin-bottom:4px}.sat-sub{font-size:11px;color:var(--ink-3);margin-bottom:11px}
+  .sat-line{display:flex;align-items:center;gap:9px;height:26px;font-size:12px;color:var(--ink-2)}
+  .sat-line .mk{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+  .sat-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-faint);margin-top:9px;padding-top:10px;font-size:11px;color:var(--ink-3)}
+  .sat-foot b{color:var(--ink);font-size:11px}
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="window">
+      <div class="chrome">
+        <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span class="crumb"><b>OneShotLink</b> / dashboard / receipts</span>
+        <span class="pill"></span>
+      </div>
+      <div class="shell">
+        <aside class="rail">
+          <p class="brand">OneShotLink</p>
+          <div class="rail-item">Overview</div>
+          <div class="rail-item on">Links</div>
+          <div class="rail-item">Incoming</div>
+          <div class="rail-item">Webhooks</div>
+          <div class="rail-item">Security</div>
+        </aside>
+        <div class="main">
+          <div class="head"><span class="title">Your links</span><span class="sub">owner receipts · metadata only</span></div>
+          <div class="tabbar"><span class="tab on">Recent</span><span class="tab">Incoming</span><span class="tab">Webhooks</span></div>
+          <p class="stat"><b>3 recent links</b> · 1 passphrase gate · no plaintext stored</p>
+          <div class="th"><span>Link</span><span>Status</span><span>Action</span></div>
+          <div class="row">
+            <span class="bar w90"></span>
+            <span class="status st-viewed">Already viewed — destroyed</span>
+            <span class="burn off">Gone</span>
+          </div>
+          <div class="row">
+            <span class="bar w72"></span>
+            <span class="status st-viewed">Destroyed by you</span>
+            <span class="burn off">Gone</span>
+          </div>
+          <div class="row">
+            <span class="bar w80"></span>
+            <span class="status st-live">Waiting to be opened</span>
+            <span class="burn">Burn</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sat">
+      <div class="sat-title">Integration gate</div>
+      <div class="sat-sub">6 parallel reviews · every control wired</div>
+      <div class="sat-line"><span class="mk"></span>28 frontend tests green</div>
+      <div class="sat-line"><span class="mk"></span>5 journeys + 20 mobile checks</div>
+      <div class="sat-line"><span class="mk"></span>261 backend specs green</div>
+      <div class="sat-line"><span class="mk"></span>No mock data / dead controls</div>
+      <div class="sat-foot"><span>Public launch</span><b>NO-GO (T-70/71)</b></div>
+    </div>
+  </div>
+</body>
+</html>

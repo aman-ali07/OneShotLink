@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppAlert from "@/components/AppAlert.vue";
 import AppButton from "@/components/AppButton.vue";
 import { errorMessage, signUp } from "@/lib/api";
+import { accountsEnabled } from "@/lib/authMode";
 
 const email = ref("");
 const password = ref("");
@@ -11,11 +12,16 @@ const confirmation = ref("");
 const submitting = ref(false);
 const error = ref("");
 const router = useRouter();
+const available = ref(true);
+
+onMounted(async () => {
+  available.value = await accountsEnabled();
+});
 
 async function submit() {
   error.value = "";
   if (new TextEncoder().encode(password.value).length < 12) {
-    error.value = "Choose a password with at least 12 characters.";
+    error.value = "Choose a password with at least 12 bytes.";
     return;
   }
   if (password.value !== confirmation.value) {
@@ -41,13 +47,18 @@ async function submit() {
   <section class="ots-panel ots-enter mx-auto max-w-lg space-y-6 p-7 sm:p-9">
     <p class="ots-eyebrow">Account / Create</p>
     <div class="space-y-2">
-      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Create an account</h1>
+      <h1 class="ots-title">Create an account</h1>
       <p class="text-muted">
         Optional. You can share secrets without an account.
       </p>
     </div>
 
-    <form class="space-y-4" @submit.prevent="submit">
+    <AppAlert v-if="!available">
+      Accounts are off on this instance. You can create secret links without an account.
+      <RouterLink to="/" class="font-semibold underline underline-offset-2">Create a secret</RouterLink>
+    </AppAlert>
+
+    <form v-if="available" class="space-y-4" @submit.prevent="submit">
       <div class="space-y-2">
         <label for="email" class="block text-sm font-semibold">Email</label>
         <input
@@ -67,13 +78,12 @@ async function submit() {
           v-model="password"
           type="password"
           autocomplete="new-password"
-          minlength="12"
           maxlength="256"
           required
-          aria-describedby="password-help"
+          :aria-describedby="error ? 'password-help signup-error' : 'password-help'"
           class="w-full rounded-md border border-border-input bg-surface px-3 py-2 text-sm"
         />
-        <p id="password-help" class="text-xs text-muted">At least 12 characters.</p>
+        <p id="password-help" class="text-xs text-muted">At least 12 bytes.</p>
       </div>
 
       <div class="space-y-2">
@@ -84,11 +94,12 @@ async function submit() {
           type="password"
           autocomplete="new-password"
           required
+          :aria-describedby="error ? 'signup-error' : undefined"
           class="w-full rounded-md border border-border-input bg-surface px-3 py-2 text-sm"
         />
       </div>
 
-      <AppAlert v-if="error" tone="danger">{{ error }}</AppAlert>
+      <AppAlert v-if="error" id="signup-error" tone="danger">{{ error }}</AppAlert>
 
       <AppButton type="submit" :loading="submitting">
         {{ submitting ? "Creating account…" : "Create account" }}

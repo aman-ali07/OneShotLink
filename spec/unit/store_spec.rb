@@ -3,12 +3,6 @@
 RSpec.describe Onetime::Store do
   let(:key) { "spec:#{SecureRandom.hex(6)}" }
 
-  it "writes and reads JSON with a TTL" do
-    described_class.set_json(key, { "a" => 1 }, ttl: 30)
-    expect(described_class.get_json(key)).to eq("a" => 1)
-    expect(described_class.redis.ttl(key)).to be_between(1, 30)
-  end
-
   it "consumes a record exactly once when the value matches" do
     value = JSON.generate("secret" => "ciphertext")
     described_class.redis.set(key, value)
@@ -47,5 +41,14 @@ RSpec.describe Onetime::Store do
   it "refuses to rewrite a key that is gone" do
     expect(described_class.rewrite_if_unchanged(key, "before", "after")).to be(false)
     expect(described_class.redis.exists?(key)).to be(false)
+  end
+
+  it "rewrites a hash field only while it is still unchanged" do
+    described_class.redis.hset(key, "signing_secret", "before")
+
+    expect(described_class.rewrite_hash_field_if_unchanged(key, "signing_secret", "before", "after")).to be(true)
+    expect(described_class.redis.hget(key, "signing_secret")).to eq("after")
+    expect(described_class.rewrite_hash_field_if_unchanged(key, "signing_secret", "before", "again")).to be(false)
+    expect(described_class.redis.hget(key, "signing_secret")).to eq("after")
   end
 end

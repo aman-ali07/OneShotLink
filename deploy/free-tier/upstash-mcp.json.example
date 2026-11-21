@@ -1,0 +1,13 @@
+{
+  "$comment": "Template only — replace YOUR_DB and YOUR_REST_TOKEN with the real values from the Upstash console, then merge the 'mcp' object into ~/.config/opencode/opencode.json (which currently has no mcp key). Never commit real credentials. The OneShotLink Ruby app does NOT use these REST variables; it uses REDIS_URL=rediss://... and REDIS_PASSWORD in the Render/GitHub secret stores.",
+  "mcp": {
+    "upstash-redis": {
+      "type": "local",
+      "command": ["npx", "-y", "@upstash/redis-mcp"],
+      "environment": {
+        "UPSTASH_REDIS_REST_URL": "https://YOUR_DB.upstash.io",
+        "UPSTASH_REDIS_REST_TOKEN": "YOUR_REST_TOKEN"
+      }
+    }
+  }
+}

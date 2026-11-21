@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "securerandom"
+
 module Onetime
   module Web
     # Serve HEAD exactly like GET, then discard the body. Roda routes and the
@@ -18,7 +20,9 @@ module Onetime
         # unfurl/bot HEAD would therefore destroy the secret without ever
         # delivering it. HEAD must stay side-effect-free, so refuse it here.
         if env["PATH_INFO"].to_s.match?(%r{\A/api/v1/secret/.})
-          return [405, { "Allow" => "GET, POST" }, []]
+          # This middleware sits outside Roda, so its early return must carry
+          # the same hardening headers the app would have set on any response.
+          return [405, rejection_headers(env), []]
         end
 
         get_env = env.dup
@@ -26,6 +30,21 @@ module Onetime
         status, headers, body = @app.call(get_env)
         body.close if body.respond_to?(:close)
         [status, headers, []]
+      end
+
+      private
+
+      def rejection_headers(env)
+        env["onetime.request_id"] ||= SecureRandom.uuid
+        # Reuse the app's single canonical header set. Hand-listing headers here
+        # let the 405 silently lag the rest of the app when a header is added
+        # (SA-18); merging keeps every future header on this early return too.
+        Onetime::Web::App::HARDENING_HEADERS.merge(
+          "Allow" => "GET, POST",
+          "Content-Type" => "application/json; charset=utf-8",
+          "Cache-Control" => "no-store",
+          "X-Request-Id" => env["onetime.request_id"]
+        )
       end
     end
   end

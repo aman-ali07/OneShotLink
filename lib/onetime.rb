@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "logger"
+require "time" # Time#iso8601 in the log formatter; do not rely on transitive requires
 
 require_relative "onetime/version"
 require_relative "onetime/config"
@@ -9,9 +10,11 @@ require_relative "onetime/ids"
 require_relative "onetime/crypto"
 require_relative "onetime/password"
 require_relative "onetime/store"
+require_relative "onetime/migrate"
 require_relative "onetime/limiter"
 require_relative "onetime/audit"
 require_relative "onetime/backup"
+require_relative "onetime/cli_api"
 require_relative "onetime/metrics"
 require_relative "onetime/webhook"
 require_relative "onetime/models/customer"
@@ -20,6 +23,7 @@ require_relative "onetime/models/secret"
 require_relative "onetime/models/secret_request"
 require_relative "onetime/logic/conceal_secret"
 require_relative "onetime/logic/reveal_secret"
+require_relative "onetime/logic/burn_secret"
 require_relative "onetime/logic/sign_up"
 require_relative "onetime/logic/sign_in"
 require_relative "onetime/logic/delete_account"

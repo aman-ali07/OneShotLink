@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OneShotLink — final QA acceptance posture</title>
+<style>
+  :root { --ink:#1d2430; --ink-2:#4a5566; --ink-3:#8a94a4; --line:#e3e7ee; --line-faint:#eef1f5;
+          --surface:#fff; --accent:#0f766e; --accent-soft:#e7f5f2; --ok:#1f7a4d; --ok-soft:#e7f5ec; }
+  * { box-sizing:border-box; } html, body { margin:0; background:#fff; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
+  .stage { position:relative; width:1030px; height:560px; overflow:hidden; }
+  .window { position:absolute; left:54px; top:32px; width:726px; height:520px; background:var(--surface);
+            border:1px solid var(--line); border-radius:12px; box-shadow:0 18px 50px rgba(25,35,55,.14); overflow:hidden; }
+  .chrome { height:38px; display:flex; align-items:center; gap:12px; padding:0 14px; border-bottom:1px solid var(--line); background:#fcfcfd; }
+  .dots { display:flex; gap:6px; } .dot { width:9px; height:9px; border-radius:50%; background:#d8dde5; }
+  .crumb { font-size:12px; color:var(--ink-3); }
+  .main { padding:26px 28px; }
+  .eyebrow { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); }
+  h1 { font-size:23px; letter-spacing:-.02em; margin:12px 0 8px; }
+  .lead { font-size:12.5px; color:var(--ink-2); line-height:1.6; max-width:530px; margin:0 0 18px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .card { border:1px solid var(--line); border-radius:9px; padding:13px 15px; }
+  .card .n { font-size:17px; font-weight:650; }
+  .card .l { font-size:11px; color:var(--ink-3); margin-top:3px; }
+  .bar { height:6px; background:var(--line-faint); border-radius:4px; margin-top:8px; }
+  .bar > i { display:block; width:100%; height:100%; background:var(--ok); border-radius:4px; }
+  .sat { position:absolute; left:752px; top:96px; width:250px; background:var(--surface);
+         border:1px solid var(--line); border-radius:10px; box-shadow:0 14px 38px rgba(25,35,55,.13); padding:16px; }
+  .sat h2 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin:0 0 12px; }
+  .fix { font-size:11px; padding:6px 0; border-bottom:1px solid var(--line-faint); }
+  .fix:last-child { border-bottom:0; }
+  .fix b { display:block; } .fix span { color:var(--ink-3); }
+  .foot { position:absolute; left:54px; top:516px; width:726px; font-size:11px; color:var(--ink-3); line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="window">
+    <div class="chrome">
+      <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <span class="crumb">OneShotLink / Product acceptance — final QA pass</span>
+    </div>
+    <div class="main">
+      <p class="eyebrow">QA / Acceptance gates</p>
+      <h1>Every gate green; launch still gated on the host</h1>
+      <p class="lead">Six parallel <b>.claude/</b> QA agents audited disjoint areas. Every finding was re-read against code, reproduced red, then fixed green. Four product defects and three false-pass browser tests were closed.</p>
+      <div class="grid">
+        <div class="card"><div class="n">303</div><div class="l">backend specs · 0 failures</div><div class="bar"><i></i></div></div>
+        <div class="card"><div class="n">34</div><div class="l">Vitest tests · 0 failures</div><div class="bar"><i></i></div></div>
+        <div class="card"><div class="n">8 / 8</div><div class="l">browser journeys · desktop + mobile</div><div class="bar"><i></i></div></div>
+        <div class="card"><div class="n">40</div><div class="l">a11y states · 0 violations</div><div class="bar"><i></i></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="sat">
+    <h2>Fixed this pass</h2>
+    <div class="fix"><b>Immortal backup</b><span>missing TTL now refused</span></div>
+    <div class="fix"><b>Error cache headers</b><span>no-store/Pragma on 4xx/5xx</span></div>
+    <div class="fix"><b>v1 501 envelope</b><span>frozen v1 shape restored</span></div>
+    <div class="fix"><b>Browser false-passes</b><span>measured, not hard-coded</span></div>
+    <div class="fix"><b>Dark contrast</b><span>AA on all 40 states</span></div>
+    <div class="fix"><b>Crypto edge cases</b><span>binary + salt-swap</span></div>
+  </div>
+  <p class="foot">Product note: code-level acceptance is <b>GO</b>. Public launch remains <b>NO-GO</b> until the operator-owned TLS/hostname and Redis firewall gates (T-70/T-71) have target-host evidence. Passphrase is an access gate, not end-to-end encryption.</p>
+</div>
+</body>
+</html>

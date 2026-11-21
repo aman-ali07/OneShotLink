@@ -10,6 +10,13 @@ module Onetime
   module Config
     class Error < StandardError; end
 
+    # One source of truth for limiter scopes: boot validation and runtime
+    # lookup must never drift apart.
+    LIMIT_SCOPES = %i[
+      conceal reveal signin signup request respond webhook webhook_read
+      password delete burn signout passphrase metrics metrics_auth meta
+    ].freeze
+
     DEFAULTS = {
       "HOST" => "localhost:3000",
       "SSL" => "false",
@@ -21,10 +28,32 @@ module Onetime
       "RATE_LIMIT_CONCEAL" => "30",
       "RATE_LIMIT_REVEAL" => "60",
       "RATE_LIMIT_SIGNIN" => "10",
+      "RATE_LIMIT_SIGNUP" => "10",
+      "RATE_LIMIT_REQUEST" => "10",
+      "RATE_LIMIT_RESPOND" => "10",
+      "RATE_LIMIT_WEBHOOK" => "10",
+      "RATE_LIMIT_WEBHOOK_READ" => "10",
+      "RATE_LIMIT_PASSWORD" => "5",
+      "RATE_LIMIT_DELETE" => "3",
+      "RATE_LIMIT_BURN" => "10",
+      "RATE_LIMIT_SIGNOUT" => "10",
+      "RATE_LIMIT_METRICS" => "5",
+      # Unauthenticated health/config/OpenAPI probes. Generous enough for
+      # container healthchecks, bounded enough to stop Redis-quota floods.
+      "RATE_LIMIT_META" => "300",
+      "RATE_LIMIT_METRICS_AUTH" => "5",
+      # Per-secret passphrase guesses, keyed by the opaque secret id (D-012b).
+      "RATE_LIMIT_PASSPHRASE" => "5",
+      # A minute of 5 guesses per secret is still 5/minute forever; guesses are
+      # bounded over a longer window so a distributed attacker cannot grind.
+      "RATE_LIMIT_PASSPHRASE_WINDOW" => "900",
       "RATE_LIMIT_WINDOW" => "60",
       "TRUST_PROXY" => "false",
       "TRUSTED_PROXIES" => "",
       "METRICS_ENABLED" => "false",
+      # A scrape token is mandatory whenever metrics are enabled: the endpoint
+      # is a closed 404 until one is configured. Never log or echo this value.
+      "METRICS_TOKEN" => "",
       "REDIS_TIMEOUT" => "5",
       "REDIS_RECONNECT_ATTEMPTS" => "2"
     }.freeze
@@ -32,14 +61,13 @@ module Onetime
     module_function
 
     def [](key)
-      value = ENV.fetch(key) { DEFAULTS[key] }
-      value.nil? ? nil : value
+      ENV.fetch(key) { DEFAULTS[key] }
     end
 
     def secret!
       raw = ENV["SECRET"].to_s
       raise Error, "SECRET must be set (generate one with: openssl rand -hex 32)" if raw.empty?
-      raise Error, "SECRET must be at least 32 bytes of entropy" if raw.bytesize < 32
+      raise Error, "SECRET must be at least 32 bytes" if raw.bytesize < 32
 
       raw
     end
@@ -60,10 +88,18 @@ module Onetime
 
       raise Error, "MAX_SECRET_BYTES must be positive" if max_secret_bytes <= 0
       raise Error, "MAX_SECRET_BYTES must be <= 10 MiB" if max_secret_bytes > (10 * 1024 * 1024)
-      raise Error, "RATE_LIMIT_CONCEAL must be positive" if rate_limit(:conceal) <= 0
-      raise Error, "RATE_LIMIT_REVEAL must be positive" if rate_limit(:reveal) <= 0
-      raise Error, "RATE_LIMIT_SIGNIN must be positive" if rate_limit(:signin) <= 0
+      LIMIT_SCOPES.each do |scope|
+        raise Error, "RATE_LIMIT_#{scope.to_s.upcase} must be positive" if rate_limit(scope) <= 0
+      end
       raise Error, "RATE_LIMIT_WINDOW must be positive" if self["RATE_LIMIT_WINDOW"].to_i <= 0
+      unless self["RATE_LIMIT_PASSPHRASE_WINDOW"].to_i.positive?
+        raise Error, "RATE_LIMIT_PASSPHRASE_WINDOW must be positive"
+      end
+      # A scrape token is a bearer credential. With metrics enabled, a short
+      # token is brute-forceable, so fail boot rather than ship a weak default.
+      if metrics_enabled? && self["METRICS_TOKEN"].to_s.bytesize < 32
+        raise Error, "METRICS_TOKEN must be at least 32 bytes when METRICS_ENABLED is true"
+      end
       raise Error, "SESSION_TTL must be at least 60 seconds" if self["SESSION_TTL"].to_i < 60
       raise Error, "AUTH_MODE must be disabled, simple, or full" unless %w[disabled simple full].include?(auth_mode)
       raise Error, "REDIS_TIMEOUT must be positive" if self["REDIS_TIMEOUT"].to_f <= 0
@@ -95,10 +131,6 @@ module Onetime
       mode.empty? ? "disabled" : mode
     end
 
-    def auth_enabled?
-      auth_mode != "disabled"
-    end
-
     # "full" mode needs PostgreSQL + RabbitMQ and is intentionally not wired
     # in this build; it fails closed instead of silently downgrading.
     def full_mode?
@@ -122,21 +154,42 @@ module Onetime
       ttl_options.include?(ttl) ? ttl : (ttl_options.last || 86_400)
     end
 
+    # One validator for every caller that accepts a caller-supplied TTL.
+    def valid_ttl!(value)
+      ttl = begin
+        Integer(value.nil? ? default_ttl : value)
+      rescue ArgumentError, TypeError
+        raise ValidationError, "ttl must be an integer number of seconds"
+      end
+      unless ttl_options.include?(ttl)
+        raise ValidationError, "ttl must be one of: #{ttl_options.join(', ')}"
+      end
+
+      ttl
+    end
+
     def session_ttl
       self["SESSION_TTL"].to_i.positive? ? self["SESSION_TTL"].to_i : 1_209_600
     end
 
     def rate_limit(kind)
-      key = case kind.to_sym
-            when :conceal then "RATE_LIMIT_CONCEAL"
-            when :signin then "RATE_LIMIT_SIGNIN"
-            else "RATE_LIMIT_REVEAL"
-            end
-      self[key].to_i
+      scope = kind.to_sym
+      unless LIMIT_SCOPES.include?(scope)
+        raise Error, "unknown rate-limit scope: #{scope.inspect}"
+      end
+
+      self["RATE_LIMIT_#{scope.to_s.upcase}"].to_i
     end
 
     def rate_limit_window
       self["RATE_LIMIT_WINDOW"].to_i.positive? ? self["RATE_LIMIT_WINDOW"].to_i : 60
+    end
+
+    # D-012b: guesses against one secret are bounded over a longer window than
+    # ordinary HTTP rate limits, so rotating IPs cannot simply outwait a minute.
+    def passphrase_attempt_window
+      value = self["RATE_LIMIT_PASSPHRASE_WINDOW"].to_i
+      value.positive? ? value : 900
     end
 
     def redis_url

@@ -13,7 +13,7 @@ fs.writeFileSync(file, bytes);
 fs.mkdirSync(downloads);
 
 const browser = await puppeteer.launch({
-  executablePath: "/usr/bin/google-chrome",
+  executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome",
   headless: true,
   args: ["--no-sandbox", "--disable-dev-shm-usage"],
 });
@@ -73,11 +73,18 @@ try {
   assert(downloaded, "the file was never downloaded");
   assert.deepEqual(fs.readFileSync(downloaded), bytes, "downloaded bytes differ from the fixture");
 
+  // Spent links show the terminal panel on load via the preview GET. Measure
+  // that preview's status instead of logging a hard-coded "404".
   await recipient.goto(link, { waitUntil: "networkidle0" });
-  await recipient.click("form button[type=submit]");
   await recipient.waitForSelector("#gone-heading", { timeout: 10000 });
+  const replayStatus = await recipient.evaluate(async (url) => {
+    const key = url.split("/secret/")[1].split(/[?#]/)[0];
+    const response = await fetch(`/api/v3/guest/secret/${encodeURIComponent(key)}`);
+    return response.status;
+  }, link);
+  assert.equal(replayStatus, 404, `replay preview returned ${replayStatus}`);
   assert.deepEqual(errors, [], `browser errors: ${errors.join(" | ")}`);
-  console.log(JSON.stringify({ ok: true, filename: "fixture.bin", bytes: bytes.length, replay: "404", errors }));
+  console.log(JSON.stringify({ ok: true, filename: "fixture.bin", bytes: bytes.length, replay: replayStatus, errors }));
 } finally {
   await browser.close();
   fs.rmSync(work, { recursive: true, force: true });

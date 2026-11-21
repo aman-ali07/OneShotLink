@@ -220,7 +220,7 @@ RSpec.describe "Simple-mode accounts" do
       end
     end
 
-    it "creates an owner receipt and removes it when revealed" do
+    it "keeps a revealed receipt in the owner list for the retention window" do
       simple do
         signup
         post_json("/api/v3/secret/conceal", { secret: "owner secret", ttl: 1800 })
@@ -236,7 +236,10 @@ RSpec.describe "Simple-mode accounts" do
         expect(last_response.status).to eq(200)
 
         get "/api/v3/account/receipts"
-        expect(JSON.parse(last_response.body)["receipts"]).to be_empty
+        receipts = JSON.parse(last_response.body)["receipts"]
+        expect(receipts.map { |r| r["identifier"] }).to eq([key])
+        expect(receipts.first["status"]).to eq("revealed")
+        expect(receipts.first).not_to have_key("secret_value")
       end
     end
 
@@ -321,6 +324,29 @@ RSpec.describe "Simple-mode accounts" do
         clear_cookies
         signup("delete-me@example.com")
         expect(last_response.status).to eq(201)
+      end
+    end
+
+    it "removes request links, submissions and webhook endpoints owned by the account" do
+      simple do
+        signup("erase@example.com")
+        customer = Onetime::Models::Customer.find_by_email("erase@example.com")
+        request_key, = Onetime::Models::SecretRequest.create(owner_id: customer[:id], label: "pending", ttl: 600)
+        Onetime::Logic::SubmitToRequest.new(key: request_key, secret: "an answer").call
+        endpoint = Onetime::Webhook.create(
+          owner_id: customer[:id], url: "http://93.184.216.34/hook", events: ["secret.created"]
+        )
+        own_index = Onetime::Webhook.owner_index(customer[:id])
+        endpoint_key = Onetime::Webhook.key(endpoint[:id])
+        request_index = Onetime::Models::SecretRequest.owner_index(customer[:id])
+
+        Onetime::Logic::DeleteAccount.new(customer: customer).call
+
+        expect(Onetime::Store.redis.exists(Onetime::Models::SecretRequest.object_key(request_key))).to be(0)
+        expect(Onetime::Store.redis.exists(Onetime::Models::SecretRequest.submission_key(request_key))).to be(0)
+        expect(Onetime::Store.redis.exists(request_index)).to be(0)
+        expect(Onetime::Store.redis.exists(endpoint_key)).to be(0)
+        expect(Onetime::Store.redis.exists(own_index)).to be(0)
       end
     end
 

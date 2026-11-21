@@ -15,6 +15,21 @@ module Onetime
       PREFIX = "session:"
       INDEX_PREFIX = "customer:sessions:"
 
+      # Sliding a session and its revocation index must be one atomic step. The
+      # index can lapse before the session (the cookie keeps the session alive),
+      # so re-add the digest on every touch. The EXISTS guard stops a concurrent
+      # destroy from recreating a TTL-less ghost hash between HGETALL and write.
+      TOUCH_SCRIPT = <<~LUA
+        if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
+        redis.call('HSET', KEYS[1], 'last_seen', ARGV[1])
+        redis.call('EXPIRE', KEYS[1], ARGV[2])
+        if ARGV[3] ~= '' then
+          redis.call('SADD', KEYS[2], ARGV[4])
+          redis.call('EXPIRE', KEYS[2], ARGV[2])
+        end
+        return 1
+      LUA
+
       module_function
 
       def digest(token)
@@ -54,11 +69,18 @@ module Onetime
       def fetch(token)
         return nil if token.to_s.empty?
 
-        raw = Store.redis.hgetall(key(token))
+        session_key = key(token)
+        raw = Store.redis.hgetall(session_key)
         return nil if raw.empty?
 
-        Store.redis.expire(key(token), Config.session_ttl)
-        Store.redis.hset(key(token), "last_seen", Time.now.to_i.to_s)
+        customer_id = raw["customer_id"].to_s
+        still_live = Store.redis.eval(
+          TOUCH_SCRIPT,
+          keys: [session_key, index_key(customer_id)],
+          argv: [Time.now.to_i.to_s, Config.session_ttl, customer_id, digest(token)]
+        ).to_i == 1
+        return nil unless still_live
+
         { customer_id: raw["customer_id"], created_at: raw["created_at"].to_i }
       end
 
@@ -78,8 +100,12 @@ module Onetime
         keep = except_token.to_s.empty? ? nil : digest(except_token)
         digests = Store.redis.smembers(index_key(customer_id))
         doomed = digests.reject { |d| d == keep }
-        Store.redis.srem(index_key(customer_id), doomed) unless doomed.empty?
-        doomed.each { |d| Store.redis.del(digest_key(d)) } unless doomed.empty?
+        return 0 if doomed.empty?
+
+        Store.redis.multi do |tx|
+          tx.srem(index_key(customer_id), doomed)
+          doomed.each { |d| tx.del(digest_key(d)) }
+        end
         doomed.length
       end
     end

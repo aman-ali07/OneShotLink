@@ -54,8 +54,9 @@ module Cli
     abort "No customer with that email." unless customer
 
     password = password_from("New password")
-    unless password.is_a?(String) && password.bytesize.between?(12, 256)
-      abort "Password must be 12 to 256 characters."
+    bounds = Onetime::Logic::SignUp::MIN_PASSWORD_BYTES..Onetime::Logic::SignUp::MAX_PASSWORD_BYTES
+    unless password.is_a?(String) && bounds.cover?(password.bytesize)
+      abort "Password must be #{bounds.begin} to #{bounds.end} characters."
     end
     Onetime::Models::Customer.update_password(customer[:id], password)
     # A reset is an administrative credential change: drop every live session.
@@ -67,7 +68,8 @@ module Cli
   end
 
   def list
-    ids = Onetime::Store.redis.keys("customer:index:*")
+    # SCAN keeps an admin listing from blocking Redis on a large keyspace.
+    ids = Onetime::Store.redis.scan_each(match: "customer:index:*", count: 500).to_a
     if ids.empty?
       puts "No customers."
       return
@@ -104,9 +106,16 @@ module Cli
     abort "No customer with that email." unless customer
 
     Onetime::Models::Customer.update_role(customer[:id], role)
+    # Privilege changes are security events, even when made from the CLI.
+    Onetime::Audit.record("admin.role_changed", actor_id: customer[:id], detail: role)
     puts "Role updated"
     print_customer(customer)
     puts "role: #{role}"
+  end
+
+  def audit(limit: 50)
+    entries = Onetime::Audit.recent(limit: limit)
+    puts JSON.pretty_generate(entries)
   end
 
   def health
@@ -122,7 +131,9 @@ module Cli
     checks["redis"] = Onetime::Store.healthy? ? "ok" : "fail (no PONG)"
 
     checks["secret_keys"] = begin
-      count = Onetime::Store.redis.keys("#{Onetime::Models::Secret::OBJECT_PREFIX}*").length
+      count = Onetime::Store.redis.scan_each(
+        match: "#{Onetime::Models::Secret::OBJECT_PREFIX}*", count: 500
+      ).count
       "#{count} stored"
     rescue StandardError => e
       "fail (#{e.class})"
@@ -133,12 +144,35 @@ module Cli
     puts "Status: ok"
   end
 
+  def migrate(dry_run: false)
+    result = dry_run ? Onetime::Migrate.dry_run : Onetime::Migrate.apply!
+    # Counts/status only: never the destination path or any stored value.
+    Onetime::Audit.record("admin.migrated", actor_id: "cli",
+                          detail: "dry_run=#{dry_run} applied=#{result[:applied].length}")
+
+    puts "schema: current=#{result[:current]} target=#{result[:target]}"
+    if dry_run
+      puts result[:planned].empty? ? "dry-run: nothing to apply" : "dry-run: would apply #{result[:planned].join(', ')}"
+    elsif result[:applied].empty?
+      puts "migrate: already current; nothing applied"
+    else
+      puts "migrate: applied #{result[:applied].join(', ')}"
+    end
+  rescue Onetime::Error => e
+    abort "Error (#{e.code}): #{e.message}"
+  end
+
   def work_webhooks(limit)
     claimed = Onetime::Webhook.claim(limit: limit)
     counts = Hash.new(0)
     claimed.each do |item|
       counts[Onetime::Webhook.deliver(item)] += 1
     end
+    # Attribution for an off-host/scheduled worker. Counts and status only:
+    # no endpoint ids, signing secrets, or payload data in the audit stream.
+    Onetime::Audit.record("webhook.worker_run", actor_id: "cli",
+                          detail: "claimed=#{claimed.length} delivered=#{counts[:delivered]} " \
+                                  "retrying=#{counts[:retrying]} failed=#{counts[:failed]}")
     puts "Webhooks: claimed=#{claimed.length} delivered=#{counts[:delivered]} " \
          "retrying=#{counts[:retrying]} failed=#{counts[:failed]} skipped=#{counts[:skipped]}"
   end
@@ -155,6 +189,8 @@ module Cli
     end
 
     stats = Onetime::Logic::RotateKey.new(new_secret: ENV["OTS_NEW_SECRET"]).call
+    Onetime::Audit.record("admin.key_rotated", actor_id: "cli",
+                          detail: "reencrypted=#{stats[:reencrypted]} skipped=#{stats[:skipped]}")
     puts "Re-encrypted #{stats[:reencrypted]} secret(s) with the new key."
     puts "Skipped #{stats[:skipped]} record(s) (unreadable or consumed during rotation)." if stats[:skipped].positive?
     puts "Update SECRET to OTS_NEW_SECRET and restart the web process."
@@ -165,19 +201,54 @@ module Cli
   def backup(path)
     abort "Usage: ots backup --out FILE" if path.to_s.empty?
     stats = Onetime::Backup.export(path)
+    # Never record the path: it can identify a customer or a backup location.
+    Onetime::Audit.record("admin.backup_exported", actor_id: "cli",
+                          detail: "secrets=#{stats[:secrets]} customers=#{stats[:customers]}")
     puts "Wrote #{stats[:secrets]} secret record(s) and #{stats[:customers]} customer(s) to #{path}"
   rescue Onetime::Error => e
     abort "Error (#{e.code}): #{e.message}"
   end
 
-  def restore(path)
+  def restore(path, force: false)
     abort "Usage: ots restore --in FILE" if path.to_s.empty?
     abort "No such file: #{path}" unless File.file?(path)
 
-    stats = Onetime::Backup.restore(path)
+    stats = Onetime::Backup.restore(path, force: force)
+    Onetime::Audit.record("admin.restored", actor_id: "cli",
+                          detail: "force=#{force} secrets=#{stats[:secrets]} customers=#{stats[:customers]}")
     puts "Restored #{stats[:secrets]} secret record(s) and #{stats[:customers]} customer(s) from #{path}"
   rescue Onetime::Error => e
     abort "Error (#{e.code}): #{e.message}"
+  end
+
+  # Secret material is read from stdin (or OTS_SECRET), never from argv, so it
+  # cannot leak through shell history or a process listing. Only the key/link
+  # and the revealed value are printed; neither is written to a log.
+  def conceal(ttl: 1800)
+    secret = if !$stdin.tty?
+               $stdin.read
+             else
+               ENV["OTS_SECRET"]
+             end
+    abort "Provide the secret on stdin or in OTS_SECRET (never as an argument)." if secret.nil?
+    abort "The secret is empty." if secret.empty?
+
+    result = Onetime::CliApi.conceal(secret: secret, ttl: ttl, passphrase: ENV["OTS_PASSPHRASE"])
+    puts result[:secret_key]
+    puts result[:link]
+  rescue Onetime::Error => e
+    abort "Error: #{e.message}"
+  end
+
+  def reveal(key)
+    abort "Usage: ots reveal SECRET_KEY" if key.to_s.empty?
+
+    value = Onetime::CliApi.reveal(key: key, passphrase: ENV["OTS_PASSPHRASE"])
+    abort "No secret was returned." if value.nil?
+
+    puts value
+  rescue Onetime::Error => e
+    abort "Error: #{e.message}"
   end
 
   def help
@@ -190,16 +261,22 @@ module Cli
         customers list                            List customers (id, email, role)
         customers show --email EMAIL              Show one customer
         customers set-role --email EMAIL --role R  Set role (customer|admin)
+        conceal [--ttl N]                         Create a secret (content on stdin)
+        reveal SECRET_KEY                         Reveal a secret once (content to stdout)
         health                                    Validate config and Redis
+        audit [--limit N]                         List recent security events (newest first)
         backup --out FILE                         Export encrypted records to FILE
-        restore --in FILE                         Restore records from a backup FILE
+        restore --in FILE [--force]               Restore records (refuses to overwrite live keys)
         rotate-key                                Re-encrypt all secrets under OTS_NEW_SECRET
+        migrate [--dry-run]                       Stamp/advance the Redis schema version (idempotent)
         webhooks:work [LIMIT]                     Deliver queued webhook events (default 10)
         version                                   Print the version
 
-      Password input:
+      Password / secret input:
         Set OTS_PASSWORD for automation, or enter it at a hidden prompt.
-        Passwords are never accepted as command-line arguments.
+        Passwords are never accepted as command-line arguments. Secret content
+        for `conceal` comes from stdin (or OTS_SECRET); an optional passphrase
+        comes from OTS_PASSPHRASE. OTS_URL overrides the API base URL.
 
       Key rotation:
         OTS_NEW_SECRET=<new secret> ots rotate-key
@@ -214,9 +291,26 @@ parser = OptionParser.new do |opts|
   opts.on("--role ROLE", "Role (customer|admin)") { |value| options[:role] = value }
   opts.on("--out FILE", "Output file for backup") { |value| options[:out] = value }
   opts.on("--in FILE", "Input file for restore") { |value| options[:in] = value }
+  opts.on("--force", "Overwrite existing keys during restore") { options[:force] = true }
+  opts.on("--dry-run", "Report planned migrations without writing") { options[:dry_run] = true }
+  opts.on("--ttl N", Integer, "Secret lifetime for `conceal` (default 1800)") { |value| options[:ttl] = value }
+  opts.on("--limit N", Integer, "Maximum audit entries to print") { |value| options[:limit] = value }
   opts.on("-h", "--help", "Show help") { puts opts; exit }
 end
 parser.parse!(ARGV)
+
+# The web app fails closed at boot via config.ru, but CLI/worker processes are
+# launched separately (cron, CI). Validate the same contract here so a bad
+# TRUSTED_PROXIES CIDR or placeholder password cannot silently disable safety.
+# `health` is the diagnostic command: it must run far enough to report the
+# failing check rather than being blocked by this gate.
+unless command.nil? || %w[help version health].include?(command)
+  begin
+    Onetime::Config.validate!
+  rescue Onetime::Config::Error => e
+    abort "onetime: invalid configuration: #{e.message}"
+  end
+end
 
 case command
 when "customers"
@@ -229,14 +323,22 @@ when "customers"
   when "set-role" then Cli.set_role(options[:email], options[:role])
   else Cli.help
   end
+when "conceal"
+  Cli.conceal(ttl: options[:ttl] || 1800)
+when "reveal"
+  Cli.reveal(ARGV.shift)
 when "health"
   Cli.health
+when "audit"
+  Cli.audit(limit: options[:limit] || 50)
 when "backup"
   Cli.backup(options[:out])
 when "restore"
-  Cli.restore(options[:in])
+  Cli.restore(options[:in], force: options[:force])
 when "rotate-key"
   Cli.rotate_key
+when "migrate"
+  Cli.migrate(dry_run: options[:dry_run])
 when "webhooks:work"
   Cli.work_webhooks((ARGV.shift || 10).to_i)
 when "version"

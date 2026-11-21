@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OneShotLink — security posture</title>
+<style>
+  /* A stageshow still: one cropped hero window, one straddling satellite,
+     real words only where the story is, bars at the edges. */
+  :root {
+    --ink: #1d2430; --ink-2: #4a5566; --ink-3: #8a94a4;
+    --line: #e3e7ee; --line-faint: #eef1f5; --surface: #ffffff;
+    --canvas: #f7f8fa; --accent: #2563eb; --accent-soft: #eaf0ff;
+    --high: #c0392b; --high-soft: #fdecea;
+    --med: #a8620a; --med-soft: #fdf1e2;
+    --ok: #1f7a4d; --ok-soft: #e7f5ec;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #ffffff; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); -webkit-font-smoothing: antialiased;
+  }
+  .stage { position: relative; width: 1030px; height: 560px; overflow: hidden; margin: 0 auto; }
+
+  .window {
+    position: absolute; left: 92px; top: 30px; width: 1120px; height: 700px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 18px 50px rgba(25,35,55,.16); overflow: hidden;
+  }
+  .chrome {
+    height: 38px; display: flex; align-items: center; gap: 14px;
+    padding: 0 14px; border-bottom: 1px solid var(--line); background: #fcfcfd;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #d8dde5; }
+  .brand { font-size: 12px; font-weight: 650; letter-spacing: -.01em; }
+  .crumb { font-size: 12px; color: var(--ink-3); }
+  .chrome-pill { width: 86px; height: 20px; border-radius: 6px; background: #eef1f5; margin-left: auto; }
+
+  .body { display: flex; height: calc(100% - 38px); }
+  .sidebar {
+    width: 160px; flex: none; border-right: 1px solid var(--line);
+    padding: 18px 10px; background: var(--canvas);
+  }
+  .nav { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 10px; border-radius: 7px; font-size: 12px; color: var(--ink-2); }
+  .nav.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .nav i { width: 12px; height: 12px; border-radius: 4px; background: #cdd5e0; flex: none; }
+  .nav.on i { background: var(--accent); }
+  .side-label { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); padding: 18px 10px 8px; }
+
+  .main { flex: 1; min-width: 0; padding: 22px 22px; }
+  .head { display: flex; align-items: baseline; margin-bottom: 16px; }
+  .title { font-size: 17px; font-weight: 650; letter-spacing: -.02em; }
+  .sub { font-size: 12px; color: var(--ink-3); margin-left: 10px; }
+  .count { font-size: 12px; color: var(--ink-2); margin-left: 16px; }
+  .count b { color: var(--ink); font-weight: 650; }
+
+  /* The table stays inside the visible crop: only filler and the sidebar bleed. */
+  .tablehead, .row { display: grid; grid-template-columns: 76px 1fr 88px 92px; align-items: center; gap: 12px; max-width: 700px; }
+  .tablehead { height: 28px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); border-bottom: 1px solid var(--line); }
+  .row { height: 54px; border-bottom: 1px solid var(--line-faint); }
+  .row.sel { background: #f7f9fd; border-radius: 8px; }
+  .badge { font-size: 10px; font-weight: 700; height: 20px; line-height: 20px; text-align: center; border-radius: 5px; width: 60px; }
+  .b-high { color: var(--high); background: var(--high-soft); }
+  .b-med { color: var(--med); background: var(--med-soft); }
+  .b-low { color: var(--ink-2); background: #eef1f5; }
+  .name { font-size: 13px; font-weight: 550; }
+  .status { font-size: 12px; color: var(--ink-2); }
+  .status.fixed { color: var(--ok); font-weight: 600; }
+  .bar { height: 7px; border-radius: 4px; background: #e7ebf1; }
+  .bar.w70 { width: 70%; } .bar.w52 { width: 52%; } .bar.w40 { width: 40%; }
+
+  .satellite {
+    position: absolute; left: 28px; bottom: 28px; width: 254px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(25,35,55,.16); padding: 16px 18px 12px;
+  }
+  .sat-title { font-size: 12px; font-weight: 650; margin-bottom: 10px; }
+  .sat-line { display: flex; gap: 9px; align-items: center; height: 28px; font-size: 12px; color: var(--ink-2); }
+  .sat-line .mark { width: 6px; height: 6px; border-radius: 50%; background: var(--med); flex: none; }
+  .sat-line .mark.hi { background: var(--high); }
+  .sat-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line-faint); margin-top: 8px; padding-top: 10px; font-size: 11px; color: var(--ink-3); }
+  .sat-foot b { color: var(--ink); font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="window">
+      <div class="chrome">
+        <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span class="brand">OneShotLink</span>
+        <span class="crumb">/ security / posture</span>
+        <span class="chrome-pill"></span>
+      </div>
+      <div class="body">
+        <aside class="sidebar">
+          <div class="nav on"><i></i>Overview</div>
+          <div class="nav"><i></i>Findings</div>
+          <div class="nav"><i></i>Rotation</div>
+          <div class="nav"><i></i>Webhooks</div>
+          <div class="nav"><i></i>Backups</div>
+          <div class="side-label">Review</div>
+          <div class="nav"><i></i>Cryptography</div>
+          <div class="nav"><i></i>Authentication</div>
+          <div class="nav"><i></i>API security</div>
+        </aside>
+        <div class="main">
+          <div class="head">
+            <div><span class="title">Findings</span><span class="sub">Security audit · 2026-11-21</span></div>
+            <div class="count"><b>11 fixed</b> · 9 open</div>
+          </div>
+          <div class="tablehead"><span>Severity</span><span>Finding</span><span>Area</span><span>Status</span></div>
+          <div class="row sel">
+            <span class="badge b-high">HIGH</span>
+            <span class="name">Webhook SSRF via DNS rebinding</span>
+            <span>Webhooks</span>
+            <span class="status fixed">Fixed</span>
+          </div>
+          <div class="row">
+            <span class="badge b-high">HIGH</span>
+            <span class="name">Rotation orphaned encrypted records</span>
+            <span>Crypto</span>
+            <span class="status fixed">Fixed</span>
+          </div>
+          <div class="row">
+            <span class="badge b-med">MED</span>
+            <span class="name">Session revocation index TTL</span>
+            <span>Auth</span>
+            <span class="status">Needs approval</span>
+          </div>
+          <div class="row">
+            <span class="badge b-med">MED</span>
+            <span class="name">Metadata MAC for stored records</span>
+            <span>Crypto</span>
+            <span class="status fixed">Fixed</span>
+          </div>
+          <div class="row">
+            <span class="badge b-low">LOW</span>
+            <span class="bar w70"></span>
+            <span>Logging</span>
+            <span class="status fixed">Fixed</span>
+          </div>
+          <div class="row">
+            <span class="badge b-low">LOW</span>
+            <span class="bar w52"></span>
+            <span>Backup</span>
+            <span class="status fixed">Fixed</span>
+          </div>
+          <div class="row">
+            <span class="badge b-low">LOW</span>
+            <span class="bar w40"></span>
+            <span>API</span>
+            <span class="status fixed">Fixed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="satellite">
+      <div class="sat-title">Open items</div>
+      <div class="sat-line"><span class="mark hi"></span>Session revocation index</div>
+      <div class="sat-line"><span class="mark hi"></span>Preflight self-test isolation</div>
+      <div class="sat-line"><span class="mark"></span>TLS on a real host (T-70)</div>
+      <div class="sat-foot"><span>Backend suite</span><b>168 / 0</b></div>
+    </div>
+  </div>
+</body>
+</html>

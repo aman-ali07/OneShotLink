@@ -3,9 +3,9 @@
 The brand is OneShotLink (R-09, `replica/brand.md`); this document still describes the
 clean-room clone of the original one-time secret service and keeps that provenance.
 
-Status: **M2 + production packaging implemented.** The secret lifecycle, browser
+Status: **v1 core + simple-mode accounts + file secrets + inbound requests shipped (2026-11-21).** The secret lifecycle, browser
 vertical slice, hardened image, simple-mode accounts, and the Compose stack are live; the
-"Impl." column below is updated to the 2026-11-12 state. Evidence lives in `lib/onetime/`, `frontend/`, the
+"Impl." column below reflects the 2026-11-21 state. Evidence lives in `lib/onetime/`, `frontend/`, the
 integration specs, a headless browser journey, and a Compose smoke test; unbuilt areas
 are called out explicitly.
 
@@ -47,9 +47,9 @@ TTL, and optionally requires a passphrase that travels over a different channel.
 - Full Rodauth/PostgreSQL/RabbitMQ auth (MFA, WebAuthn, magic links, SSO). Deferred; see
   [docs/DECISIONS.md](docs/DECISIONS.md) D-003.
 - Organizations, custom domains, billing.
-- File uploads (the data model reserves `kind`/`filename`, but no upload path ships).
+- File secrets ship in v3 only (≤512 KiB, base64-in-JSON); v1 is text-only.
 - Email delivery and expiration-warning jobs.
-- 27-language i18n. English-only strings; the i18n gem is declared but unused.
+- 27-language i18n. English-only strings; no i18n dependency is declared (adding one needs a decision).
 - Public SaaS operation, multi-region, or horizontal-session replication beyond Redis.
 
 ## 4. Functional requirements
@@ -67,18 +67,18 @@ today (2026-11-11), not intent.
 | FR-6 | Every secret has a TTL from `TTL_OPTIONS` (defaults 30 min, 12 h, 24 h, 3 d) and Redis expires it. | P0 | Yes |
 | FR-7 | Reveal is atomic: exactly one of N concurrent requests wins, the rest get 404. | P0 | Yes: 8-way race spec |
 | FR-8 | Creation and reveal are rate limited per client (defaults 30/min and 60/min). | P0 | Yes: `429` + `Retry-After` |
-| FR-9 | Optional passphrase is hashed with Argon2id; legacy bcrypt hashes verify and rehash on use. | P0 | Partial: gate + Argon2id + bcrypt verify; rehash-on-login is M3 |
+| FR-9 | Optional passphrase is hashed with Argon2id; legacy bcrypt hashes verify and rehash on use. | P0 | Yes (D-009) |
 | FR-10 | IDs are opaque (≥128 bits from a CSPRNG); no sequential identifiers. | P0 | Yes: `ids.rb` |
 | FR-11 | UI has conceal and reveal views, shows the one-time link, warns before reveal, and handles passphrase prompts. | P0 | Yes: browser journey verified; no auto-reveal |
 | FR-12 | `AUTH_MODE=disabled` runs with Redis only and no sessions. | P0 | Yes |
 | FR-13 | `AUTH_MODE=simple` adds signup/signin/signout with Redis-stored opaque sessions; owners can list active receipts. | P1 | Yes: account specs + `e2e/accounts.mjs` |
 | FR-14 | `AUTH_MODE=full` returns 501 with a clear message (not implemented). | P1 | Yes: owner routes return `501 not_configured` |
 | FR-15 | `GET /health` and `/api/v3/health` report app + Redis status; no secrets. | P0 | Yes |
-| FR-16 | `bin/ots customers create --email ...` seeds an account; password is hidden/`OTS_PASSWORD`. | P1 | Partial: create/reset implemented; role/list/health flags still T-43 |
-| FR-17 | OpenAPI 3.1 document served at `/api/v3/openapi.json` and written to `docs/openapi.json` on build. | P1 | No |
+| FR-16 | `bin/ots customers create --email ...` seeds an account; password is hidden/`OTS_PASSWORD`. | P1 | Yes: create/reset/list/show/set-role/health (K-33) |
+| FR-17 | OpenAPI 3.1 document served at `/api/v3/openapi.json` and contract-checked by specs. | P1 | Yes (served + spec-checked; static `docs/openapi.json` export remains deferred) |
 | FR-18 | CLI can list/retry dead-letter jobs in full mode. | P2 | No |
 | FR-19 | Organizations, custom domains, SSO, MFA, WebAuthn, magic links. | P2 | No |
-| FR-20 | File secrets (upload/download, encrypted, one-time). | P2 | No |
+| FR-20 | File secrets (upload/download, encrypted, one-time). | P2 | Yes: `e2e/file.mjs` byte-for-byte + replay 404 |
 | FR-21 | Localized UI/emails (target 27 locales). | P2 | No |
 
 ## 5. User stories and acceptance criteria
@@ -126,7 +126,7 @@ As a self-hoster, I can run the stack with Docker.
 
 - `docker compose up` starts web + Redis with AOF enabled
 - The UI loads on `http://localhost:3000`
-- `GET /health` returns `200` with `{"status":"ok","redis":"ok"}`
+- `GET /health` returns `200` with `{"status":"ok","redis":"ok","version":"0.1.0"}`
 - Restarting the web container does not lose secrets (Redis persists)
 
 **US-7 — Accounts (simple mode)**
@@ -147,7 +147,7 @@ As a small-team operator, I can enable accounts without PostgreSQL.
 | NFR-4 | Availability | Health check distinguishes app and Redis failure |
 | NFR-5 | Logging | No plaintext, passphrase, ciphertext, token, or cookie values |
 | NFR-6 | Compatibility | v1 responses stable; v3 additive-only within a major |
-| NFR-7 | Accessibility | WCAG 2.1 AA for the two primary views (labels, focus, AA tokens checked; no formal audit yet) |
+| NFR-7 | Accessibility | WCAG 2.2 AA automated axe gate across all routes (0 violations); manual keyboard/reflow checks still required (D-016) |
 | NFR-8 | Deployment | Single image; env-only configuration; no secrets baked in |
 
 ## 7. Success criteria (verified, not assumed)
@@ -162,8 +162,7 @@ As a small-team operator, I can enable accounts without PostgreSQL.
 7. ✅ Simple-mode signup → owner receipt → signout → signin verified in a browser;
    dashboard contains no secret plaintext.
 
-Criteria 1–4 were verified on 2026-11-11 (94 specs at the time; the suite is now 133, 0
-failures) plus a live Puma run.
+Criteria 1–4 were first verified on 2026-11-11; the suite is now 307 examples, 0 failures, plus a live Puma run.
 The browser vertical slice, headless journey, and the production Compose stack also
 passed. Strict production status still depends on the operational items in
 [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md); see [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
@@ -173,10 +172,10 @@ passed. Strict production status still depends on the operational items in
 - **Assumption:** Redis is the only datastore in v1; secrets are JSON strings (see D-004).
 - **Assumption:** the UI is served by Rack from `public/app` in production, Vite dev
   server proxies `/api` in development.
-- **Open:** does the product need file secrets in v1? Currently deferred.
-- **Decided (D-012):** passphrase attempts are limited per IP only; there is no
-  per-secret attempt budget. The passphrase is a gate, not zero-knowledge.
+- **Resolved:** v3 file secrets shipped (T-116); v1 remains text-only.
+- **Decided (D-012/D-012b):** passphrase attempts are bounded by the per-IP reveal limiter and a
+  per-secret budget (5 guesses / 900 s keyed by opaque id). The passphrase is a gate, not zero-knowledge.
 - **Open:** which exact 27 locales are required, and are emails in scope?
 - **Open:** is legacy API v2 compatibility needed? The spec mentions v2 only in the
   OpenAPI sentence; v1 + v3 are the implemented surface.
-- **Open:** retention of receipts after reveal (currently: deleted with the secret).
+- **Decided (D-017):** non-sensitive receipt metadata is retained 30 days; the payload is permanently deleted.

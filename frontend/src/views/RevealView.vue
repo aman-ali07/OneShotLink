@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import AppAlert from "@/components/AppAlert.vue";
 import AppButton from "@/components/AppButton.vue";
 import CopyButton from "@/components/CopyButton.vue";
-import { ApiError, errorMessage, revealSecret, type RevealResponse } from "@/lib/api";
+import { formatTimestamp, sizeLabel, ttlLabel } from "@/lib/format";
+import { ApiError, errorMessage, peekSecret, revealSecret, type RevealResponse, type SecretPreview } from "@/lib/api";
 
-type Phase = "idle" | "passphrase" | "revealed" | "gone";
+type Phase = "idle" | "passphrase" | "revealed" | "gone" | "invalid";
 
 const route = useRoute();
 const phase = ref<Phase>("idle");
@@ -16,6 +17,18 @@ const passphrase = ref("");
 const revealed = ref<RevealResponse | null>(null);
 const passphraseInput = ref<HTMLInputElement | null>(null);
 const revealHeading = ref<HTMLHeadingElement | null>(null);
+const goneHeading = ref<HTMLHeadingElement | null>(null);
+const invalidHeading = ref<HTMLHeadingElement | null>(null);
+const preview = ref<SecretPreview | null>(null);
+const previewNote = ref("");
+let peekController: AbortController | undefined;
+
+// Plaintext lives only in component state. Drop it when the view is left, not
+// just when the user presses Hide (DESIGN_SYSTEM.md §6).
+onBeforeUnmount(() => {
+  revealed.value = null;
+  peekController?.abort();
+});
 
 const key = () => String(route.params.key ?? "");
 
@@ -25,9 +38,54 @@ function reset() {
   error.value = "";
   passphrase.value = "";
   revealed.value = null;
+  preview.value = null;
+  previewNote.value = "";
+  peekController?.abort();
 }
 
-watch(() => route.params.key, reset);
+// GET is a metadata-only preview: it never decrypts or consumes the secret.
+// Using it lets us present the passphrase/gone state before a POST and avoids
+// spending a reveal attempt on a link that is already gone.
+async function load() {
+  peekController?.abort();
+  peekController = new AbortController();
+  const controller = peekController;
+  try {
+    const meta = await peekSecret(key(), controller.signal);
+    if (controller.signal.aborted) return;
+    preview.value = meta;
+    if (meta.passphrase_required) {
+      phase.value = "passphrase";
+      await nextTick();
+      passphraseInput.value?.focus();
+    }
+  } catch (cause) {
+    if (controller.signal.aborted) return;
+    if (cause instanceof ApiError && cause.code === "not_found") {
+      phase.value = "gone";
+      revealed.value = null;
+      await nextTick();
+      goneHeading.value?.focus();
+    } else if (cause instanceof ApiError && cause.status === 422) {
+      phase.value = "invalid";
+      revealed.value = null;
+      await nextTick();
+      invalidHeading.value?.focus();
+    } else {
+      // A preview failure is not fatal: the explicit reveal still works.
+      previewNote.value = "Could not check this link's status. You can still try to reveal it.";
+    }
+  }
+}
+
+onMounted(load);
+
+// The router reuses this component across /secret/:key navigations. Reset the
+// terminal phase and peek the new key instead of inheriting the old one.
+watch(() => route.params.key, () => {
+  reset();
+  void load();
+});
 
 async function reveal() {
   if (loading.value || phase.value === "revealed" || phase.value === "gone") return;
@@ -51,10 +109,23 @@ async function reveal() {
     } else if (cause instanceof ApiError && cause.code === "invalid_passphrase") {
       phase.value = "passphrase";
       error.value = cause.message;
+      // Keep the field, but clear the wrong value so a retry is one type, not
+      // a select-all/delete gesture on mobile.
+      passphrase.value = "";
       await nextTick();
       passphraseInput.value?.focus();
     } else if (cause instanceof ApiError && cause.code === "not_found") {
       phase.value = "gone";
+      revealed.value = null;
+      await nextTick();
+      goneHeading.value?.focus();
+    } else if (cause instanceof ApiError && cause.status === 422) {
+      // A malformed key (too long/invalid) is distinct from a consumed or
+      // expired one: tell the recipient the link itself is broken.
+      phase.value = "invalid";
+      revealed.value = null;
+      await nextTick();
+      invalidHeading.value?.focus();
     } else {
       error.value = errorMessage(cause);
     }
@@ -63,21 +134,13 @@ async function reveal() {
   }
 }
 
-function sharedOn(seconds: number | null): string | null {
-  if (!seconds) return null;
-  return new Date(seconds * 1000).toLocaleString();
-}
-
-function ttlLabel(seconds: number): string {
-  if (seconds < 3600) return `${Math.round(seconds / 60)} minutes`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)} hours`;
-  return `${Math.round(seconds / 86400)} day${seconds >= 172800 ? "s" : ""}`;
-}
-
-function sizeLabel(value: number): string {
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+// The server has already deleted the secret at this point. Hiding it removes
+// the plaintext from the screen without implying it can be shown again.
+async function hideSecret() {
+  revealed.value = null;
+  phase.value = "gone";
+  await nextTick();
+  goneHeading.value?.focus();
 }
 
 const isFile = () => revealed.value?.metadata.kind === "file";
@@ -102,13 +165,28 @@ function downloadFile() {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  // Defer revocation: some browsers cancel a download whose object URL is
+  // revoked in the same task as the click.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 </script>
 
 <template>
   <div class="ots-enter mx-auto max-w-3xl">
-    <section v-if="phase === 'gone'" class="ots-panel overflow-hidden" aria-labelledby="gone-heading">
+    <section v-if="phase === 'invalid'" class="ots-panel overflow-hidden" aria-labelledby="invalid-heading">
+      <div class="border-b border-border px-6 py-4 sm:px-8"><span class="ots-eyebrow">Invalid link</span></div>
+      <div class="space-y-5 px-6 py-10 sm:px-8">
+        <h1 id="invalid-heading" ref="invalidHeading" tabindex="-1" class="ots-title-compact">This link is not valid</h1>
+        <p class="max-w-lg leading-relaxed text-muted">
+          The address is malformed. Check that you copied the whole link and ask the sender for a new one.
+        </p>
+        <RouterLink to="/" class="inline-block text-sm font-semibold text-accent hover:underline">
+          Ask the sender for a new link
+        </RouterLink>
+      </div>
+    </section>
+
+    <section v-else-if="phase === 'gone'" class="ots-panel overflow-hidden" aria-labelledby="gone-heading">
       <div class="border-b border-border px-6 py-4 sm:px-8">
         <span class="ots-eyebrow">Terminal state</span>
       </div>
@@ -118,12 +196,12 @@ function downloadFile() {
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </div>
-        <h1 id="gone-heading" class="text-3xl font-bold tracking-tight">This secret is gone</h1>
+        <h1 id="gone-heading" ref="goneHeading" tabindex="-1" class="ots-title-compact">This secret is gone</h1>
         <p class="max-w-lg leading-relaxed text-muted">
           It was already opened, it expired, or it never existed. The server does not say which.
         </p>
         <RouterLink to="/" class="inline-block text-sm font-semibold text-accent hover:underline">
-          Create a new secret
+          Ask the sender for a new link
         </RouterLink>
       </div>
     </section>
@@ -136,7 +214,7 @@ function downloadFile() {
       </div>
       <div class="space-y-7 px-6 py-9 sm:px-8">
         <div class="space-y-3">
-          <h1 id="revealed-heading" ref="revealHeading" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h1 id="revealed-heading" ref="revealHeading" tabindex="-1" class="ots-title-compact">
             Your secret
           </h1>
           <p class="text-muted">
@@ -166,10 +244,12 @@ function downloadFile() {
           <CopyButton :text="revealed.secret_value" label="Copy secret" />
         </div>
 
+        <AppButton variant="secondary" type="button" @click="hideSecret">Hide secret</AppButton>
+
         <AppAlert tone="success">
           Permanently deleted on the server.
-          <span v-if="sharedOn(revealed.metadata.created_at)">
-            Shared on {{ sharedOn(revealed.metadata.created_at) }}, with a
+          <span v-if="formatTimestamp(revealed.metadata.created_at)">
+            Shared on {{ formatTimestamp(revealed.metadata.created_at) }}, with a
             {{ ttlLabel(revealed.metadata.ttl) }} lifetime.
           </span>
         </AppAlert>
@@ -180,7 +260,7 @@ function downloadFile() {
       </div>
     </section>
 
-    <section v-else class="ots-panel overflow-hidden" aria-labelledby="reveal-heading">
+    <section v-else class="ots-panel overflow-hidden" aria-labelledby="reveal-heading" :aria-busy="loading">
       <div class="flex items-center gap-3 border-b border-border px-6 py-4 sm:px-8">
         <span class="ots-eyebrow">03 / Open</span>
         <span class="ots-rule flex-1" aria-hidden="true" />
@@ -189,14 +269,22 @@ function downloadFile() {
       <div class="grid gap-8 px-6 py-9 sm:px-8 lg:grid-cols-[minmax(0,1fr)_15rem]">
         <div class="space-y-6">
           <div class="space-y-3">
-            <h1 id="reveal-heading" class="text-3xl font-bold tracking-tight sm:text-4xl">
+            <h1 id="reveal-heading" class="ots-title">
               A secret was shared with you
             </h1>
-            <p class="text-muted">It can be opened once. Opening it deletes it.</p>
+            <p class="text-muted">If this link is still valid, you can open it once. Opening it deletes it.</p>
           </div>
 
-          <AppAlert>
-            Your browser previewed this link without opening the secret. Nothing has been spent.
+          <AppAlert v-if="preview">
+            <span v-if="preview.metadata.filename">File: {{ preview.metadata.filename }} · </span>
+            <span v-else-if="preview.metadata.kind === 'file'">File secret · </span>
+            <span v-else>Text secret · </span>
+            <span v-if="formatTimestamp(preview.metadata.created_at ?? null)">Shared {{ formatTimestamp(preview.metadata.created_at ?? null) }} · </span>
+            Lifetime {{ ttlLabel(preview.metadata.ttl) }}. A link preview cannot open it; nothing has been spent yet.
+          </AppAlert>
+          <AppAlert v-else-if="previewNote">{{ previewNote }}</AppAlert>
+          <AppAlert v-else>
+            A link preview cannot open the secret. Nothing has been spent until you confirm.
             Do not reload after revealing — the value cannot be shown again.
           </AppAlert>
 
@@ -210,11 +298,12 @@ function downloadFile() {
                 type="password"
                 autocomplete="current-password"
                 class="ots-inset w-full px-3 py-2.5 text-sm"
+                :aria-describedby="error ? 'reveal-passphrase-help reveal-passphrase-error' : 'reveal-passphrase-help'"
               />
-              <p class="text-xs text-muted">The sender should have given this to you separately.</p>
+              <p id="reveal-passphrase-help" class="text-xs text-muted">The sender should have given this to you separately.</p>
             </div>
 
-            <AppAlert v-if="error" tone="danger">{{ error }}</AppAlert>
+            <AppAlert v-if="error" id="reveal-passphrase-error" tone="danger">{{ error }}</AppAlert>
 
             <AppButton type="submit" :loading="loading">
               {{ loading ? "Revealing…" : "Reveal secret" }}

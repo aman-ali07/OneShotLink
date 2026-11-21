@@ -25,10 +25,19 @@ def api(path, method="GET", body=None):
         with urllib.request.urlopen(request) as response:
             return response.status, json.loads(response.read())
     except urllib.error.HTTPError as error:
-        return error.code, json.loads(error.read())
+        raw = error.read()
+        try:
+            return error.code, json.loads(raw)
+        except ValueError:
+            return error.code, {"raw": raw.decode(errors="replace")}
 
 
-status, created = api("/api/v3/guest/conceal", "POST", {"secret": SECRET_VALUE, "ttl": 1800})
+# Never hard-code a TTL: the operator may narrow the allowlist.
+status, config = api("/api/v3/config")
+assert status == 200, (status, config)
+status, created = api("/api/v3/guest/conceal", "POST", {
+    "secret": SECRET_VALUE, "ttl": config["default_ttl"],
+})
 assert status == 201, (status, created)
 key = created["secret_key"]
 assert key

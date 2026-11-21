@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-const props = withDefaults(defineProps<{ tone?: "info" | "success" | "danger" }>(), {
+const props = withDefaults(defineProps<{ tone?: "info" | "success" | "danger"; id?: string }>(), {
   tone: "info",
 });
 
@@ -20,7 +20,7 @@ const toneClass = computed(() => {
 </script>
 
 <template>
-  <div :role="role" :class="['rounded-md border bg-surface px-4 py-3 text-sm', toneClass]">
+  <div :id="id" :role="role" :class="['rounded-md border bg-surface px-4 py-3 text-sm', toneClass]">
     <slot />
   </div>
 </template>

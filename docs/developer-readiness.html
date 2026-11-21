@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OneShotLink — developer readiness</title>
+<style>
+  :root{--ink:#1d2430;--ink-2:#4a5566;--ink-3:#8a94a4;--line:#e3e7ee;--line-faint:#eef1f5;--surface:#fff;--canvas:#f7f8fa;--accent:#0f766e;--accent-soft:#e7f4f2;--ok:#1f7a4d;--ok-soft:#e7f5ec;--warn:#a8620a;--warn-soft:#fdf1e2}
+  *{box-sizing:border-box}html,body{margin:0;background:#fff}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .stage{position:relative;width:1030px;height:560px;overflow:hidden;margin:0 auto}
+  .window{position:absolute;left:92px;top:30px;width:1120px;height:700px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(25,35,55,.16);overflow:hidden}
+  .chrome{height:38px;display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);background:#fcfcfd}
+  .dots{display:flex;gap:6px}.dot{width:9px;height:9px;border-radius:50%;background:#d8dde5}
+  .brand{font-size:12px;font-weight:650}.crumb{font-size:12px;color:var(--ink-3)}.chrome-pill{width:86px;height:20px;border-radius:6px;background:#eef1f5;margin-left:auto}
+  .body{display:flex;height:calc(100% - 38px)}
+  .sidebar{width:160px;flex:none;border-right:1px solid var(--line);padding:18px 10px;background:var(--canvas)}
+  .nav{display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:7px;font-size:12px;color:var(--ink-2)}
+  .nav.on{background:var(--accent-soft);color:var(--accent);font-weight:600}.nav i{width:12px;height:12px;border-radius:4px;background:#cdd5e0;flex:none}.nav.on i{background:var(--accent)}
+  .side-label{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);padding:18px 10px 8px}
+  .main{flex:1;min-width:0;padding:22px 26px}
+  .eyebrow{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .title{font-size:19px;font-weight:650;letter-spacing:-.02em;margin:6px 0 4px}.sub{font-size:12px;color:var(--ink-3);margin-bottom:18px}
+  .row{display:grid;grid-template-columns:120px 1fr 72px;gap:12px;align-items:center;max-width:740px;height:48px;border-bottom:1px solid var(--line-faint);font-size:12px}
+  .row.head{height:28px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+  .desc{color:var(--ink-2)}.tag{font-size:10px;font-weight:700;color:var(--ok);background:var(--ok-soft);border-radius:10px;padding:5px 8px;text-align:center}
+  .satellite{position:absolute;left:28px;bottom:28px;width:268px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(25,35,55,.16);padding:16px 18px 12px}
+  .sat-title{font-size:12px;font-weight:650;margin-bottom:10px}
+  .sat-line{display:flex;gap:9px;align-items:center;height:27px;font-size:11.5px;color:var(--ink-2)}
+  .sat-line .mark{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+  .sat-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-faint);margin-top:8px;padding-top:10px;font-size:11px;color:var(--ink-3)}
+  .sat-foot b{color:var(--warn);font-size:11px}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="window">
+    <div class="chrome"><div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <span class="brand">OneShotLink</span><span class="crumb">/ developers / readiness</span><span class="chrome-pill"></span></div>
+    <div class="body">
+      <aside class="sidebar">
+        <div class="nav on"><i></i>Readiness</div><div class="nav"><i></i>API contract</div>
+        <div class="nav"><i></i>Examples</div><div class="nav"><i></i>Containers</div>
+        <div class="side-label">Decisions</div><div class="nav"><i></i>D-018 SDK</div>
+        <div class="nav"><i></i>v1 vs v3</div><div class="nav"><i></i>Retry rules</div>
+      </aside>
+      <div class="main">
+        <div class="eyebrow">Self-hosting readiness</div>
+        <div class="title">Four developer surfaces, one contract</div>
+        <div class="sub">Machine-readable OpenAPI, human docs, runnable examples and a reproducible container.</div>
+        <div class="row head"><span>Surface</span><span>Evidence</span><span>State</span></div>
+        <div class="row"><span>API contract</span><span class="desc">OpenAPI refs + error enum + mounted-route gate</span><span class="tag">20 checks</span></div>
+        <div class="row"><span>Examples</span><span class="desc">guest, passphrase, file, cookie burn in 3 languages</span><span class="tag">6 green</span></div>
+        <div class="row"><span>Containers</span><span class="desc">Compose defaults, healthcheck, quickstart, backup</span><span class="tag">documented</span></div>
+        <div class="row"><span>SDK plan</span><span class="desc">hand-written now; generate after v3 stabilises (D-018)</span><span class="tag">decided</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="satellite">
+    <div class="sat-title">Evidence gate</div>
+    <div class="sat-line"><span class="mark"></span>285 backend specs, 28 Vitest</div>
+    <div class="sat-line"><span class="mark"></span>6 SDK examples verified locally</div>
+    <div class="sat-line"><span class="mark"></span>T-70/T-71 operator-owned</div>
+    <div class="sat-line"><span class="mark"></span>passphrase is not E2EE</div>
+    <div class="sat-foot"><span>Public launch</span><b>NO-GO</b></div>
+  </div>
+</div>
+</body>
+</html>

@@ -12,7 +12,7 @@ import AppHeader from "@/components/AppHeader.vue";
       Skip to content
     </a>
     <AppHeader />
-    <main id="main" class="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:py-14">
+    <main id="main" tabindex="-1" class="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:py-14">
       <RouterView />
     </main>
     <AppFooter />

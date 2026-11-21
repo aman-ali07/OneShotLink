@@ -8,13 +8,19 @@ configurable TTL.
 > **Project status: production-packaged core with optional simple-mode accounts,
 > pre-alpha product.** The anonymous create → one-time reveal flow and optional accounts
 > run in a hardened non-root container with Redis persistence, CI, and redacted logs.
-> **149 backend specs pass**; the TypeScript/Vite build, a headless-Chrome secret journey,
-> and a browser signup → receipt → signout → signin journey were verified. Operational
+> **307 backend specs pass**; the TypeScript/Vite build and eight committed browser journeys
+> (lifecycle, accounts, file, requests, webhooks, states, mobile, a11y) were verified at
+> desktop and 320 px. Operational
 > controls are closed in the repository (Redis auth, backups, metrics, dependency scanning,
 > key rotation, Redis isolation); what is left is **TLS on the operator's own host and
 > domain**, which no commit can provide: see
 > [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md),
 > and [TASKS.md](TASKS.md).
+>
+> **Go-live verdict: NO-GO.** TLS on your own hostname (T-70) and the host-side Redis firewall
+> rule (T-71) are operator actions that no commit can satisfy. Do not describe a deployment as
+> production-ready until both are signed off; the app-side flow is rehearsed by
+> `script/tls-rehearsal.sh`.
 
 ## What works now
 
@@ -44,9 +50,10 @@ configurable TTL.
   container, health checks, and CI smoke test.
 
 Also implemented: the OpenAPI 3.1 document at `/api/v3/openapi.json`, `bin/ots` for
-operator tasks (customers, health, backup/restore, rotate-key), `/metrics`, and the `bin/ots`
-audit stream. Not built yet: the colonel/admin **API** (the CLI covers it), file secrets,
-organizations, custom domains, email jobs, MFA/WebAuthn/SSO, and i18n.
+operator tasks (customers, health, backup/restore, rotate-key), `/metrics`, the audit stream,
+and text file secrets up to 512 KiB (base64 in JSON, encrypted, downloaded once).
+Not built yet: the colonel/admin **API** (the CLI covers it), organizations, custom domains,
+email jobs, MFA/WebAuthn/SSO, and i18n.
 `AUTH_MODE=full` intentionally returns `501` rather than silently degrading; account
 routes return `403` when auth is disabled.
 Remaining production gaps are infrastructure, not features: TLS on your domain and the
@@ -87,9 +94,9 @@ lib/onetime/
 replica/                 # recon, feature matrix, architecture, design tokens, parity
 bin/ots                  # CLI: customers, health, backup/restore, rotate-key
 script/loadtest.rb       # single-use invariant under concurrency
-spec/                    # 133 unit + integration examples (Redis DB 15)
-e2e/journey.mjs          # committed create → reveal → gone browser test
-e2e/accounts.mjs         # committed signup → receipt → signout → signin journey
+spec/                    # 307 unit + integration examples (Redis DB 15)
+e2e/                     # 8 committed browser journeys: journey, accounts, file,
+                         # requests, webhooks, states, mobile, a11y
 Dockerfile               # multi-stage UI build + non-root Ruby runtime
 compose.yaml             # web + persistent Redis
 .github/workflows/ci.yml # specs, scans, container + browser smoke test + load test
@@ -100,6 +107,11 @@ Built by Vite into `public/app/` (git-ignored). Set `AUTH_MODE=simple` to expose
 routes and the dashboard; the default `disabled` keeps the anonymous flow only.
 
 ## Quickstart (Compose, recommended)
+
+Prerequisites: Docker with Compose v2, `openssl` (to generate secrets), `curl` (to probe)
+and `python3` (SDK example and verification scripts). For UI work you also need Node 24;
+browser journeys need Chrome/Chromium and `CHROME_PATH`. The manual non-Compose development
+path in `script/dev.sh` additionally uses a local `redis-server`.
 
 ```bash
 export SECRET="$(openssl rand -hex 32)"
@@ -116,7 +128,12 @@ read-only root filesystem and a persistent Redis volume with a memory ceiling
 hostname? [DEPLOYMENT.md](DEPLOYMENT.md) §4.2 is the deploy-day sequence, and
 `script/tls-rehearsal.sh` rehearses it on a scratch box first.
 
-Smoke test (verified through Compose; the shapes below are live responses):
+Automated end-to-end verification: `bash script/test-examples.sh` boots a throwaway Puma +
+Redis stack, runs all six SDK examples (guest, passphrase, file, burn) and cleans up. It is
+also a CI gate. Uses `ots-dev` + `ots-bundle` when present, otherwise the `oneshotlink-web`
+image produced by the quickstart (see [TESTING.md](TESTING.md) §2).
+
+Manual smoke test (verified through Compose; the shapes below are live responses):
 
 ```bash
 curl -s localhost:3000/health
@@ -131,12 +148,24 @@ curl -si -X POST localhost:3000/api/v3/guest/secret/<key>/reveal \
 ```
 
 Copy-paste examples in curl, TypeScript and Python are in [`examples/`](examples/),
-explained in [docs/SDK.md](docs/SDK.md).
+explained in [docs/SDK.md](docs/SDK.md). To prove a running stack end to end (SDK examples and
+eight browser journeys — `test`, `accounts`, `file`, `requests`, `webhooks`, `states`, `a11y`,
+where `a11y` is the axe WCAG gate; mobile, metrics and restore checks are optional):
+
+```bash
+BASE_URL=http://localhost:3000 script/verify-deployment.sh
+```
+
+`.env.example` already ships `REDIS_URL=redis://redis:6379/0` (the Compose service name).
+Use `redis://127.0.0.1:6379/0` only for a standalone process running next to Redis, never in a
+Compose `.env`. Build prerequisites (BuildKit, outbound internet, `replica/design/tokens.css`)
+are in [DEPLOYMENT.md](DEPLOYMENT.md) §2.
 
 ## Local development (no host Ruby required)
 
-Ruby/Bundler are absent on this host, so the verified test path uses a dev image. Build
-it once and create the bundle volume:
+For a one-command dev stack (Redis + Puma + Vite with source mounted), run
+`bash script/dev.sh` and open `http://127.0.0.1:5174`. It builds the dev image on first use
+and cleans up on Ctrl-C. The manual equivalent below uses a dev image and a bundle volume:
 
 ```bash
 docker build -t ots-dev - <<'EOF'
@@ -145,6 +174,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
  && rm -rf /var/lib/apt/lists/*
 EOF
 docker volume create ots-bundle
+docker run --rm -v "$PWD":/app -v ots-bundle:/bundle -e BUNDLE_PATH=/bundle -w /app \
+  ots-dev bundle install
 ```
 
 Start Redis and the Rack app on `:3100` (specs use DB 15; the app uses DB 0):
@@ -169,7 +200,7 @@ docker run --rm --network=host \
   ots-dev bundle exec rspec
 ```
 
-Expected: `149 examples, 0 failures`. The suite only touches Redis DB 15 and calls
+Expected: `307 examples, 0 failures`. The suite only touches Redis DB 15 and calls
 `FLUSHDB` there, never `FLUSHALL`.
 
 Frontend checks:
@@ -183,8 +214,9 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
 
-Vitest covers the Zod API client. A committed puppeteer journey covers the full browser flow;
-run it against a live stack with `BASE_URL=http://127.0.0.1:3000 npm --prefix e2e test`.
+Vitest covers the Zod API client. Eight committed puppeteer journeys cover the browser flows;
+run the primary one against a live stack with
+`BASE_URL=http://127.0.0.1:3000 npm --prefix e2e test` (see `TESTING.md` §3 for all eight).
 
 ## Clone workflow
 
@@ -193,17 +225,18 @@ pack (installed under `~/.agents/skills/`) drives recon → architect → design
 backend → test → diff → entrepreneur → brand → launch → deploy. Current artifacts:
 
 - [replica/recon.md](replica/recon.md) — public-source map, evidence gaps
-- [replica/features.csv](replica/features.csv) — 27-feature matrix
+- [replica/features.csv](replica/features.csv) — 33-feature matrix
 - [replica/architecture.md](replica/architecture.md) — v1 architecture
 - [replica/design/tokens.json](replica/design/tokens.json) — AA-checked tokens, applied by the SPA
-- [replica/parity.md](replica/parity.md) — parity history; current score **63.0/100 with
+- [replica/parity.md](replica/parity.md) — parity history; current working-tree score **80.8/100 with
   11/11 must-haves** (`python3 ~/.agents/skills/replica-diff/parity.py replica/features.csv`).
+  The committed HEAD figure is 66.7/100; the difference is the uncommitted release work.
   The remaining gaps are should/could items, and the passphrase is still an access gate,
   not a second key (D-012)
 
 The original's name, logo, copy, screenshots, and fonts are never copied. A rebrand is
-mandatory before launch; the brand sweep still reports the HKDF salt (K-23) and must pass
-before any deploy.
+mandatory before launch; the brand sweep (`script/brand-sweep.sh`) passes today and must stay green
+before any deploy (K-23 is resolved).
 
 Read [AGENTS.md](AGENTS.md) before clone work.
 
@@ -224,6 +257,24 @@ Read [AGENTS.md](AGENTS.md) before clone work.
 - [TECH_STACK.md](TECH_STACK.md) / [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)
 - [docs/DECISIONS.md](docs/DECISIONS.md) / [KNOWN_ISSUES.md](KNOWN_ISSUES.md)
 - [CHANGELOG.md](CHANGELOG.md)
+
+## Contributing
+
+Read [AGENTS.md](AGENTS.md) for the ground rules (including protected paths that need operator
+review) and [TESTING.md](TESTING.md) for the exact test commands. Ruby specs run in Docker against
+Redis DB 15; a change needs a spec that fails before the fix and passes after. Open a draft PR —
+a human reviews and merges; nothing is auto-merged. Never include secret values, passphrases or
+tokens in issues, PRs, logs or docs. See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[code of conduct](CODE_OF_CONDUCT.md).
+
+## Security reporting
+
+**Do not file public issues for security vulnerabilities.** Follow
+[SECURITY.md](SECURITY.md), which documents the reporting policy and scope. **Enable GitHub
+private vulnerability reporting in Settings → Security before publishing**; until then there is
+no private channel. For ordinary
+bugs, [open an issue](https://github.com/aman-ali07/OneShotLink/issues) with `X-Request-Id` from
+the failing response and the output of `script/verify-deployment.sh`.
 
 ## License
 

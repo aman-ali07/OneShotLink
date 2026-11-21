@@ -25,7 +25,13 @@ container:
 ```sh
 docker compose exec web ruby bin/ots health
 docker compose exec web ruby bin/ots customers list
+docker compose exec web ruby bin/ots migrate --dry-run   # planned schema steps, no writes
+docker compose exec web ruby bin/ots migrate             # apply pending steps (idempotent)
 ```
+
+`ots migrate` refuses a newer or corrupt `schema:version` and never rewrites stored secret
+records; run the dry-run first on every upgrade. It is an operator action — an agent run
+does not apply migrations to a live instance.
 
 ---
 

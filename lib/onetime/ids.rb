@@ -7,6 +7,9 @@ module Onetime
   # Opaque, unguessable identifiers. There are no sequential IDs anywhere in
   # the public surface: everything a user can see is 128+ bits of randomness.
   module Ids
+    # Maximum bytes of an opaque capability key accepted on any route.
+    MAX_KEY_BYTES = 128
+
     module_function
 
     def extid(bytes: 16)
