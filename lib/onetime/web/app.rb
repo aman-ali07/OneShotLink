@@ -20,8 +20,6 @@ module Onetime
       plugin :error_handler
       plugin :halt
       plugin :hooks
-      plugin :public, root: PUBLIC_ROOT,
-                     headers: { "Cache-Control" => "public, max-age=31536000, immutable" }
 
       CONTENT_SECURITY_POLICY = [
         "default-src 'self'",
@@ -38,16 +36,25 @@ module Onetime
         "worker-src 'self'"
       ].join("; ").freeze
 
+      # The static-file plugin replaces default_headers for asset responses, so
+      # both plugins must be given the same hardening set. Keeping one hash also
+      # prevents a future header added to one path from missing the other.
+      HARDENING_HEADERS = {
+        "Content-Security-Policy" => CONTENT_SECURITY_POLICY,
+        "X-Content-Type-Options" => "nosniff",
+        "X-Frame-Options" => "DENY",
+        "Referrer-Policy" => "no-referrer",
+        "Permissions-Policy" => "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        "Cross-Origin-Opener-Policy" => "same-origin",
+        "Cross-Origin-Resource-Policy" => "same-origin",
+        "X-Permitted-Cross-Domain-Policies" => "none"
+      }.freeze
+
       plugin :default_headers,
-             "Content-Type" => "application/json; charset=utf-8",
-             "Content-Security-Policy" => CONTENT_SECURITY_POLICY,
-             "X-Content-Type-Options" => "nosniff",
-             "X-Frame-Options" => "DENY",
-             "Referrer-Policy" => "no-referrer",
-             "Permissions-Policy" => "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-             "Cross-Origin-Opener-Policy" => "same-origin",
-             "Cross-Origin-Resource-Policy" => "same-origin",
-             "X-Permitted-Cross-Domain-Policies" => "none"
+             { "Content-Type" => "application/json; charset=utf-8" }.merge(HARDENING_HEADERS)
+
+      plugin :public, root: PUBLIC_ROOT,
+                     headers: HARDENING_HEADERS.merge("Cache-Control" => "public, max-age=31536000, immutable")
 
       def json(payload, status: nil)
         response.status = status if status
@@ -56,6 +63,18 @@ module Onetime
 
       def request_id
         env["onetime.request_id"] ||= SecureRandom.uuid
+      end
+
+      # Roda's error handler builds a fresh response, so these headers must be
+      # applied on the error path too — a consumed link's 404 is just as much a
+      # secret-bearing answer as the 200 that preceded it.
+      def apply_response_headers!
+        response["X-Request-Id"] = request_id
+        response["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains" if Config.ssl?
+        return unless request.path.start_with?("/api", "/health", "/metrics")
+
+        response["Cache-Control"] = "no-store"
+        response["Pragma"] = "no-cache"
       end
 
       def logger
@@ -102,6 +121,10 @@ module Onetime
       # instance-method overrides) is what Roda registers.
       before do
         @request_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        # API.md promises X-Request-Id on every response; the error envelope
+        # already carries the same value. Generate it once, here, so both the
+        # header and the body agree and every response is correlatable.
+        response["X-Request-Id"] = request_id
       end
 
       after do |res|
@@ -113,6 +136,16 @@ module Onetime
         # response.status here would not affect what is sent.
         status = res ? res[0] : 500
         Metrics.record(family: metrics_family(request.path_info), status: status, duration: duration)
+      end
+
+      # Metrics are operator-only. An enabled endpoint with no configured token
+      # stays a closed 404 (fail closed). Compare the whole header in constant
+      # time so the token cannot be recovered by timing.
+      def metrics_authorized?
+        token = Config["METRICS_TOKEN"].to_s
+        return false if token.empty?
+
+        Crypto.secure_compare(env["HTTP_AUTHORIZATION"].to_s, "Bearer #{token}")
       end
 
       # Bounded label set: never derive a family from a key or raw path.
@@ -194,6 +227,12 @@ module Onetime
         Audit.record(event, actor_id: actor_id, request_id: request_id, ip: client_id, detail: detail)
       end
 
+      # A request key is a bearer capability. The access log redacts it, and the
+      # long-lived audit stream must not become the weaker copy of that secret.
+      def audit_reference(key)
+        Ids.opaque_index(key)[0, 12]
+      end
+
       def enforce_rate_limit!(scope)
         result = Limiter.check!(
           client_id,
@@ -218,13 +257,13 @@ module Onetime
 
       # Recompute headers for the 429 path: enforce_rate_limit! raises before
       # it can set them, so the error handler asks the limiter what is left.
-      def set_rate_limit_headers_for(scope)
+      def set_rate_limit_headers_for(scope, id: nil, window: nil)
         set_rate_limit_headers(
           Limiter.snapshot(
-            client_id,
+            id || client_id,
             scope: scope,
             limit: Config.rate_limit(scope),
-            window: Config.rate_limit_window
+            window: window || Config.rate_limit_window
           )
         )
       rescue StandardError
@@ -239,7 +278,7 @@ module Onetime
       end
 
       def parse_json_body
-        unless request.content_type.to_s.include?("application/json")
+        unless request.media_type == "application/json"
           raise ValidationError, "Content-Type must be application/json"
         end
 
@@ -284,15 +323,44 @@ module Onetime
         raise e
       end
 
+      # Owner-initiated destruction: the payload is deleted without being
+      # decrypted or returned. The key itself is never placed in the audit
+      # stream (it is a bearer capability).
+      def burn_secret_payload(key, owner_id)
+        result = Logic::BurnSecret.new(key: key, owner_id: owner_id).call
+        audit("secret.burned", actor_id: owner_id)
+        json(result)
+      end
+
       # A GET describes the key and never touches it. Chat clients unfurl links, and
       # a preview that consumed the record would hand the recipient a dead link; the
       # irreversible step belongs to an explicit POST .../reveal (K-35). The record is
       # not decrypted here either, so a rotated SECRET still answers 200 instead of 500.
+      def validate_capability_key!(key)
+        value = key.to_s
+        raise ValidationError, "key is required" if value.empty?
+        raise ValidationError, "key is too long" if value.bytesize > 128
+      end
+
       def peek_payload(key)
+        validate_capability_key!(key)
         pair = Models::Secret.fetch(key)
         raise NotFound unless pair
 
         record, = pair
+        # The preview renders metadata from the record, so authenticate it exactly
+        # as reveal does: a Redis writer must not be able to rewrite what a link
+        # appears to hold, even though a preview never decrypts or consumes it.
+        Models::Secret.verify_meta!(record)
+        # A preview is not a reveal: it never decrypts or consumes the record.
+        # Marking the receipt `previewed` is best-effort housekeeping only.
+        begin
+          Models::Secret.mark_status(key, "previewed")
+        rescue Redis::BaseError => e
+          Metrics.best_effort_failure("cleanup")
+          Onetime.logger.warn("receipt_status_failed class=#{e.class}")
+        end
+
         json(
           {
             passphrase_required: record.key?("passphrase_hash"),
@@ -329,10 +397,17 @@ module Onetime
       end
 
       def request_preview_payload(key)
+        validate_capability_key!(key)
+        # C2: the link is a capability, so preview is public. Still rate-limit
+        # it: an unthrottled GET is a cheap polling oracle for `fulfilled`.
+        enforce_rate_limit!(:reveal)
         pair = Models::SecretRequest.fetch(key)
         raise NotFound unless pair
 
         record, = pair
+        # Preview surfaces owner/label metadata; verify it before trusting it,
+        # just as the submit and reveal paths do.
+        Models::SecretRequest.verify_meta!(record, key: key)
         json({
           fulfilled: Store.redis.exists?(Models::SecretRequest.submission_key(key)),
           metadata: {
@@ -344,17 +419,19 @@ module Onetime
       end
 
       def respond_to_request_payload(key)
-        enforce_rate_limit!(:conceal)
+        # A public responder must not share the secret-creation budget: an IP
+        # exhausting one flow used to lock the other out (SA-11 class).
+        enforce_rate_limit!(:respond)
         body = parse_json_body
         result = Logic::SubmitToRequest.new(key: key, secret: body["secret"]).call
-        audit("request.responded", detail: key)
+        audit("request.responded", detail: audit_reference(key))
         json(result, status: 201)
       end
 
       def reveal_request_payload(key, customer)
         enforce_rate_limit!(:reveal)
         result = Logic::RevealRequestSubmission.new(key: key, owner_id: customer[:id]).call
-        audit("request.revealed", actor_id: customer[:id], detail: key)
+        audit("request.revealed", actor_id: customer[:id], detail: audit_reference(key))
         json(result)
       end
 
@@ -492,6 +569,7 @@ module Onetime
             created_at: receipt["created_at"].to_i,
             passphrase_required: receipt["passphrase"] == "1",
             kind: receipt["kind"],
+            status: receipt["status"] || "new",
             secret_url: "/secret/#{objid}"
           }
         end
@@ -530,7 +608,7 @@ module Onetime
 
         enforce_rate_limit!(:conceal)
 
-        params = if request.content_type.to_s.include?("application/json")
+        params = if request.media_type == "application/json"
                    parse_json_body
                  else
                    bounded_form_params(r)
@@ -556,12 +634,17 @@ module Onetime
       end
 
       route do |r|
-        response["X-Request-Id"] = request_id
-        response["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains" if Config.ssl?
-        if r.path.start_with?("/api", "/health", "/metrics")
-          response["Cache-Control"] = "no-store"
-          response["Pragma"] = "no-cache"
+        # AUTH_MODE=full is deliberately unimplemented. Fail closed for the
+        # entire API rather than serving anonymous routes while an operator
+        # believes full authentication is active (AGENTS.md, D-003).
+        if Config.full_mode? && request.path.start_with?("/api")
+          # Tag v1 before failing: the frozen v1 envelope uses `message`, and the
+          # error handler picks its shape from this value.
+          env["onetime.api_version"] = "v1" if request.path.start_with?("/api/v1")
+          raise NotConfigured
         end
+
+        apply_response_headers!
 
         # The shell must revalidate; hashed assets are immutable (public plugin).
         r.get true do
@@ -577,18 +660,27 @@ module Onetime
         r.public
 
         r.get "health" do
+          enforce_rate_limit!(:meta)
           status, body = health_response
           response.status = status
           json(body)
         end
 
-        # Prometheus scrape target. Off unless METRICS_ENABLED is set, because the
-        # series expose traffic volume.
+        # Prometheus scrape target. Closed by default: enabling it still needs a
+        # bearer token, because the series expose traffic volume and build info.
         r.get "metrics" do
           unless Config.metrics_enabled?
             response.status = 404
             next json(error_body("not_found", "Not found."))
           end
+          unless metrics_authorized?
+            # Failed token guesses must not be free. A uniform 404 until the
+            # budget is spent, then 429 — no signal about the token itself.
+            enforce_rate_limit!(:metrics_auth)
+            response.status = 404
+            next json(error_body("not_found", "Not found."))
+          end
+          enforce_rate_limit!(:metrics)
 
           redis_up = Store.healthy?
           memory = redis_up ? Store.memory_stats : nil
@@ -622,16 +714,19 @@ module Onetime
 
           r.on "v3" do
             r.get "health" do
+              enforce_rate_limit!(:meta)
               status, body = health_response
               response.status = status
               json(body)
             end
 
             r.get "config" do
+              enforce_rate_limit!(:meta)
               json(public_config)
             end
 
             r.get "openapi.json" do
+              enforce_rate_limit!(:meta)
               response["Content-Type"] = "application/json; charset=utf-8"
               json(OpenApi.document)
             end
@@ -639,7 +734,7 @@ module Onetime
             r.post "signup" do
               require_accounts!
               verify_request_origin!
-              enforce_rate_limit!(:signin)
+              enforce_rate_limit!(:signup)
               body = parse_json_body
               result = Logic::SignUp.new(email: body["email"], password: body["password"]).call
               set_session_cookie(result[:session_token])
@@ -663,6 +758,7 @@ module Onetime
 
             r.post "signout" do
               require_accounts!
+              enforce_rate_limit!(:signout)
               verify_csrf!
               actor = current_customer
               Models::Session.destroy(session_token)
@@ -686,6 +782,7 @@ module Onetime
 
               r.post "password" do
                 require_accounts!
+                enforce_rate_limit!(:password)
                 verify_csrf!
                 customer = require_session!
                 body = parse_json_body
@@ -715,6 +812,7 @@ module Onetime
               # the method matcher.
               r.is(method: "DELETE") do
                 require_accounts!
+                enforce_rate_limit!(:delete)
                 verify_csrf!
                 customer = require_session!
                 body = parse_json_body
@@ -742,9 +840,9 @@ module Onetime
             r.on "requests" do
               r.post true do
                 require_accounts!
+                enforce_rate_limit!(:request)
                 verify_csrf!
                 customer = require_session!
-                enforce_rate_limit!(:signin)
                 create_request_payload(customer)
               end
 
@@ -755,13 +853,13 @@ module Onetime
               end
 
               r.on String do |key|
+                # C2: recipient-facing routes are public capabilities. The
+                # owner-only create/list/reveal routes above stay session-scoped.
                 r.get true do
-                  require_accounts!
                   request_preview_payload(key)
                 end
 
                 r.post "respond" do
-                  require_accounts!
                   verify_csrf!
                   respond_to_request_payload(key)
                 end
@@ -784,6 +882,7 @@ module Onetime
             r.on "webhooks" do
               r.post true do
                 require_accounts!
+                enforce_rate_limit!(:webhook)
                 verify_csrf!
                 customer = require_session!
                 create_webhook_payload(customer)
@@ -798,12 +897,20 @@ module Onetime
               r.on String do |id|
                 r.get "deliveries" do
                   require_accounts!
+                  # This GET performs a Redis SCAN over every delivery record,
+                  # so it needs the same budget as the mutating webhook routes.
+                  enforce_rate_limit!(:webhook_read)
                   customer = require_session!
-                  json({ deliveries: Webhook.deliveries(customer[:id]) })
+                  # A foreign or unknown id is a uniform 404, never an
+                  # owner-wide delivery listing (B8).
+                  raise NotFound unless Webhook.owned?(customer[:id], id)
+
+                  json({ deliveries: Webhook.deliveries(customer[:id], id: id) })
                 end
 
                 r.is(method: "DELETE") do
                   require_accounts!
+                  enforce_rate_limit!(:webhook)
                   verify_csrf!
                   customer = require_session!
                   delete_webhook_payload(customer, id)
@@ -861,6 +968,16 @@ module Onetime
                   reveal_payload(key, passphrase: body["passphrase"])
                 end
 
+                # D-receipt burn: owner-only, CSRF-checked and rate-limited.
+                # Roda has no r.delete; use the explicit method matcher.
+                r.is(method: "DELETE") do
+                  require_accounts!
+                  enforce_rate_limit!(:burn)
+                  verify_csrf!
+                  customer = require_session!
+                  burn_secret_payload(key, customer[:id])
+                end
+
                 r.get true do
                   require_session!
                   enforce_rate_limit!(:reveal)
@@ -893,6 +1010,9 @@ module Onetime
       end
 
       error do |error|
+        # Re-apply the correlation, HSTS and no-store headers lost when Roda
+        # rebuilds the response; the envelope body uses the same request_id.
+        apply_response_headers!
         # A Redis outage is our failure, not the caller's, and it is temporary.
         # Report it as 503 with a retry hint instead of a generic 500.
         error = Onetime::Unavailable.new if datastore_error?(error)
@@ -900,9 +1020,10 @@ module Onetime
         if api_version == "v1"
           response.status = error.respond_to?(:status) ? error.status : 500
           if error.is_a?(Onetime::RateLimited)
-            response["Retry-After"] = Config.rate_limit_window.to_s
+            response["Retry-After"] = (error.instance_variable_get(:@window) || Config.rate_limit_window).to_s
             scope = error.instance_variable_get(:@scope)
-            set_rate_limit_headers_for(scope) if scope
+            set_rate_limit_headers_for(scope, id: error.instance_variable_get(:@id),
+                                        window: error.instance_variable_get(:@window)) if scope
           elsif error.is_a?(Onetime::Unavailable)
             response["Retry-After"] = retry_after_unavailable
           end
@@ -912,9 +1033,10 @@ module Onetime
           case error
           when Onetime::RateLimited
             response.status = 429
-            response["Retry-After"] = Config.rate_limit_window.to_s
+            response["Retry-After"] = (error.instance_variable_get(:@window) || Config.rate_limit_window).to_s
             scope = error.instance_variable_get(:@scope)
-            set_rate_limit_headers_for(scope) if scope
+            set_rate_limit_headers_for(scope, id: error.instance_variable_get(:@id),
+                                        window: error.instance_variable_get(:@window)) if scope
             json(error_body(error.code, error.message))
           when Onetime::Unavailable
             response.status = 503

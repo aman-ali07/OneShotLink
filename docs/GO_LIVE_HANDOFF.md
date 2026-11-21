@@ -4,6 +4,11 @@ Snapshot: **2026-11-20**, verified on the `dd14fa7` tree plus the final `REDIS_P
 sentinel guard (both pushed). Companion artifact:
 [FEATURE_EVIDENCE.md](FEATURE_EVIDENCE.md).
 
+> **Historical snapshot.** Spec counts and scores below are from that date (133/149 specs,
+> 12 Vitest tests, parity 63.0). The current authoritative figures are in `TESTING.md`
+> (285 backend specs, 28 Vitest tests) and `README.md` (parity 66.7). Do not treat the numbers
+> in this memo as current; it is kept for the operator sequence and approval line only.
+
 ## Production audit: 84/100 — launchable with caveats
 
 Every in-repo gap found by the four-role production audit is closed and verified below. The
@@ -129,7 +134,9 @@ Payloads never contain secret material; this is not end-to-end encrypted deliver
 
 ## Operator sequence for a real go decision
 
-1. Buy the domain; point `app.` and apex at the VM; serve `site/` at apex.
+1. Buy the domain; point `app.` and apex at the VM; serve `site/` at apex. Replace
+   `https://app.your-domain.example/` in `site/index.html` (hero "Create a secret" CTA) with the
+   real app URL before publishing — on the split-host topology `href="/"` just reloads the landing page.
 2. Terminate TLS at the proxy; set `SSL=true`, `HOST=https://app.<domain>`, `TRUST_PROXY=true`,
    `TRUSTED_PROXIES=<proxy CIDRs>`; generate `SECRET`/`REDIS_PASSWORD` into a `0600` `.env`.
    The example placeholders now fail closed, so an unfilled copy cannot boot.
@@ -140,6 +147,22 @@ Payloads never contain secret material; this is not end-to-end encrypted deliver
    instance (receipts and owner index now come back too); re-run preflight after any change.
 6. Only then record the live URL at the top of `replica/deploy.md`, close B2/B4/B5/B6, and ask
    the human for the go. Until then keep saying "production-packaged, go-live pending".
+
+### Stage 17 staging preparation
+
+Phase 0 decisions, the staging-isolation waiver awaiting operator acceptance, and the outstanding
+human gates are recorded in [`STAGING_PHASE0.md`](STAGING_PHASE0.md). No staging resource exists
+yet; `STAGING_TEST_REPORT.md` will be written only after real target-host evidence is collected.
+
+### Free-tier (₹0) alternative sequence
+
+For the approved free-tier stack (Render Free + Upstash Redis Free + GitHub Actions + Cloudflare
+Pages), use [`deploy/free-tier/README.md`](../deploy/free-tier/README.md) instead of steps 1–4
+above. It contains the Render environment contract (`rediss://`, `HOST` without a scheme, proxy
+trust decision), the one-off migration gate, the ≥60 s health-check grace, the proposed ops
+workflow, and the non-deploying verification script. On that stack T-71 is **substitute controls
+only** (TLS + token AUTH; no IP allowlist/ACL/Private Link), and a `preflight.sh --skip-redis`
+PASS proves nothing about Redis isolation. Nothing there has been deployed.
 
 ## Decisions not taken here
 

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OneShotLink — open-source release readiness</title>
+<style>
+  :root { --ink:#1d2430; --ink-2:#4a5566; --ink-3:#8a94a4; --line:#e3e7ee; --line-faint:#eef1f5;
+          --surface:#fff; --ok:#1f7a4d; --warn:#9a6700; }
+  * { box-sizing:border-box; } html, body { margin:0; background:#fff; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
+  .stage { position:relative; width:1030px; height:560px; overflow:hidden; }
+  .window { position:absolute; left:54px; top:32px; width:726px; height:520px; background:var(--surface);
+            border:1px solid var(--line); border-radius:12px; box-shadow:0 18px 50px rgba(25,35,55,.14); overflow:hidden; }
+  .chrome { height:38px; display:flex; align-items:center; gap:12px; padding:0 14px; border-bottom:1px solid var(--line); background:#fcfcfd; }
+  .dots { display:flex; gap:6px; } .dot { width:9px; height:9px; border-radius:50%; background:#d8dde5; }
+  .crumb { font-size:12px; color:var(--ink-3); }
+  .main { padding:26px 28px; }
+  .eyebrow { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); }
+  h1 { font-size:22px; letter-spacing:-.02em; margin:12px 0 8px; }
+  .lead { font-size:12px; color:var(--ink-2); line-height:1.6; max-width:530px; margin:0 0 16px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .card { border:1px solid var(--line); border-radius:9px; padding:12px 14px; }
+  .card .n { font-size:16px; font-weight:650; }
+  .card .l { font-size:10.5px; color:var(--ink-3); margin-top:3px; }
+  .bar { height:6px; background:var(--line-faint); border-radius:4px; margin-top:7px; }
+  .bar > i { display:block; width:100%; height:100%; background:var(--ok); border-radius:4px; }
+  .sat { position:absolute; left:752px; top:88px; width:250px; background:var(--surface);
+         border:1px solid var(--line); border-radius:10px; box-shadow:0 14px 38px rgba(25,35,55,.13); padding:16px; }
+  .sat h2 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin:0 0 11px; }
+  .fix { font-size:10.8px; padding:6px 0; border-bottom:1px solid var(--line-faint); }
+  .fix:last-child { border-bottom:0; }
+  .fix b { display:block; } .fix span { color:var(--ink-3); }
+  .foot { position:absolute; left:54px; top:514px; width:726px; font-size:10.8px; color:var(--ink-3); line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="window">
+    <div class="chrome">
+      <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <span class="crumb">OneShotLink / Open-source release readiness</span>
+    </div>
+    <div class="main">
+      <p class="eyebrow">Release / Documentation gates</p>
+      <h1>Source package complete; publishing is human-gated</h1>
+      <p class="lead">Five parallel <b>.claude/</b> doc reviewers covered README, architecture/API, contributor files, security policy and deployment. A tracked-only clone fails to build; the intended release tree builds, tests and ships a non-root image.</p>
+      <div class="grid">
+        <div class="card"><div class="n">0</div><div class="l">secrets in tracked files</div><div class="bar"><i></i></div></div>
+        <div class="card"><div class="n">307</div><div class="l">backend specs · 0 failures</div><div class="bar"><i></i></div></div>
+        <div class="card"><div class="n">35</div><div class="l">Vitest tests · 0 failures</div><div class="bar"><i></i></div></div>
+        <div class="card"><div class="n">PASS</div><div class="l">clean-tree build + non-root image</div><div class="bar"><i></i></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="sat">
+    <h2>Fixed / remaining</h2>
+    <div class="fix"><b>verify-deployment</b><span>installs e2e deps on clean clone</span></div>
+    <div class="fix"><b>OpenAPI contract</b><span>503 / 429 gaps closed red→green</span></div>
+    <div class="fix"><b>Doc drift</b><span>README, API, ADRs, env, deployment</span></div>
+    <div class="fix"><b>Release tree</b><span>git add -A; fresh clone green</span></div>
+    <div class="fix"><b>Private reporting</b><span>HIGH: enable in repo settings</span></div>
+    <div class="fix"><b>Deploy gates</b><span>T-70/T-71 still NO-GO</span></div>
+  </div>
+  <p class="foot">Verdict: source-package <b>GO</b> after human staging and security-settings actions. Public deployment remains <b>NO-GO</b>; no commit, push or deploy was performed. Passphrase is an access gate, not end-to-end encryption.</p>
+</div>
+</body>
+</html>

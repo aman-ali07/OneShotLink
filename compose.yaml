@@ -23,7 +23,9 @@ services:
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      # REDISCLI_AUTH keeps the password out of the process argument list, where
+      # any container-local process could read it from /proc.
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -45,8 +47,13 @@ services:
         condition: service_healthy
     environment:
       SECRET: ${SECRET:?SECRET is required (openssl rand -hex 32)}
-      REDIS_URL: redis://redis:6379/0
+      # Compose default differs from the standalone default: the app reaches
+      # Redis by service name on the internal network. Override with a
+      # rediss:// URL to use managed/external Redis.
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      REDIS_TIMEOUT: ${REDIS_TIMEOUT:-5}
+      REDIS_RECONNECT_ATTEMPTS: ${REDIS_RECONNECT_ATTEMPTS:-2}
       HOST: ${HOST:-localhost:3000}
       SSL: ${SSL:-false}
       AUTH_MODE: ${AUTH_MODE:-disabled}
@@ -58,17 +65,35 @@ services:
       RATE_LIMIT_CONCEAL: ${RATE_LIMIT_CONCEAL:-30}
       RATE_LIMIT_REVEAL: ${RATE_LIMIT_REVEAL:-60}
       RATE_LIMIT_SIGNIN: ${RATE_LIMIT_SIGNIN:-10}
+      RATE_LIMIT_SIGNUP: ${RATE_LIMIT_SIGNUP:-10}
+      RATE_LIMIT_REQUEST: ${RATE_LIMIT_REQUEST:-10}
+      RATE_LIMIT_RESPOND: ${RATE_LIMIT_RESPOND:-10}
+      RATE_LIMIT_BURN: ${RATE_LIMIT_BURN:-10}
+      RATE_LIMIT_WEBHOOK: ${RATE_LIMIT_WEBHOOK:-10}
+      RATE_LIMIT_WEBHOOK_READ: ${RATE_LIMIT_WEBHOOK_READ:-10}
+      RATE_LIMIT_PASSWORD: ${RATE_LIMIT_PASSWORD:-5}
+      RATE_LIMIT_DELETE: ${RATE_LIMIT_DELETE:-3}
+      RATE_LIMIT_SIGNOUT: ${RATE_LIMIT_SIGNOUT:-10}
+      RATE_LIMIT_METRICS: ${RATE_LIMIT_METRICS:-5}
+      RATE_LIMIT_META: ${RATE_LIMIT_META:-300}
+      RATE_LIMIT_METRICS_AUTH: ${RATE_LIMIT_METRICS_AUTH:-5}
       RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-60}
-      TRUST_PROXY: ${TRUST_PROXY:-false}
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      RATE_LIMIT_PASSPHRASE: ${RATE_LIMIT_PASSPHRASE:-5}
+      RATE_LIMIT_PASSPHRASE_WINDOW: ${RATE_LIMIT_PASSPHRASE_WINDOW:-900}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1/32,::1/128}
       METRICS_ENABLED: ${METRICS_ENABLED:-false}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      PUMA_MIN_THREADS: ${PUMA_MIN_THREADS:-1}
       PUMA_MAX_THREADS: ${PUMA_MAX_THREADS:-5}
+      PUMA_WORKER_TIMEOUT: ${PUMA_WORKER_TIMEOUT:-60}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      # With a proxy on the host, set APP_BIND=127.0.0.1 so the app port is not
-      # reachable from the internet; the default suits a proxy on another host.
-      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
+      # Loopback by default: publishing on all interfaces exposes the app (and
+      # its reveal payloads) directly, bypassing the TLS proxy. Set APP_BIND=0.0.0.0
+      # only when the proxy runs on another host.
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
     networks:
       # Frontend carries the published port and normal egress.
       - frontend
@@ -90,6 +115,8 @@ services:
     cap_drop:
       - ALL
     healthcheck:
+      # Puma binds 3000 inside the container (Dockerfile ENV PORT=3000); the
+      # host's PORT variable must not change the in-container health probe.
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
       interval: 15s
       timeout: 5s

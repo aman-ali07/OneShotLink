@@ -2,8 +2,17 @@
 
 > **Status: production image and Compose stack built and smoke-tested (2026-11-11).**
 > The container runs as UID 10001 with a read-only rootfs, two Puma workers, a persistent
-> Redis volume, and a `/health` check. TLS, Redis auth, backups, and monitoring are still
-> operator responsibilities listed in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
+> Redis volume, and a `/health` check. Redis auth, backups and the app-side TLS gate are
+> implemented and rehearsed in-repo. The two **mandatory** operator items are TLS on a real
+> hostname (T-70) and the host Redis firewall (T-71); webhook worker scheduling (K-46) is
+> required before webhooks are enabled. See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
+
+> **Free-tier (₹0) production preparation:** the approved Render Free + Upstash Redis Free +
+> GitHub Actions + Cloudflare Pages stack is prepared under
+> [`deploy/free-tier/`](deploy/free-tier/README.md) — environment contract, proposed digest-pinned
+> image and ops workflow, and a non-deploying verification script. Those artifacts are
+> **prepared, not applied**; the protected paths in this repository are unchanged and public
+> launch remains NO-GO until T-70/T-71/K-46 have target-host evidence.
 
 ## 1. Environment variables
 
@@ -15,7 +24,7 @@ are the code defaults; `SECRET` has no default and is required.
 | `SECRET` | **yes** | — | Instance-wide encryption secret; ≥ 32 bytes. `openssl rand -hex 32` |
 | `HOST` | no | `localhost:3000` | Public host **including port**, used for links |
 | `SSL` | no | `false` | `true` when behind TLS; makes links/cookies `https`/`Secure` |
-| `REDIS_URL` | no | `redis://127.0.0.1:6379/0` | Redis/Valkey connection URL; `rediss://` enables TLS |
+| `REDIS_URL` | no | `redis://127.0.0.1:6379/0` (Compose sets `redis://redis:6379/0`) | Redis/Valkey connection URL; `rediss://` enables TLS. **Do not copy the localhost value into a Compose `.env`** — the web container has no local Redis. See `.env.example` |
 | `REDIS_PASSWORD` | compose **yes** | — | Redis auth password; folded into the URL by `Config.validated_redis_url` and never logged |
 | `REDIS_TIMEOUT` | no | `5` | Connect/read/write timeout in seconds |
 | `REDIS_RECONNECT_ATTEMPTS` | no | `2` | Reconnect attempts before surfacing an error |
@@ -26,26 +35,52 @@ are the code defaults; `SECRET` has no default and is required.
 | `SESSION_TTL` | no | `1209600` | Session lifetime in seconds (14 days) |
 | `RATE_LIMIT_CONCEAL` | no | `30` | Conceal requests per window per client |
 | `RATE_LIMIT_REVEAL` | no | `60` | Reveal attempts per window per client |
-| `RATE_LIMIT_SIGNIN` | no | `10` | Signup + signin attempts per window per client |
+| `RATE_LIMIT_SIGNUP` | no | `10` | Account-creation attempts; raising weakens the abuse guard |
+| `RATE_LIMIT_SIGNIN` | no | `10` | Sign-in attempts |
 | `RATE_LIMIT_WINDOW` | no | `60` | Window length in seconds |
+| `RATE_LIMIT_REQUEST` | no | `10` | Incoming secret request creation |
+| `RATE_LIMIT_RESPOND` | no | `10` | Answers submitted to request links |
+| `RATE_LIMIT_WEBHOOK` | no | `10` | Webhook endpoint create/delete |
+| `RATE_LIMIT_WEBHOOK_READ` | no | `10` | Webhook delivery listings |
+| `RATE_LIMIT_PASSWORD` | no | `5` | Password changes; throttles reset abuse |
+| `RATE_LIMIT_DELETE` | no | `3` | Account deletion; lowest budget for a destructive action |
+| `RATE_LIMIT_BURN` | no | `10` | Owner-initiated secret burns |
+| `RATE_LIMIT_SIGNOUT` | no | `10` | Signouts |
+| `RATE_LIMIT_METRICS` | no | `5` | Successful `/metrics` scrapes |
+| `RATE_LIMIT_METRICS_AUTH` | no | `5` | Failed token attempts; brute-force guard |
+| `RATE_LIMIT_META` | no | `300` | Health/config/OpenAPI probes; generous for healthchecks, bounded against Redis-quota floods |
+| `RATE_LIMIT_PASSPHRASE` | no | `5` | Passphrase guesses per secret (D-012b), keyed by the opaque id |
+| `RATE_LIMIT_PASSPHRASE_WINDOW` | no | `900` | 15-minute window for the per-secret guess budget |
 | `MAX_SECRET_BYTES` | no | `1048576` | Maximum secret payload (1 MiB) |
-| `TRUST_PROXY` | no | `false` | Honor `X-Forwarded-For` **only** from `TRUSTED_PROXIES` |
-| `TRUSTED_PROXIES` | no | empty | Comma-separated CIDRs of proxies allowed to set the client IP |
-| `WEB_CONCURRENCY` | no | `0` (image sets `2`) | Puma workers; 0 runs a single process |
+| `TRUST_PROXY` | no | `false` (Compose ships `true`) | Honor `X-Forwarded-For` **only** from `TRUSTED_PROXIES`; the shipped Compose file enables it for its loopback TLS proxy (SA-24) |
+| `TRUSTED_PROXIES` | no | empty (Compose ships `127.0.0.1/32,::1/128`) | Comma-separated CIDRs of proxies allowed to set the client IP |
+| `WEB_CONCURRENCY` | no | `0` (Compose ships `2`) | Puma workers; 0 runs a single process |
 | `PUMA_MIN_THREADS` / `PUMA_MAX_THREADS` | no | `1` / `5` | Per-worker thread pool |
 | `LOG_LEVEL` | no | `info` | `debug`\|`info`\|`warn`\|`error` |
 | `PUMA_WORKER_TIMEOUT` | no | `60` | Seconds a worker may take to boot before Puma stops it (`config/puma.rb`) |
 | `PORT` | no | `3000` | Puma bind port inside the container (`config/puma.rb`); Compose publishes `APP_PORT` |
 | `RACK_ENV` | no | `development` | `production` in the image |
 | `METRICS_ENABLED` | no | `false` | Serve `/metrics` (Prometheus text); `404` when off |
+| `METRICS_TOKEN` | with metrics | `""` (empty) | Bearer token, **≥32 bytes**; boot fails if metrics are enabled without it. `openssl rand -hex 24` |
 
 Two Compose-only variables are read by `compose.yaml`, not by `Config`:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `APP_PORT` | `3000` | Host port published by Compose |
-| `APP_BIND` | `0.0.0.0` | Host interface the port is published on. Use `127.0.0.1` when the TLS proxy runs on the same host, so the app port is not reachable from the internet |
+| `APP_BIND` | `127.0.0.1` | Host interface the port is published on. Use `0.0.0.0` only when the TLS proxy runs on another host. Keep the port in `HOST` equal to `APP_PORT`, or generated links and cookies point at the wrong port |
+| `REDIS_SUBNET` | `10.77.13.0/24` | Fixed subnet of the internal Redis network; the T-71 host firewall rule must match it |
 | `REDIS_MAXMEMORY` | `256mb` | Redis memory ceiling. It is what gives `maxmemory-policy noeviction` meaning, and it is required for `onetime_redis_memory_used_ratio` to exist at all |
+
+Process-only variables read outside `Config` (never set them in production):
+
+| Variable | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `WEBHOOK_ALLOW_PRIVATE` | no | unset | **SSRF escape hatch** for local webhook testing; never set in production (`webhook.rb`) |
+| `OTS_URL` | no | — | Base URL used by `bin/ots conceal`/`reveal` (`cli_api.rb`) |
+| `OTS_ALLOW_INSECURE` | no | unset | Permit plaintext HTTP to a non-loopback `OTS_URL`; never set in production |
+| `OTS_PASSWORD` | no | unset | CLI-only password for customer commands; inject with `docker compose exec -e OTS_PASSWORD=...`, never store it |
+| `VITE_API_PROXY` | no | `http://127.0.0.1:3100` | Vite dev-server proxy target for `/api` and `/health`; frontend development only, not a runtime setting |
 
 ## Accounts and the CLI
 
@@ -74,7 +109,15 @@ prompt. The full command set (all verified in the production container):
 | `backup --out FILE` | Export encrypted records |
 | `restore --in FILE` | Restore from a backup |
 | `rotate-key` | Re-encrypt all secrets under `OTS_NEW_SECRET` |
+| `migrate --dry-run` / `migrate` | Inspect or apply a schema migration (`RUNBOOK.md`) |
+| `audit recent` | Read the last audit events (operator read path) |
+| `webhooks:work --limit N` | Drain queued webhook deliveries; schedule via cron/systemd (K-46) |
+| `conceal` / `reveal` | Create or reveal a secret from the CLI |
 | `version` | Print the version |
+
+Outside the container, the same CLI derives its API URL from `HOST` and `SSL` (or
+`OTS_URL`) and still needs a valid `SECRET`, `REDIS_PASSWORD` and Redis reachable; see
+[docs/SDK.md](docs/SDK.md) for the client-side flow.
 
 A password change from the UI **also revokes every other live session** and keeps the
 caller signed in (verified); `reset-password` revokes all of them. The Redis session TTL
@@ -82,6 +125,10 @@ slides on activity; the browser cookie has a fixed `SESSION_TTL` max-age (defaul
 days) and is `Secure` only when `SSL=true`.
 
 `.env.example` contains placeholder values only. Never commit `.env`.
+
+**What is stored, and for how long:** see [DATABASE.md](DATABASE.md) §2 (key catalogue) and
+§8 (migrations). Secrets expire by TTL; receipts keep non-sensitive metadata for 30 days after
+reveal/burn; the audit stream is count-trimmed. Backups exclude sessions and limiter keys.
 
 ## 2. Docker image
 
@@ -92,6 +139,10 @@ Multi-stage build in `Dockerfile`:
 2. `ruby:3.3-slim` installs gems without the test group into the bundle path.
 3. The runtime stage installs only `curl`/`libssl3`, creates UID/GID 10001, copies the
    app and assets, drops privileges, exposes `3000`, and health-checks `/health`.
+
+Build prerequisites: a BuildKit-capable Docker builder (`# syntax=docker/dockerfile:1.7`),
+outbound internet during the build (npm registry, Debian apt, RubyGems), and the build input
+`replica/design/tokens.css`. Air-gapped builders need mirrored packages and a prebuilt image.
 
 Runtime requirements: `SECRET` and reachable Redis. The image contains **no** secrets and
 no `.env`; do not copy one into the build context.
@@ -106,6 +157,8 @@ docker compose up -d --build
 curl -fsS http://localhost:3000/health
 ```
 
+CI uses the equivalent explicit-image path: `docker build -t oneshotlink-web . && docker compose
+up -d --no-build` (the Compose default image name is `oneshotlink-web`).
 `compose.yaml` runs `web` and `redis`. Redis uses AOF (`appendfsync everysec`),
 `maxmemory-policy noeviction`, and `requirepass` (auth is mandatory — set
 `REDIS_PASSWORD`); the web container is read-only with `/tmp` as tmpfs. Set `APP_PORT` to
@@ -130,7 +183,7 @@ the rename itself.
 
 ## 4. Reverse proxy and TLS
 
-- Terminate TLS at Caddy/nginx/Traefik and proxy to `web:3000`.
+- Terminate TLS at Caddy/nginx/Traefik. Proxy to `web:3000` when the proxy runs as a Compose service, or to `127.0.0.1:3000` when it runs on the host.
 - Set `SSL=true` and `HOST=secrets.example.com` so generated links and cookie flags match.
 - Do not expose port 3000 publicly without TLS: URLs contain secret keys.
 - Set `TRUST_PROXY=true` and list **only** the proxy CIDRs in `TRUSTED_PROXIES`
@@ -266,6 +319,10 @@ printf 'SECRET=%s\nREDIS_PASSWORD=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" >> .env
 ```
 
+Use `>>` only into a fresh or empty `.env`; when starting from `.env.example`, replace its
+`CHANGE-ME` placeholders in place — `REDIS_PASSWORD=CHANGE-ME` is a fail-closed sentinel and
+duplicate keys make the effective value parser-dependent.
+
 Then set, in the same `.env`:
 
 ```ini
@@ -276,10 +333,19 @@ TRUST_PROXY=true
 TRUSTED_PROXIES=127.0.0.1/32      # the proxy's CIDR — nothing wider
 APP_BIND=127.0.0.1                # proxy runs on this host
 METRICS_ENABLED=true              # only if /metrics is not public-facing
+METRICS_TOKEN=<openssl rand -hex 24>   # MANDATORY with metrics; boot fails without it
+RATE_LIMIT_PASSPHRASE=5           # per-secret guesses (D-012b)
+RATE_LIMIT_PASSPHRASE_WINDOW=900  # 15-minute window for those guesses
 ```
 
+If you copied `.env.example`, leave `REDIS_URL=redis://redis:6379/0` (Compose service DNS).
+The localhost default in the table above is only for a standalone process on the Redis host.
+
 Check: `docker compose config >/dev/null` (a YAML/interpolation error fails here, not at
-boot) and `docker compose config | grep -c 'SECRET='` is not 0.
+boot) and `docker compose config | grep -c 'SECRET='` is not 0. This check proves **presence**,
+not quality: `config.ru` calls `Config.validate!` before serving, so a short `SECRET`, the
+`CHANGE-ME` Redis password sentinel, or metrics enabled without a ≥32-byte `METRICS_TOKEN`
+fails at process boot. Do not treat `docker compose config` as the security gate.
 
 **3. Bring the stack up.** `docker compose up -d --wait`. The healthcheck gates startup,
 so this returning 0 means Redis and the app are both healthy.
@@ -289,8 +355,16 @@ http://127.0.0.1:3000/health` returns `{"status":"ok","redis":"ok",...}`; `curl 
 http://<host-lan-ip>:3000/health` must **fail** — with `APP_BIND=127.0.0.1` the app port
 is reachable from the proxy and nothing else.
 
-**4. Terminate TLS.** nginx and Caddy both forward to `127.0.0.1:3000`; the app never
-serves TLS itself. Minimal Caddy (`/etc/caddy/Caddyfile`):
+**4. Terminate TLS at zero cost.** Caddy's built-in ACME client obtains and renews a Let's
+Encrypt certificate automatically for a real hostname — no subscription, CDN, WAF or paid
+certificate is required. nginx + free Certbot is the equivalent alternative. The app never
+serves TLS itself. For the host firewall (T-71), `script/host-firewall.sh` prints restrictive
+nftables/ufw rules (public 80/443, SSH only from `ADMIN_CIDR`, deny outbound to the Redis
+subnet on 6379); it is a **dry run unless `--apply` is passed as root** and refuses a
+world-open SSH rule. Applying it and pointing DNS at the host require actual server-owner
+access; `script/tls-rehearsal.sh` proves the app side locally with Caddy.
+
+Minimal Caddy (`/etc/caddy/Caddyfile`):
 
 ```
 secrets.example.com {
@@ -345,9 +419,9 @@ passphrase rejected, secret preserved, correct passphrase reveals once, reload s
 gone). Automated equivalent:
 `BASE_URL=https://secrets.example.com npm --prefix e2e test`.
 
-**8. First backup, and prove it restores.** Backups contain ciphertext only, so a dump is
-useless without `SECRET` — store it off the host and keep `SECRET` in the same secret
-manager:
+**8. First backup, and prove it restores.** Backups contain ciphertext, passphrase hashes
+and session digests — never plaintext, but useless without `SECRET`. Store the dump off the
+host and keep `SECRET` in the same secret manager:
 
 ```bash
 docker compose exec web ruby bin/ots backup --out /backups/dump.json
@@ -356,7 +430,10 @@ docker compose exec web ruby bin/ots health      # config + Redis reachable
 ```
 
 Check the dump is non-empty and record its size; schedule it more often than your
-shortest TTL (§6). A restore drill is `bin/ots restore --in FILE` on a scratch stack.
+shortest TTL (§6). Run the isolated restore drill before relying on backups:
+`script/restore-drill.sh` (needs Docker, the `ots-dev` image and host `redis-cli`; it uses a
+throwaway instance and touches no production data). A manual equivalent is
+`bin/ots restore --in FILE` on a scratch stack.
 
 **9. Watch it.** Point your scraper at `/metrics` (§5.1) and alert on `onetime_up == 0`,
 `onetime_redis_up == 0`, `/health` non-200, and Redis memory > 80% (the policy is
@@ -441,23 +518,30 @@ docker cp "$(docker compose ps -q web):/backups/dump.json" ./dump.json
   RUNBOOK.md.
 - Keep the AOF-volume snapshot as a kernel-level backstop; the `bin/ots` export is the
   portable one because it does not depend on the Redis file format version.
-- Backups contain ciphertext and Argon2id hashes only — useless without `SECRET`, and
-  only a holder of the current `SECRET` can restore-and-read them. Encrypt at rest and
-  restrict access. Sessions are deliberately **not** exported.
+- Secret values, passphrase hashes and webhook signing secrets are encrypted and useless
+  without `SECRET`, so only a holder of the current `SECRET` can restore-and-read them.
+  Customer emails and receipt metadata are plaintext PII, however, and sessions are
+  deliberately **not** exported. Treat the dump as sensitive, encrypt it at rest and restrict
+  access.
 - `noeviction` prevents silent loss before TTL; monitor memory and alert at 80%.
 - Losing Redis without a backup loses all unexpired secrets. Make that explicit to
   operators; see [RUNBOOK.md](RUNBOOK.md) §2.
 
 ## 7. Upgrades and rollback
 
-1. Read [CHANGELOG.md](CHANGELOG.md); check for schema/`schema:version` changes (none yet).
+1. Read [CHANGELOG.md](CHANGELOG.md) and [DATABASE.md](DATABASE.md) §8. A `schema:version`
+   marker and `bin/ots migrate` exist; run `bin/ots migrate --dry-run` on a copy before every
+   upgrade (RUNBOOK §0), then apply with `bin/ots migrate` if it reports pending steps.
 2. Back up Redis (AOF/RDB) before upgrading.
-3. Deploy the new image; health check must pass before routing traffic.
-4. Rollback: redeploy the previous image tag. Redis data is backward compatible within
-   v1; if a migration ran, restore the backup instead of downgrading blindly.
+3. Rebuild the image from the known-good commit (`docker compose up -d --build`); the health
+   check must pass before routing traffic.
+4. Rollback: **rebuild from the previous commit** exactly as described in
+   [RUNBOOK.md](RUNBOOK.md) §6. This Compose file has a `build:` section and no `image:`, so
+   `docker pull` is a no-op. Redis data is backward compatible within v1; if a migration ran,
+   restore the backup instead of downgrading blindly.
 
-Image tags: `:dev`, `:vX.Y.Z`, and `:latest` for the newest stable. Pin a digest in
-production.
+No registry image tags are published. If you publish your own, add `image:` with a pinned
+digest to `compose.yaml` and adapt the rollback steps.
 
 ## 8. Redis hardening (auth and TLS)
 
@@ -484,17 +568,13 @@ Redis is the system of record, so it must not be reachable unauthenticated.
 - A single Redis is a single point of failure. Sentinel/Cluster is out of scope. The
   outage behaviour is: `/health` and every Redis-backed route answer `503
   service_unavailable` with `Retry-After`, and they recover without a restart — an outage
-  is neve limits are per Redis, not per instance — good.
-- A single Redis is a single point of failure. Sentinel/Cluster is out of scope. The
-  outage behaviour is: `/health` and every Redis-backed route answer `503
-  service_unavailable` with `Retry-After`, and they recover without a restart — an outage
   is never reported as a generic `500`.
 - **When Redis reaches `maxmemory`** (with `noeviction`) every write is rejected with the
   same `503`, and so is every reveal — the atomic consume is a Lua `EVAL`, which Redis
   refuses to run at the ceiling. Nothing is lost: measured on a 6 MB stack, the write that
   crossed the ceiling got `503` + `Retry-After: 5`, and the earlier secrets revealed
   normally once `maxmemory` was raised. Note that TTLs keep running while storage is full,
-  so a secret can expire before the operator frees space — alert on the ratio below 0.8 to
+  so a secret can expire before the operator frees space — alert before the ratio exceeds 0.8 to
   make that window unreachable in practice. Runbook: [RUNBOOK.md](RUNBOOK.md) §2b.
 - **Sizing the ceiling.** Measured on the default 256 MB: a 200-secret load test (161
   creates/s) left Redis at 1.36 MB, i.e. ~7 KB per small secret, so 256 MB holds roughly

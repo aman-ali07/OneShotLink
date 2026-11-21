@@ -56,17 +56,19 @@ The `secret:object:<id>` value is deleted by a Lua script evaluated atomically i
 ```lua
 local current = redis.call('GET', KEYS[1])
 if not current then return 0 end
-if ARGV[1] ~= '' and current ~= ARGV[1] then return 0 end
+if current ~= ARGV[1] then return 0 end
 redis.call('DEL', KEYS[1])
 return 1
 ```
 
+The comparison is deliberately unconditional: an empty expected value must never turn this
+into an unverified delete, even if a future caller forgets the Ruby guard (SA-20).
 `expected_value` is mandatory in `Store.consume`. The record bytes read, verified and
 decrypted are the exact bytes compared and deleted, so an intervening mutation cannot cause
 the wrong record to be destroyed. Two concurrent reveals produce one winner (`200`) and
 one or more `404`s — covered by an 8-way race spec.
 
-Reveal order is: fetch → verify passphrase → decrypt → atomic consume → receipt/index
+Reveal order is: fetch → `verify_meta!` → verify passphrase → decrypt → atomic consume → receipt/index
 cleanup (D-013). A rotated or wrong `SECRET`, a corrupt record or a wrong passphrase all
 fail **before** the irreversible step and leave the secret readable.
 
@@ -78,7 +80,7 @@ Key rotation uses a separate compare-and-swap script (`Store.rewrite_if_unchange
 
 - The record is written with `SET … EX <ttl>`; TTL must be one of `TTL_OPTIONS`
   (defaults `1800,43200,86400,259200` seconds). Receipt hashes and owner index entries
-  receive matching TTLs in the same `MULTI`, so metadata does not outlive the secret.
+  receive matching TTLs in the same `MULTI`, so metadata does not outlive the secret until a terminal transition; the receipt is then retained for 30 days with no payload (D-017).
 - "Destroyed" means the Redis key is deleted (on reveal) or expires (on TTL). It is **not**
   cryptographic erasure: Redis AOF/RDB snapshots, backups, and filesystem snapshots taken
   while the key existed still contain the ciphertext until they age out or are deleted.
@@ -124,8 +126,8 @@ plaintext. The committed integration spec asserts exactly this (ciphertext-only 
 Executed live against a throwaway stack (2026-11-20), with `SECRET` generated at boot:
 
 ```text
-GET secret:object:<id>  -> {"v":1,...,"ciphertext":"X4VA...","iv":"67DR...",
-                            "tag":"pjKH...","salt":"4E2n...","cipher":"aes-256-gcm"}
+GET secret:object:<id>  -> {"v":3,"meta_mac":"<hex>",...,"ciphertext":"X4VA...",
+                            "iv":"67DR...","tag":"pjKH...","salt":"4E2n...","cipher":"aes-256-gcm"}
 grep -c 'TAMPER_SENTINEL' over all secret:object values -> 0
 flip one base64 char in ciphertext, POST .../reveal -> 500
   {"error":{"code":"internal_error","message":"Stored secret failed integrity verification",...}}
@@ -139,9 +141,12 @@ failure neither leaks nor destroys the secret.
 ## 8. What this does not claim
 
 - No zero-knowledge: the instance `SECRET` can decrypt every record (D-012).
-- No per-secret passphrase attempt budget: guessing is bounded only by the per-IP reveal
-  limiter (D-014 consequences).
-- No forward secrecy, no per-recipient keys, no client-side encryption, no file secrets.
+- Not a zero-knowledge passphrase: the passphrase is an access gate, not a second key, and
+  guessing is bounded by both the per-IP reveal limiter and a per-secret budget
+  (5 guesses / 900 s, D-012b). A leaked `SECRET` plus a leaked record exposes the content.
+- No forward secrecy, no per-recipient keys, no client-side encryption. Text and text-file
+  secrets use the same server-side AES-256-GCM path (see API.md §5.1); there is no separate
+  file-encryption primitive.
 - No cryptographic erasure from backups or storage snapshots (§5).
 - No distributed tracing; metrics counters are per Puma worker.
 - No claim that static inspection proves runtime behavior — the specs and live requests in

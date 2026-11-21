@@ -20,16 +20,18 @@ rather than the Gemfile constraint.
 | JSON | OJ | `~> 3.16` | via Bundler | Fast serialization for API responses (`Oj.dump`, compat mode) |
 | Passwords | Argon2id via `argon2` | `~> 2.3` | via Bundler | Memory-hard hashing; `bcrypt` legacy path verified (K-03 resolved) |
 | CLI | Ruby `OptionParser` (stdlib) | Ruby 3.3 | stdlib | `bin/ots` subcommands without an extra runtime dependency |
-| Logging | semantic_logger | `~> 4.16` | via Bundler | Declared; current app uses Ruby `Logger` + request IDs, not wired yet |
-| i18n | ruby-i18n | `~> 1.14` | via Bundler | Declared for later localization; no locale files are loaded yet |
+| Logging | Ruby `Logger` (stdlib) | Ruby 3.3 | stdlib | Request IDs + redacted logger; no external logging gem |
+| i18n | — | — | — | Not used; would require a dependency decision before adding one |
 | Tests | RSpec + rack-test | `~> 3.13`, `~> 2.2` | via Bundler | Integration specs through the real Rack stack |
 | Frontend | Vue 3 | `^3.5.13` | Node 24.22.0 | Composition API, `<script setup>` |
 | Build | Vite | `^6.0.7` | Node 24 | Dev server + static build to `public/app` |
 | Language (frontend) | TypeScript | `~5.7.2` | — | Strict + `noUncheckedIndexedAccess`; `vue-tsc` gate |
 | Styling | Tailwind CSS | `^4.0.0` (`@tailwindcss/vite`) | — | Utility-first, tokens from `replica/design` |
 | Validation | Zod | `^4.6.7` | — | Runtime parsing + inferred types; 3.x had a high advisory (T-74) |
-| State | Pinia | not used | — | Local component state is enough for two views |
-| Routing | Vue Router | `^4.5.0` | — | `/` and `/secret/:key` |
+| Component tests | `@vue/test-utils` + `jsdom` | `^2.6.0`, `^31.0.1` | Node 24 | Dev-only; canonical Vue/JSdom projects (D-016). jsdom does not replace the live axe gate |
+| A11y gate | `axe-core` | `^4.14.1` | Node 24 | Dev-only in `e2e/`; canonical Deque package (D-016), injected via CDP past the strict CSP |
+| State | Pinia | not used | — | Local component state is enough for the current seven views/routes |
+| Routing | Vue Router | `^4.5.0` | — | `/`, `/secret/:key`, `/signin`, `/signup`, `/dashboard`, `/request/:key` and the not-found catch-all |
 | Container | Docker + Compose | 29.1.3 available | yes | Single-image self-hosting |
 
 ## Deliberate deviations from the brief
@@ -40,11 +42,11 @@ rather than the Gemfile constraint.
 | Familia v2 ORM | Explicit Redis mapping in `Store` + model modules | Same reason; a small, auditable mapping is enough for ~6 models (D-002) |
 | Rodauth (full mode) | Deferred; `AUTH_MODE=full` returns 501 | Full auth needs Postgres + RabbitMQ and is a product of its own (D-003) |
 | Sequel/PostgreSQL | Not used in v1 | No relational data in v1; receipts live in Redis |
-| RabbitMQ | Not used in v1 | No background work in v1; TTL handles expiry |
+| RabbitMQ | Not used in v1 | No RabbitMQ; TTL handles expiry and webhooks use a Redis queue drained by `bin/ots webhooks:work` (K-46) |
 
 ## Version policy
 
-- Pin exact versions in `Gemfile.lock` and `package-lock.json` once generated.
+- Exact versions are pinned in the committed `Gemfile.lock` and both `package-lock.json` files.
 - Ruby runtime image pins `ruby:3.3-slim` (Debian) for reproducible native gem builds.
 - Redis major version must support `EVAL`, `GET`, `SET EX`, `INCR`, `ZADD`; Redis 7+ and
   Valkey 7+ qualify. Tests must not depend on Redis 8-only commands.

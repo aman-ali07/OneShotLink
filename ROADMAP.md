@@ -5,17 +5,16 @@ Dates are **indicative**, not commitments: they assume ~1 working day per "day" 
 no external review bottleneck, and the stack in [TECH_STACK.md](TECH_STACK.md). Every
 milestone ends with an evidence gate; a milestone is not "done" because code exists.
 
-At 2026-11-12: docs, recon, architect, and design complete; **M0, M1, M2, the
+At 2026-11-21: docs, recon, architect, and design complete; **M0, M1, M2, the
 production-packaging gate, M3 simple-mode accounts, and all in-repo operational gates are
 complete.** M0: app boots and 26 specs pass. M1: full secret lifecycle. M2: Vue vertical
 slice. Packaging: hardened non-root container, Compose with persistent Redis, CI, redacted
 logs. M3: signup/signin/signout, sessions, owner receipts, dashboard, password change, CLI
 create/reset, and two browser journeys. Operations: Redis auth + internal network + host
 firewall rule, `/metrics`, dependency scanning, key rotation, backup/restore, audit
-stream, TLS rehearsal. **133 specs** green; parity **63.0/100 with 11/11 must-haves**
+stream, TLS rehearsal. **304 specs** green; parity **11/11 must-haves**
 (the remaining parity gaps are should/could items such as email verification and i18n).
-Next: **TLS on the operator's own domain** (T-70, the only open gate), then M4
-verification.
+Open operator items: **TLS on the operator's own domain (T-70), host-side Redis firewall (T-71), and webhook worker scheduling (K-46)**. All in-repo milestones and verification gates are complete (T-135…T-139).
 
 ## Order, and why
 
@@ -28,7 +27,7 @@ M0 runnable core ──► M1 secret lifecycle ──► M2 UI vertical slice �
                     │
         M2.5 production packaging (done)
                                                           
-M7 deferred (orgs, domains, i18n, full auth) runs only after M6.
+M7 deferred (orgs, domains, i18n, full auth) runs only after M6. Incoming requests and file secrets shipped in M3/M4 (T-117/T-116).
 ```
 
 | # | Milestone | Comes first because | Depends on |
@@ -41,7 +40,7 @@ M7 deferred (orgs, domains, i18n, full auth) runs only after M6.
 | M4 | Full test pass, concurrency/expiry proofs, parity re-score, CI | Numbers must be measured before branding or deploying | M1–M3 |
 | M5 | Brand + entrepreneur fixes: new name/palette, sweep clean, review-driven fixes, LICENSE | Rebranding earlier wastes work; later blocks launch | M4 |
 | M6 | Docker image, Compose, docs finalization, deploy preflight | Packaging is the last step, not the first | M5 |
-| M7 | Deferred: orgs/RBAC/SSO, custom domains, incoming requests, i18n, file secrets | Out of v1; each is its own project | M6 |
+| M7 | Deferred: orgs/RBAC/SSO, custom domains, i18n | Out of v1; each is its own project. Incoming requests and file secrets already shipped (T-117/T-116) | M6 |
 
 Deliberate sequencing rules:
 
@@ -72,9 +71,7 @@ concurrent reveal).
 Gate: PRD §7 criteria 1–4 pass; parity must-haves reach ~7/11.
 
 **Actual:** all four criteria pass (create/reveal/gone, expiry, ciphertext-only Redis,
-one winner in an 8-way race); parity is **9/11** (the two open: UI not built; passphrase
-is a gate, not zero-knowledge — D-012). Evidence: 40 specs + live Puma run. The remaining
-`/health` 503 case with Redis down is not yet tested.
+one winner in an 8-way race); parity is **11/11 must-haves**; the passphrase model is a documented parity gap (D-012), not an unmet must-have. `/health` 503 with Redis down is verified live and by spec (T-82).
 
 ### M2 — UI vertical slice (effort: 2–3 days) — ✅ done 2026-11-11
 
@@ -103,7 +100,7 @@ Compose; secrets survive a web restart; logs contain no secret keys; CI config v
 
 Delivered: signup/signin/signout/me, Redis sessions, owner receipt index, dashboard,
 password change, CSRF checks, cookie hardening, and `bin/ots customers create` /
-`reset-password`. List/health/role CLI commands remain in T-43.
+`reset-password`. The CLI also provides list/show/set-role/health (K-33).
 
 Gate verified: cookie flags; duplicate signup rejected atomically; owner cannot see
 another owner's receipts; reveal removes the receipt; browser account journey passes;
@@ -115,9 +112,7 @@ secrets never appear in the dashboard or logs. Evidence: `spec/integration/accou
 Deliverables: full RSpec suite, Playwright/click-through plan, `replica/test-plan.md`,
 `replica/bugs.md`, parity report, CI workflow, coverage of every documented status code.
 
-Gate: no open S1/S2 bugs; all must-haves are done except the passphrase zero-knowledge
-claim, which is explicitly waived by D-012 (not stubbed or relabeled); `replica/parity.md`
-committed with the waiver stated.
+Gate: no open S1/S2 bugs; 11/11 must-haves met; the passphrase zero-knowledge claim is explicitly waived by D-012 (not stubbed or relabeled); `replica/parity.md` records the waiver.
 
 ### M5 — Brand + fixes (effort: 1–2 days)
 
@@ -150,7 +145,7 @@ Start 2026-11-12. "Day" = one focused working day.
 | Window | Milestone | Ends with |
 | --- | --- | --- |
 | Nov 12–14 | M3 accounts | simple auth + dashboard |
-| Nov 17–19 | M4 tests + parity | 10/11 must-haves + D-012 waiver, no S1/S2 |
+| Nov 17–19 | M4 tests + parity | 11/11 must-haves + D-012 waiver, no S1/S2 |
 | Nov 20–24 | M5 brand + fixes | clean sweep, new identity |
 | Nov 25–28 | M6 ops + deploy | TLS, backups, metrics, preflight green |
 | Dec 7–9 | Buffer | regressions, docs, release tag |
@@ -176,7 +171,7 @@ slips by more than two days, M6 moves by the same amount; do not compress M4 or 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | No Ruby on the host | Every check runs in Docker (slower) | M0 produces a lockfile; CI mirrors the Docker command |
-| Passphrase-model decision (K-21/T-48) | Rework in crypto + specs | Decide during M1, before routes freeze |
+| Passphrase-model decision (D-012/D-012b) | Rework in crypto + specs | Resolved 2026-11-11: access gate, not zero-knowledge; per-secret budget added |
 | Reveal race is subtle | Security regression | Dedicated concurrency spec in M1 and M4 |
 | Brand/domain/trademark checks | Launch slips | Start name checks during M4, not M6 |
 | Full-auth expectations | Scope creep | Explicitly deferred to M7; 501 until then |

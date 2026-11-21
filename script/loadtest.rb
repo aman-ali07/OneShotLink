@@ -21,8 +21,16 @@ SECRETS = (ARGV[0] || ENV.fetch("LT_SECRETS", "200")).to_i
 THREADS = (ARGV[1] || ENV.fetch("LT_THREADS", "20")).to_i
 
 def http
-  uri = URI(BASE)
-  Net::HTTP.new(uri.host, uri.port).tap { |h| h.open_timeout = 5; h.read_timeout = 15 }
+  # Reuse one connection per worker thread: opening a fresh socket for every
+  # request folded TCP setup into the throughput figure being measured.
+  Thread.current[:ots_http] ||= begin
+    uri = URI(BASE)
+    Net::HTTP.new(uri.host, uri.port).tap do |h|
+      h.open_timeout = 5
+      h.read_timeout = 15
+      h.start
+    end
+  end
 end
 
 def post(path, body)
@@ -46,14 +54,13 @@ end
 
 puts "Creating #{SECRETS} secrets over #{THREADS} threads..."
 started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-queue = Queue.new
 keys = []
 
 mutex = Mutex.new
 creators = Array.new(THREADS) do
   Thread.new do
     loop do
-      done = mutex.synchronize { queue.empty? && keys.length >= SECRETS }
+      done = mutex.synchronize { keys.length >= SECRETS }
       break if done
 
       key = create
@@ -97,8 +104,8 @@ workers = Array.new(THREADS) do
           reveal_ok += 1
         else
           double_reveals += 1
+          reveal_fail += 1
         end
-        reveal_fail += 1
       end
     end
   end
@@ -109,6 +116,7 @@ reveal_in = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
 puts format("Revealed in %.2fs", reveal_in)
 puts "Secrets revealed exactly once: #{reveal_ok}"
 puts "Secrets with wrong reveal count: #{double_reveals}"
+puts "Workers that completed with no successful reveal: #{reveal_fail}"
 
 if double_reveals.positive?
   warn "FAIL: #{double_reveals} secret(s) were not revealed exactly once"

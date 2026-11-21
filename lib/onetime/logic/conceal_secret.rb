@@ -71,17 +71,7 @@ module Onetime
       end
 
       def validate_ttl
-        ttl = begin
-          Integer(@ttl.nil? ? Config.default_ttl : @ttl)
-        rescue ArgumentError, TypeError
-          raise ValidationError, "ttl must be an integer number of seconds"
-        end
-
-        unless Config.ttl_options.include?(ttl)
-          raise ValidationError, "ttl must be one of: #{Config.ttl_options.join(', ')}"
-        end
-
-        ttl
+        Config.valid_ttl!(@ttl)
       end
 
       def validate_passphrase

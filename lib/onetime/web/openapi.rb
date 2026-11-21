@@ -17,7 +17,7 @@ module Onetime
           "info" => {
             "title" => "OneShotLink API",
             "version" => VERSION,
-            "description" => "Create a single-use secret, share the link, and let it be revealed exactly once."
+            "description" => "Create a single-use secret, share the link, and let it be revealed exactly once. All responses carry X-Request-Id. AUTH_MODE=full makes every /api route return 501 not_configured."
           },
           "servers" => [{ "url" => "/" }],
           "tags" => [
@@ -35,14 +35,15 @@ module Onetime
       end
 
       def paths
-        {
+        routes = {
           "/health" => {
             "get" => op(
               "meta",
               "Liveness and Redis health",
               responses: {
                 "200" => json_ref("HealthOk"),
-                "503" => json_ref("Error")
+                "429" => rate_limited,
+                "503" => json_ref("HealthDegraded")
               }
             )
           },
@@ -50,14 +51,45 @@ module Onetime
             "get" => op(
               "meta",
               "Liveness and Redis health (versioned)",
-              responses: { "200" => json_ref("HealthOk"), "503" => json_ref("Error") }
+              responses: {
+                "200" => json_ref("HealthOk"), "429" => rate_limited,
+                "503" => json_ref("HealthDegraded")
+              }
+            )
+          },
+          "/metrics" => {
+            "get" => op(
+              "meta",
+              "Prometheus exposition; requires METRICS_ENABLED and a bearer scrape token",
+              security: [{ bearerAuth: [] }],
+              responses: {
+                "200" => {
+                  "description" => "Prometheus text exposition",
+                  "content" => { "text/plain" => { "schema" => { "type" => "string" } } }
+                },
+                "404" => json_ref("Error"),
+                "429" => rate_limited
+              }
+            )
+          },
+          "/api/v3/openapi.json" => {
+            "get" => op(
+              "meta",
+              "This machine-readable API description",
+              responses: {
+                "200" => {
+                  "description" => "OpenAPI 3.1 document",
+                  "content" => { "application/json" => { "schema" => { "type" => "object" } } }
+                },
+                "429" => rate_limited
+              }
             )
           },
           "/api/v3/config" => {
             "get" => op(
               "meta",
               "Public configuration for the UI",
-              responses: { "200" => json_ref("PublicConfig") }
+              responses: { "200" => json_ref("PublicConfig"), "429" => rate_limited }
             )
           },
           "/api/v3/requests" => {
@@ -71,14 +103,19 @@ module Onetime
                 "401" => json_ref("Error"),
                 "403" => json_ref("Error"),
                 "422" => json_ref("Error"),
-                "429" => rate_limited
+                "429" => rate_limited,
+                "503" => json_ref("Error")
               }
             ),
             "get" => op(
               "requests",
               "List the signed-in customer's incoming requests",
               security: [{ cookie: [] }],
-              responses: { "200" => json_ref("RequestList"), "401" => json_ref("Error") }
+              responses: {
+                "200" => json_ref("RequestList"),
+                "401" => json_ref("Error"),
+                "503" => json_ref("Error")
+              }
             )
           },
           "/api/v3/requests/{key}" => {
@@ -86,7 +123,12 @@ module Onetime
               "requests",
               "Describe a request without revealing any submitted secret",
               params: [key_param],
-              responses: { "200" => json_ref("RequestPreview"), "404" => json_ref("Error") }
+              responses: {
+                "200" => json_ref("RequestPreview"),
+                "404" => json_ref("Error"),
+                "429" => rate_limited,
+                "503" => json_ref("Error")
+              }
             )
           },
           "/api/v3/requests/{key}/respond" => {
@@ -101,7 +143,8 @@ module Onetime
                 "409" => json_ref("Error"),
                 "413" => json_ref("Error"),
                 "422" => json_ref("Error"),
-                "429" => rate_limited
+                "429" => rate_limited,
+                "503" => json_ref("Error")
               }
             )
           },
@@ -116,7 +159,8 @@ module Onetime
                 "200" => json_ref("RevealResponse"),
                 "401" => json_ref("Error"),
                 "404" => json_ref("Error"),
-                "429" => rate_limited
+                "429" => rate_limited,
+                "503" => json_ref("Error")
               }
             )
           },
@@ -130,32 +174,50 @@ module Onetime
                 "201" => json_ref("WebhookCreated"),
                 "401" => json_ref("Error"),
                 "403" => json_ref("Error"),
-                "422" => json_ref("Error")
+                "422" => json_ref("Error"),
+                "429" => rate_limited,
+                "503" => json_ref("Error")
               }
             ),
             "get" => op(
               "webhooks",
               "List the signed-in customer's webhook endpoints",
               security: [{ cookie: [] }],
-              responses: { "200" => json_ref("WebhookList"), "401" => json_ref("Error") }
+              responses: {
+                "200" => json_ref("WebhookList"),
+                "401" => json_ref("Error"),
+                "503" => json_ref("Error")
+              }
             )
           },
-          "/api/v3/webhooks/{key}" => {
+          "/api/v3/webhooks/{id}" => {
             "delete" => op(
               "webhooks",
               "Remove a webhook endpoint",
-              params: [key_param],
+              params: [id_param],
               security: [{ cookie: [] }],
-              responses: { "200" => json_ref("Ok"), "401" => json_ref("Error"), "404" => json_ref("Error") }
+              responses: {
+                "200" => json_ref("Ok"),
+                "401" => json_ref("Error"),
+                "404" => json_ref("Error"),
+                "429" => rate_limited,
+                "503" => json_ref("Error")
+              }
             )
           },
-          "/api/v3/webhooks/{key}/deliveries" => {
+          "/api/v3/webhooks/{id}/deliveries" => {
             "get" => op(
               "webhooks",
-              "List recent delivery attempts for the signed-in customer's endpoints",
-              params: [key_param],
+              "List recent delivery attempts for one of the signed-in customer's endpoints",
+              params: [id_param],
               security: [{ cookie: [] }],
-              responses: { "200" => json_ref("WebhookDeliveryList"), "401" => json_ref("Error") }
+              responses: {
+                "200" => json_ref("WebhookDeliveryList"),
+                "401" => json_ref("Error"),
+                "404" => json_ref("Error"),
+                "429" => rate_limited,
+                "503" => json_ref("Error")
+              }
             )
           },
           "/api/v3/guest/conceal" => {
@@ -213,8 +275,9 @@ module Onetime
                 "201" => json_ref("ConcealResponse"),
                 "401" => json_ref("Error"),
                 "403" => json_ref("Error"),
+                "413" => json_ref("Error"),
+                "422" => json_ref("Error"),
                 "429" => rate_limited,
-
                 "503" => json_ref("Error")
               }
             )
@@ -229,7 +292,21 @@ module Onetime
                 "200" => json_ref("PeekResponse"),
                 "401" => json_ref("Error"),
                 "404" => json_ref("Error"),
-
+                "429" => rate_limited,
+                "503" => json_ref("Error")
+              }
+            ),
+            "delete" => op(
+              "owner",
+              "Burn an unrevealed secret; the payload is deleted and never returned",
+              params: [key_param],
+              security: [{ cookie: [] }],
+              responses: {
+                "200" => json_ref("BurnResponse"),
+                "401" => json_ref("Error"),
+                "403" => json_ref("Error"),
+                "404" => json_ref("Error"),
+                "429" => rate_limited,
                 "503" => json_ref("Error")
               }
             )
@@ -245,7 +322,7 @@ module Onetime
                 "200" => json_ref("RevealResponse"),
                 "401" => json_ref("Error"),
                 "404" => json_ref("Error"),
-
+                "429" => rate_limited,
                 "503" => json_ref("Error")
               }
             )
@@ -287,7 +364,11 @@ module Onetime
               "account",
               "Sign out and destroy the session",
               security: [{ cookie: [] }],
-              responses: { "200" => json_ref("OkResponse"), "503" => json_ref("Error") }
+              responses: {
+                "200" => json_ref("OkResponse"),
+                "429" => rate_limited,
+                "503" => json_ref("Error")
+              }
             )
           },
           "/api/v3/account/me" => {
@@ -316,7 +397,7 @@ module Onetime
                 "200" => json_ref("OkResponse"),
                 "401" => json_ref("Error"),
                 "422" => json_ref("Error"),
-
+                "429" => rate_limited,
                 "503" => json_ref("Error")
               }
             )
@@ -331,7 +412,7 @@ module Onetime
                 "200" => json_ref("OkResponse"),
                 "401" => json_ref("Error"),
                 "403" => json_ref("Error"),
-
+                "429" => rate_limited,
                 "503" => json_ref("Error")
               }
             )
@@ -340,28 +421,66 @@ module Onetime
             "post" => op(
               "legacy",
               "Create a secret (v1 legacy shape)",
-              body: "ConcealRequest",
-              responses: { "200" => json_ref("LegacyConcealResponse"), "429" => rate_limited, "503" => json_ref("Error") }
+              body: "LegacyConcealRequest",
+              form_body: "LegacyConcealRequest",
+              responses: {
+                "200" => json_ref("LegacyConcealResponse"),
+                "413" => json_ref("LegacyError"),
+                "422" => json_ref("LegacyError"),
+                "429" => rate_limited(version: "v1"),
+                "503" => json_ref("LegacyError")
+              }
             )
           },
           "/api/v1/secret/{key}" => {
             "get" => op(
               "legacy",
-              "Reveal a secret (v1 GET)",
+              "Reveal a secret (v1 GET — CONSUMES it; not link-preview safe). HEAD is refused with 405 and Allow: GET, POST.",
               params: [key_param],
-              responses: { "200" => json_ref("LegacyRevealResponse"), "404" => json_ref("LegacyError"), "503" => json_ref("Error") }
+              responses: {
+                "200" => json_ref("LegacyRevealResponse"),
+                "401" => json_ref("LegacyError"),
+                "404" => json_ref("LegacyError"),
+                "429" => rate_limited(version: "v1"),
+                "503" => json_ref("LegacyError")
+              }
             ),
             "post" => op(
               "legacy",
-              "Reveal a secret (v1 POST)",
+              "Reveal a secret (v1 POST — consumes it; v3 splits GET preview from POST reveal)",
               params: [key_param],
-              responses: { "200" => json_ref("LegacyRevealResponse"), "404" => json_ref("LegacyError"), "503" => json_ref("Error") }
+              responses: {
+                "200" => json_ref("LegacyRevealResponse"),
+                "401" => json_ref("LegacyError"),
+                "404" => json_ref("LegacyError"),
+                "429" => rate_limited(version: "v1"),
+                "503" => json_ref("LegacyError")
+              }
             )
           }
         }
+
+        # Every operation can emit 500 internal_error. Full-mode 501 is a
+        # guard on /api paths only; /health and /metrics never return it.
+        routes.each_with_object({}) do |(path, methods), out|
+          out[path] = methods.transform_values do |operation|
+            responses = operation.fetch("responses").dup
+            responses.delete("501") unless path.start_with?("/api/")
+            responses["500"] = json_ref(path.start_with?("/api/v1/") ? "LegacyError" : "Error")
+            operation.merge("responses" => responses)
+          end
+        end
       end
 
-      def op(tag, summary, responses:, params: nil, body: nil, security: nil)
+      def op(tag, summary, responses:, params: nil, body: nil, form_body: nil, security: nil)
+        # Every cookie-secured route goes through require_accounts!, which is
+        # 403 when accounts are disabled and 501 in AUTH_MODE=full. Generated
+        # clients need to see those outcomes on each such operation.
+        # Full mode fails closed for every /api path, not just cookie routes.
+        responses = responses.merge("501" => json_ref(tag == "legacy" ? "LegacyError" : "Error"))
+        if security&.include?({ cookie: [] })
+          responses = responses.merge("403" => json_ref("Error"))
+        end
         operation = {
           "tags" => [tag],
           "summary" => summary,
@@ -369,12 +488,10 @@ module Onetime
         }
         operation["parameters"] = params if params
         operation["security"] = security if security
-        if body
-          operation["requestBody"] = {
-            "required" => true,
-            "content" => { "application/json" => { "schema" => { "$ref" => "#/components/schemas/#{body}" } } }
-          }
-        end
+        content = {}
+        content["application/json"] = { "schema" => { "$ref" => "#/components/schemas/#{body}" } } if body
+        content["application/x-www-form-urlencoded"] = { "schema" => { "$ref" => "#/components/schemas/#{form_body}" } } if form_body
+        operation["requestBody"] = { "required" => true, "content" => content } unless content.empty?
         operation
       end
 
@@ -387,6 +504,21 @@ module Onetime
         }
       end
 
+      def id_param
+        {
+          "name" => "id",
+          "in" => "path",
+          "required" => true,
+          "schema" => { "type" => "string", "maxLength" => 128 }
+        }
+      end
+
+      # Schema positions must contain a bare $ref, not a Response Object. Using
+      # json_ref here would hide the referenced model from generated clients.
+      def schema_ref(name)
+        { "$ref" => "#/components/schemas/#{name}" }
+      end
+
       def json_ref(name)
         {
           "description" => name,
@@ -394,7 +526,9 @@ module Onetime
         }
       end
 
-      def rate_limited
+      def rate_limited(version: "v3")
+        # The v1 error handler always emits {"message": ...}, even for 429/503.
+        schema = version == "v1" ? "LegacyError" : "Error"
         {
           "description" => "Rate limited",
           "headers" => {
@@ -403,14 +537,18 @@ module Onetime
             "X-RateLimit-Remaining" => { "schema" => { "type" => "integer" } },
             "X-RateLimit-Reset" => { "schema" => { "type" => "integer" } }
           },
-          "content" => { "application/json" => { "schema" => { "$ref" => "#/components/schemas/Error" } } }
+          "content" => { "application/json" => { "schema" => { "$ref" => "#/components/schemas/#{schema}" } } }
         }
       end
 
       def components
         {
           "securitySchemes" => {
-            "cookie" => { "type" => "apiKey", "in" => "cookie", "name" => "ots_session" }
+            "cookie" => { "type" => "apiKey", "in" => "cookie", "name" => "ots_session" },
+            "bearerAuth" => {
+              "type" => "http", "scheme" => "bearer",
+              "description" => "METRICS_TOKEN for the /metrics scrape endpoint"
+            }
           },
           "schemas" => {
             "Error" => {
@@ -421,7 +559,15 @@ module Onetime
                   "type" => "object",
                   "required" => %w[code message request_id],
                   "properties" => {
-                    "code" => { "type" => "string" },
+                    "code" => {
+                      "type" => "string",
+                      "enum" => %w[
+                        internal_error validation_error not_found unauthorized forbidden
+                        conflict email_taken invalid_credentials rate_limited
+                        passphrase_required invalid_passphrase payload_too_large
+                        not_configured service_unavailable
+                      ]
+                    },
                     "message" => { "type" => "string" },
                     "request_id" => { "type" => "string" }
                   }
@@ -430,6 +576,7 @@ module Onetime
             },
             "LegacyError" => {
               "type" => "object",
+              "required" => %w[message],
               "properties" => { "message" => { "type" => "string" } }
             },
             "HealthOk" => {
@@ -437,6 +584,16 @@ module Onetime
               "properties" => {
                 "status" => { "type" => "string", "enum" => %w[ok degraded] },
                 "redis" => { "type" => "string", "enum" => %w[ok error] },
+                "version" => { "type" => "string" }
+              }
+            },
+            # The degraded response is a health body, not the v3 Error envelope.
+            "HealthDegraded" => {
+              "type" => "object",
+              "required" => %w[status redis version],
+              "properties" => {
+                "status" => { "type" => "string", "enum" => ["degraded"] },
+                "redis" => { "type" => "string", "enum" => ["error"] },
                 "version" => { "type" => "string" }
               }
             },
@@ -479,7 +636,7 @@ module Onetime
             },
             "WebhookCreated" => {
               "allOf" => [
-                json_ref("Webhook"),
+                schema_ref("Webhook"),
                 {
                   "type" => "object",
                   "properties" => {
@@ -493,7 +650,7 @@ module Onetime
             },
             "WebhookList" => {
               "type" => "object",
-              "properties" => { "webhooks" => { "type" => "array", "items" => json_ref("Webhook") } }
+              "properties" => { "webhooks" => { "type" => "array", "items" => schema_ref("Webhook") } }
             },
             "WebhookDelivery" => {
               "type" => "object",
@@ -502,13 +659,13 @@ module Onetime
                 "event" => { "type" => "string" },
                 "status" => { "type" => "string", "enum" => %w[queued delivered retrying failed skipped] },
                 "attempts" => { "type" => "integer" },
-                "response_code" => { "type" => "integer", "nullable" => true },
+                "response_code" => { "type" => %w[integer null] },
                 "created_at" => { "type" => "integer" }
               }
             },
             "WebhookDeliveryList" => {
               "type" => "object",
-              "properties" => { "deliveries" => { "type" => "array", "items" => json_ref("WebhookDelivery") } }
+              "properties" => { "deliveries" => { "type" => "array", "items" => schema_ref("WebhookDelivery") } }
             },
             "CreateRequestRequest" => {
               "type" => "object",
@@ -529,7 +686,7 @@ module Onetime
               "type" => "object",
               "properties" => {
                 "request_key" => { "type" => "string" },
-                "metadata" => json_ref("RequestMetadata"),
+                "metadata" => schema_ref("RequestMetadata"),
                 "links" => {
                   "type" => "object",
                   "properties" => { "request" => { "type" => "string" } }
@@ -540,12 +697,12 @@ module Onetime
               "type" => "object",
               "properties" => {
                 "fulfilled" => { "type" => "boolean" },
-                "metadata" => json_ref("RequestMetadata")
+                "metadata" => schema_ref("RequestMetadata")
               }
             },
             "RequestItem" => {
               "allOf" => [
-                json_ref("RequestMetadata"),
+                schema_ref("RequestMetadata"),
                 {
                   "type" => "object",
                   "properties" => {
@@ -557,7 +714,7 @@ module Onetime
             },
             "RequestList" => {
               "type" => "object",
-              "properties" => { "requests" => { "type" => "array", "items" => json_ref("RequestItem") } }
+              "properties" => { "requests" => { "type" => "array", "items" => schema_ref("RequestItem") } }
             },
             "RequestSubmit" => {
               "type" => "object",
@@ -569,6 +726,16 @@ module Onetime
               "properties" => {
                 "ok" => { "type" => "boolean" },
                 "label" => { "type" => "string" }
+              }
+            },
+            # v1 is a frozen contract: no file support, no kind/filename fields.
+            "LegacyConcealRequest" => {
+              "type" => "object",
+              "required" => %w[secret],
+              "properties" => {
+                "secret" => { "type" => "string", "minLength" => 1 },
+                "ttl" => { "type" => "integer" },
+                "passphrase" => { "type" => "string", "minLength" => 8, "maxLength" => 256 }
               }
             },
             "ConcealRequest" => {
@@ -695,8 +862,23 @@ module Onetime
                       "created_at" => { "type" => "integer" },
                       "passphrase_required" => { "type" => "boolean" },
                       "kind" => { "type" => "string" },
+                      "status" => { "type" => "string", "enum" => %w[new previewed revealed burned] },
                       "secret_url" => { "type" => "string" }
                     }
+                  }
+                }
+              }
+            },
+            "BurnResponse" => {
+              "type" => "object",
+              "required" => %w[ok metadata],
+              "properties" => {
+                "ok" => { "type" => "boolean" },
+                "metadata" => {
+                  "type" => "object",
+                  "properties" => {
+                    "identifier" => { "type" => "string" },
+                    "status" => { "type" => "string", "enum" => %w[burned] }
                   }
                 }
               }

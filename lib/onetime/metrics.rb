@@ -11,6 +11,10 @@ module Onetime
     # label, or cardinality grows without limit.
     FAMILIES = %w[health metrics web api_v1 api_v3 api_v3_guest other].freeze
 
+    # Best-effort edge effects that must never break a request, but must not
+    # fail silently either. Bounded labels; never interpolate a key or path.
+    BEST_EFFORT_OPERATIONS = %w[cleanup audit].freeze
+
     class << self
       def record(family:, status:, duration:)
         bucket = status_bucket(status)
@@ -29,6 +33,15 @@ module Onetime
         nil
       end
 
+      # A best-effort edge effect failed (post-consume cleanup, dropped audit
+      # write). The caller logs the detail; this counter makes it alertable.
+      def best_effort_failure(operation)
+        name = BEST_EFFORT_OPERATIONS.include?(operation.to_s) ? operation.to_s : "other"
+        lock.synchronize { best_effort_failures[name] += 1 }
+      rescue StandardError
+        nil
+      end
+
       # Snapshot for tests and rendering.
       def snapshot
         lock.synchronize do
@@ -36,7 +49,8 @@ module Onetime
             requests: requests.dup,
             durations_sum: durations_sum.dup,
             durations_count: durations_count.dup,
-            errors: errors
+            errors: errors,
+            best_effort_failures: best_effort_failures.dup
           }
         end
       end
@@ -47,6 +61,7 @@ module Onetime
           @durations_sum = Hash.new(0.0)
           @durations_count = Hash.new(0)
           @errors = 0
+          @best_effort_failures = Hash.new(0)
         end
       end
 
@@ -75,9 +90,8 @@ module Onetime
         lines << "# TYPE onetime_redis_up gauge"
         lines << "onetime_redis_up #{redis_up ? 1 : 0}"
 
-        lines << "# HELP onetime_version_info Build version, always 1."
-        lines << "# TYPE onetime_version_info gauge"
-        lines << %(onetime_version_info{version="#{VERSION}"} 1)
+        # Do not publish the exact build version: it turns a scrape into a
+        # fingerprint for version-specific attacks (SA-19).
 
         lines << "# HELP onetime_requests_total HTTP requests by route family and status class."
         lines << "# TYPE onetime_requests_total counter"
@@ -88,6 +102,13 @@ module Onetime
         lines << "# HELP onetime_errors_total 5xx responses."
         lines << "# TYPE onetime_errors_total counter"
         lines << "onetime_errors_total #{snap[:errors]}"
+
+        lines << "# HELP onetime_best_effort_failures_total Failed non-critical edge effects."
+        lines << "# TYPE onetime_best_effort_failures_total counter"
+        BEST_EFFORT_OPERATIONS.each do |operation|
+          lines << %(onetime_best_effort_failures_total{operation="#{operation}"} ) +
+                   snap[:best_effort_failures].fetch(operation, 0).to_s
+        end
 
         lines << "# HELP onetime_request_duration_seconds_sum Total request time by route family."
         lines << "# TYPE onetime_request_duration_seconds_sum counter"
@@ -148,6 +169,10 @@ module Onetime
 
       def errors
         @errors ||= 0
+      end
+
+      def best_effort_failures
+        @best_effort_failures ||= Hash.new(0)
       end
     end
   end

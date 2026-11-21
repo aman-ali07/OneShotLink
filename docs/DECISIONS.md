@@ -12,7 +12,7 @@ combination is not available as a documented, installable dependency for this st
 Depending on unpublished internals would make the build unreproducible.
 
 **Decision.** Use `roda` directly on `rack` 3, with Puma as the server. Routes live in
-`lib/onetime/web/app.rb` and versioned sub-apps under `apps/api/`.
+`lib/onetime/web/app.rb` (no `apps/` directory — superseded by T-87).
 
 **Consequences.** We lose Otto's conventions and any inherited plugin ecosystem. Roda's
 tree routing is sufficient; the missing structure is replaced by explicit logic objects
@@ -99,7 +99,7 @@ Cache headers for hashed assets and `no-store` for `index.html` must be set expl
 **Context.** Simple mode needs logout/revocation and minimal moving parts.
 
 **Decision.** Random 32-byte token in an `HttpOnly`, `SameSite=Lax`, `Secure`-when-SSL
-cookie; `session:<token>` in Redis with a TTL. No signing, no JWT, no refresh tokens.
+cookie; `session:<sha256(token)>` (digest only) in Redis with a TTL. No signing, no JWT, no refresh tokens.
 
 **Consequences.** Revocation is a `DEL`. Every request costs one Redis lookup. Multi-app
 SSO is not possible without a shared Redis (acceptable).
@@ -180,8 +180,9 @@ check, never as "zero-knowledge" or "the server cannot decrypt". Revisit only as
 opt-in client-side-encryption mode (v2), with its own UX and recovery trade-offs.
 
 **Consequences.** K-21 remains a deliberate parity gap, not an implementation bug.
-Passphrase guessing is bounded only by the per-IP reveal limiter (no per-secret budget),
-and a leaked `SECRET` plus a leaked record still exposes content without the passphrase.
+Passphrase guessing is bounded by the per-IP reveal limiter **and**, since D-012b, a per-secret
+budget (5 guesses / 900 s keyed by the opaque secret id). A leaked `SECRET` plus a leaked record
+still exposes content without the passphrase.
 T-48 is closed; future copy must not overclaim.
 
 ## D-013 — Decrypt before the atomic consume
@@ -228,8 +229,8 @@ records created before this decision keep revealing with their original passphra
 used to return `201` now returns `422`. The UI sets `minlength`, mirrors the check, and
 explains the rule next to the field. 8 bytes is still short for a human-chosen passphrase —
 the honest ceiling is a longer minimum or a generated one, which is a copy/UX decision, not
-a code one. MFA, per-secret attempt budgets and passphrase-strength scoring remain out of
-scope (D-012, K-21).
+a code one. MFA and passphrase-strength scoring remain out of scope (D-012, K-21); a per-secret
+attempt budget was added later in D-012b.
 
 ## D-015 — Patch inside the declared constraint; do not add a gem for a bump
 
@@ -250,3 +251,200 @@ does not fire; this decision records the reasoning anyway. The declared constrai
 range precisely so patch fixes can land without another product decision. `TECH_STACK.md`,
 `CHANGELOG.md`, `TASKS.md` and `KNOWN_ISSUES.md` carry the new resolved version; a future
 bump outside `~> 7.2` needs a fresh decision.
+
+## D-016 — Automated WCAG 2.2 AA gate and component tests
+
+**Status:** accepted (2026-11-21)
+
+**Context.** Four frontend audits found real code-level WCAG gaps (per-route titles,
+terminal-state focus, placeholder contrast, clipboard announcements, touch targets). The
+only automated check was a `[role=alert]` assertion in one journey, so those defects shipped.
+The same audits also found repeated primitives with no component-level tests; the API client
+has 12 Vitest tests, but nothing exercises a button's loading/disabled or a copy button's
+status behaviour.
+
+**Decision.** Add two **test-only** dependency sets, each verified canonical before install:
+- `@axe-core/puppeteer` (4.14.0, MPL-2.0, `github.com/dequelabs/axe-core-npm`) for a
+  `e2e/a11y.mjs` gate run against the live stack with `wcag2a`, `wcag2aa`, `wcag21a`,
+  `wcag21aa` and `wcag22aa` tag sets; any violation exits non-zero. It is wired into the
+  container CI job after the existing journeys. **Superseded in the shipped build:** the gate
+  uses canonical `axe-core` 4.14.1 (MPL-2.0) injected via CDP, because `@axe-core/puppeteer`
+  pulled a full Puppeteer tree with known advisories. The tag sets and non-zero-on-violation
+  contract are unchanged.
+- `@vue/test-utils` (2.6.0, MIT, `github.com/vuejs/test-utils`) and `jsdom` (31.0.1, MIT,
+  `github.com/jsdom/jsdom`, Node ^24.15 accepted) for component tests in Vitest. No
+  production dependency is added; `frontend/src/lib/api.ts` remains the only fetch layer.
+
+**Alternatives considered.** A hosted scanner (rejected: network + secret exposure); hand-
+written ARIA assertions only (rejected: misses contrast, target size and reflow); Playwright
+test runner (rejected: duplicate of the committed puppeteer journeys and another dependency).
+
+**Consequences.** CI now fails on accessibility regressions, not just on TypeScript and
+build errors. jsdom is an approximation: it does not compute layout or real screen-reader
+announcements, so the live axe gate and the manual keyboard/reflow checks remain necessary.
+A11y findings from the gate are fixed in code, never suppressed by rule exclusions; any
+temporary exclusion must be recorded here with a reason and an expiry. Dark mode stays out
+of scope — the app remains light-only and `DESIGN_SYSTEM.md` says so.
+
+## D-017 — Receipt lifecycle, owner burn, and endpoint-scoped deliveries
+
+**Status:** accepted (operator decision 2026-11-21; resolves D-receipt and B8)
+
+**Context.** Reveal used to delete the owner receipt and its index member. That made the
+dashboard's "newest secrets" list forget a secret the moment it was read, and there was no
+way for an owner to destroy an unrevealed secret. Separately,
+`GET /api/v3/webhooks/:id/deliveries` ignored `:id` and returned deliveries across every
+endpoint the owner had registered. Both needed a recorded product decision before touching
+the protected web layer.
+
+**Decision (operator).**
+- Keep the receipt after a successful reveal. The secret payload is permanently destroyed
+  by the existing atomic compare-and-delete; only non-sensitive metadata survives.
+- Lifecycle statuses are `new → previewed → revealed → burned`. A preview never consumes
+  and cannot downgrade a terminal status; `revealed` and `burned` are terminal and applied
+  at most once (Lua compare-and-set).
+- Retain receipt metadata for **30 days** after `revealed` or `burned`, then let Redis expire
+  it. The owner-index member carries the same retention TTL and stale members are pruned
+  lazily by the receipts listing.
+- Never put secret contents, passphrases, encryption keys, or the bearer key in a receipt,
+  an audit event, or a log line.
+- Add an owner-only burn route `DELETE /api/v3/secret/:key`: session required, CSRF/origin
+  proof, a dedicated `RATE_LIMIT_BURN` scope, owner scoping with a uniform 404, and the
+  same atomic consume as reveal (no decrypt, no plaintext returned).
+- Webhook deliveries are filtered by the `:id` in the path; unknown or foreign ids answer
+  `404` rather than an owner-wide listing.
+
+**Alternatives considered.** Deleting receipts on reveal (rejected by the operator: owners
+want a 30-day record); a separate receipt token/API (deferred — P1-1 token model is not
+decided, and the opaque secret key already acts as a capability); a dedicated burn limiter
+scope (chosen so a burst of burns cannot exhaust the reveal or account-delete budgets).
+
+**Consequences.** `secret:receipt:*` now has a 30-day TTL after a terminal transition
+instead of the original secret TTL; dashboard receipts expose `status`. A new audit event
+`secret.burned` and a `RATE_LIMIT_BURN` env var are part of the contract. Burn is idempotent
+at the HTTP layer only in the sense that a replay is `404` — it is not a two-step
+prepare/commit. Auditing and webhook emission for preview are deliberately absent to avoid
+high-volume traffic in the append-only audit stream and the operator-run webhook worker.
+
+## D-012b — Per-secret passphrase budget with the existing Redis limiter
+
+**Status:** accepted (2026-11-21). **Budget:** ₹0.
+
+**Context.** Only a per-IP reveal limiter existed, so distributed guessing of a protected
+secret was unbounded. A paid WAF or bot service is unnecessary for a self-hosted service
+with Redis already running.
+
+**Decision.** Reuse `Onetime::Limiter` (the same atomic Lua fixed-window script used by
+every other scope) with a new `passphrase` scope, keyed by the **opaque secret id** rather
+than an IP. `RATE_LIMIT_PASSPHRASE` defaults to 5 guesses, bounded over a dedicated
+`RATE_LIMIT_PASSPHRASE_WINDOW` of 900 s (not the general 60 s HTTP window), so an attacker
+cannot simply outwait a minute. The check runs in `RevealSecret#call` after the metadata MAC and before
+`verify_passphrase!`, decrypt and consume. Requests with no passphrase are not guesses and
+do not spend the budget. Exhaustion is `429` with `Retry-After`; the record stays readable.
+
+**Trade-offs / limitations.** A fixed window allows a burst across a window boundary; it
+is a rate limit, not a permanent lockout. Keys are capability identifiers, not personal
+data, and expire with the window. A distributed attacker with many links still gets 5
+guesses per link per window — acceptable given 8-byte minimum passphrases (D-014) and
+Argon2id cost. No CAPTCHA, no third-party service, no new datastore.
+
+## D-retention — No raw IPs in the audit stream
+
+**Status:** accepted (2026-11-21). **Budget:** ₹0.
+
+**Context.** `audit:events` stored the raw client IP for every account/security event and
+was retained at `MAXLEN 100000` with no time bound — unnecessary personal data for a
+self-hosted one-time secret service.
+
+**Decision.** `Audit.record` now stores `ip_day`: the first 12 hex characters of an
+HMAC-SHA256 over the IP, keyed by `Crypto.derive(SECRET, "ots-audit-ip/v1:<utc-day>")`.
+The daily salt rotates, so the same IP maps to a different reference tomorrow; no raw IP
+is persisted. Abuse prevention continues to use the existing 60-second limiter keys,
+which are already short-lived and expire automatically.
+
+**Trade-offs / limitations.** Same-day correlation is preserved; cross-day correlation is
+deliberately impossible. The digest is still a personal-data derivative and is covered by
+the stream's retention decision below; operators should set a retention window suited to
+their jurisdiction. `ip_day` is not reversible without `SECRET` plus the IP. No IP-based
+notification or geo features are planned.
+
+## D-queue — Bounded webhook queue and delivery records in Redis
+
+**Status:** accepted (2026-11-21). **Budget:** ₹0.
+
+**Context.** `webhook:queue` and `webhook:delivery:*` had no TTL; a deployment that never
+scheduled `bin/ots webhooks:work` (K-46) could grow the keyspace indefinitely.
+
+**Decision.** Keep the existing Redis sorted-set queue and external worker. Add
+`QUEUE_TTL = DELIVERY_TTL = 7 days` (matching `webhook:seen:*`): `emit` sets an `EX` on each
+delivery hash, and `claim` atomically prunes queue members older than the TTL before
+claiming due work via `ZREMRANGEBYSCORE`. Retry limit remains 3 attempts with backoff; a
+terminal delivery is marked `failed` and never re-queued.
+
+**Trade-offs / limitations.** An event unclaimed for 7 days is dropped — an operator who
+cannot schedule the worker within a week will lose notifications. At-least-once delivery
+still means receivers must deduplicate on the stable delivery id. No managed queue, no
+dead-letter exchange; the delivery hash retains `status`/`last_error` for inspection until
+its TTL. `webhook:seen:*` and `webhook:inflight:*` are excluded from backups (ephemeral).
+
+## C2 — Public request preview/respond, owner routes remain authenticated
+
+**Status:** accepted (2026-11-21). **Budget:** ₹0.
+
+**Context.** API.md described request preview/respond as public, but both routes called
+`require_accounts!` and returned `403` in the default `AUTH_MODE=disabled`. Owners could
+only create requests in simple mode; recipients should not need an account.
+
+**Decision.** Recipient-facing `GET /api/v3/requests/:key` and `POST …/respond` are public
+capabilities: remove `require_accounts!`. Keep `verify_csrf!` (a no-op without a cookie),
+keep the `:respond` rate limiter on submission, add the `:reveal` limiter to the preview so
+`fulfilled` cannot be polled for free, and keep strict input validation plus `SET NX`
+single-answer semantics. Owner create/list/reveal stay session-scoped.
+
+**Trade-offs / limitations.** Anyone with the 128-bit link can answer once; that is the
+product contract, not a vulnerability. Abuse is bounded by per-IP windows, not by identity.
+Requests cannot be created without an account in the default mode — the feature is
+owner-initiated; ordinary guest secret creation remains fully anonymous. No email
+verification or CAPTCHA (both would add infrastructure and friction).
+
+## D-TLS/FW — Free Let's Encrypt TLS and host firewall only
+
+**Status:** accepted (2026-11-21). **Budget:** ₹0.
+
+**Context.** T-70/T-71 remained open because they need the operator's host, not code.
+
+**Decision.** Terminate TLS with Caddy (its built-in ACME client obtains and renews Let's
+Encrypt certificates free for a real hostname) or nginx with a free Certbot certificate;
+the app stays on loopback behind the proxy. Restrict inbound traffic with the host's own
+nftables/ufw: loopback + established allowed, 80/443 public, SSH only from an explicit
+`ADMIN_CIDR`, everything else dropped; deny outbound to the Redis subnet on 6379.
+`script/host-firewall.sh` prints the exact rules and is a **dry run unless `--apply` is
+passed as root**, and refuses to generate a rule with world-open SSH.
+
+**Trade-offs / limitations.** The real hostname, DNS record, public ACME challenge and the
+firewall change require actual server-owner access and cannot be performed from this repo.
+A local rehearsal behind Caddy with a throwaway CA passed 7 assertions (certificate chain,
+HSTS, hardening headers, Secure/HttpOnly/SameSite cookies, HTTP→HTTPS redirect); it does
+not prove a public certificate chain or the host rule. No paid CDN, WAF, or managed
+firewall is used; scaling to paid infrastructure is deferred until traffic or revenue
+justifies it.
+
+## D-018 — Hand-written examples now; generated clients later
+
+**Status:** accepted (2026-11-21, developer-experience pass)
+
+**Context.** The served OpenAPI 3.1 document is the machine-readable contract, but the
+repository ships only hand-written examples and a hand-written Zod client. Consumers repeatedly
+ask whether a generated SDK exists and which language/runtime is supported.
+
+**Decision.** Keep dependency-free, stdlib-only curl/TypeScript/Python examples as the supported
+integration path for the pre-1.0 API. Do **not** add a published SDK package or a codegen step
+to CI yet. When a stable v3 consumer is committed, generate it from `/api/v3/openapi.json` with
+a canonical generator (`openapi-generator` or `hey-api`), pinned in a `docs/DECISIONS.md`
+follow-up and verified by `script/test-examples.sh`.
+
+**Consequences.** Every response-shape change must still be mirrored in the examples and the
+Zod client; the example harness and the OpenAPI spec tests are the drift gates. Generated
+clients must preserve two contract facts a naive generator loses: v1 GET *consumes* while v3 GET
+is a preview, and the legacy `{"message":...}` envelope differs from the v3 `{"error":...}` one.
+The support matrix and retry rules live in `docs/SDK.md`.

@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site">
       <div class="wrap">
         <a class="brand" href="/">OneShotLink</a>
@@ -23,11 +24,11 @@
       </div>
     </header>
 
-    <main class="wrap">
+    <main id="main" tabindex="-1" class="wrap">
       <section aria-labelledby="title">
         <h1 id="title">Privacy</h1>
         <p class="lede">
-          This page describes the software in this repository and the hosted instance we run.
+          This page describes the software in this repository and any hosted instance an operator runs.
           If you self-host, the operator of your instance is the data controller; this page is
           still an accurate description of what the software itself stores.
         </p>
@@ -36,7 +37,7 @@
 
       <section aria-labelledby="what">
         <h2 id="what">What is stored</h2>
-        <div class="table-scroll">
+        <div class="table-scroll" role="region" tabindex="0" aria-label="What is stored table">
           <table>
             <thead>
               <tr>

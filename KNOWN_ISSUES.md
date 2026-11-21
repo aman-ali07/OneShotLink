@@ -1,9 +1,12 @@
 # Known issues and gaps
 
-Last reviewed: 2026-11-12. Severity: **S1** blocks use / security, **S2** blocks a
+Last reviewed: 2026-11-21. Severity: **S1** blocks use / security, **S2** blocks a
 feature, **S3** quality/operability, **S4** documentation/process.
 
-> The core has been executed: 133 backend specs pass in Docker against Redis DB 15, a live
+> The 2026-11-21 security hardening pass and its remaining risks are recorded in
+> [SECURITY_AUDIT.md](SECURITY_AUDIT.md); it supersedes the older status notes in this file
+> where they disagree. The core has been executed: 307 backend specs pass in Docker against
+> Redis DB 15, a live
 > Puma run completed create → reveal → gone (including a four-way reveal race), a
 > headless Chrome journey covered the built UI (including the passphrase path), and the
 > production Compose stack passed a lifecycle smoke test. "Verified"
@@ -18,7 +21,7 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-02 | — | **Resolved 2026-11-11:** `Gemfile.lock` generated and all gems installed in Docker; suite runs | `Gemfile.lock` | — |
 | K-03 | — | **Resolved 2026-11-11:** `bcrypt` declared; legacy verification covered by a spec | `Gemfile`, `spec/unit/password_spec.rb` | — |
 | K-04 | — | **Resolved (M3):** simple-mode accounts, sessions, owner receipts, dashboard, and CLI create/reset are implemented | `spec/integration/accounts_spec.rb`, `e2e/accounts.mjs` | — |
-| K-33 | — | **Resolved 2026-11-11:** `bin/ots` supports create/reset-password/list/show/set-role/health/backup/restore/rotate-key/version, ships in the image, and was executed in the production container | `bin/ots`, `Dockerfile` | — |
+| K-33 | — | **Resolved 2026-11-11:** `bin/ots` supports conceal/reveal/create/reset-password/list/show/set-role/health/backup/restore/migrate/rotate-key/audit/webhooks:work/version, ships in the image, and was executed in the production container | `bin/ots`, `Dockerfile` | — |
 | K-34 | — | **Resolved 2026-11-11:** sessions are now indexed per customer (`customer:sessions:<id>`); changing a password calls `Session.revoke_all(keeping the caller)`, so every other live session is deleted. Verified live in the production container (other device → 401, caller → 200) and by `spec/unit/session_spec.rb`. Auth audit trail remains open (tracked separately). | `models/session.rb`, `web/app.rb`, `spec/unit/session_spec.rb` | — |
 | K-35 | — | **Resolved 2026-11-12:** a GET used to consume the secret, so a chat client's link preview burned it. `GET /api/v3/{guest/,}secret/:key` now returns metadata only (`passphrase_required`, `kind`, `created_at`, `ttl`) and **`POST …/reveal` is the only consuming route**; the SPA already used POST, so only API clients change. Verified over HTTP: three GETs in a row left the key intact, POST revealed it once, the next GET was `404`, and a protected secret reported `passphrase_required: true` without leaking content. The frozen v1 GET still consumes (API.md §4) | `lib/onetime/web/app.rb`, `spec/integration/secrets_api_spec.rb`, API.md §5.2 | — |
 | K-05 | — | **Resolved:** the repository is a git repo with history on `main`, an `origin` remote, and a `.gitignore` covering `.env` and build output | `git status`, `.gitignore` | — |
@@ -64,13 +67,19 @@ feature, **S3** quality/operability, **S4** documentation/process.
 | K-44 | — | **Resolved 2026-11-20:** `.env.example`'s `SECRET` placeholder was exactly 32 bytes and passed boot validation, so copying the example could run a deployment with a known key. Placeholders are now `CHANGE-ME`; boot rejects both the short `SECRET` and the `REDIS_PASSWORD=CHANGE-ME` sentinel, and specs read the committed example to assert both. Red then green; suite 133/0 | `.env.example`, `lib/onetime/config.rb`, `spec/unit/config_spec.rb`, T-107 | — |
 | K-45 | S2 | **Resolved 2026-11-20:** signin/signup origin proof built its expected origin from Rack's `request.scheme/host/port`, which Rack 3 derives from client-supplied `X-Forwarded-*` headers even when untrusted. A matching `X-Forwarded-Host` + `Origin` pair was accepted as same-site (reproduced: `201` signup). Expected origin now derives from operator-controlled `Config.base_url` with URI default ports normalised; live hostile signup → `403`, legitimate → `201`, both browser journeys pass. Regression spec red then green; suite 134/0. The `SSL=true` spec's fixture now sends an HTTPS Origin so it still tests the `Secure` flag | `lib/onetime/web/app.rb`, `spec/integration/accounts_spec.rb`, SECURITY.md | — |
 | K-46 | S3 | **Accepted 2026-11-20:** signed webhooks are implemented with a Redis queue and `bin/ots webhooks:work`, but the operator must schedule that worker; no worker runs inside the web process. Delivery is at-least-once with an idempotency key for the receiver to deduplicate, not exactly-once. Payloads are metadata-only by design — no secret values are ever sent. Private URLs are refused unless `WEBHOOK_ALLOW_PRIVATE=true` is set for local testing | `lib/onetime/webhook.rb`, `bin/ots`, T-118 | schedule the worker |
+| K-47 | S3 | **Resolved 2026-11-21 (QA pass):** `check_passphrase_budget!` now annotates the `RateLimited` exception with `@scope = :passphrase`, the secret id and `Config.passphrase_attempt_window`; the error handler already honours those fields, so the 429's `Retry-After` and `X-RateLimit-*` describe the 900 s per-secret budget rather than the 60 s HTTP bucket. The budget spec sets `RATE_LIMIT_PASSPHRASE_WINDOW=7` and asserts the literal header `Retry-After: 7` (ran green with that override). No change to the protected `app.rb` was needed | `lib/onetime/logic/reveal_secret.rb`, `spec/integration/secrets_api_spec.rb` | — |
+| K-48 | — | **Resolved 2026-11-21:** the web healthcheck in `compose.yaml` now hardcodes `http://127.0.0.1:3000/health`, so a host-exported `PORT` cannot redirect the probe inside the container. `docker compose config --quiet` passes with the variable present in the environment | `compose.yaml` | — |
+| K-49 | S4 | **Accepted waiver 2026-11-21 (dated):** `npm --prefix e2e audit` reports 9 high advisories in `puppeteer-core` 24.43.1 and transitives (`extract-zip`, `basic-ftp`, `zod` 3.25.76 via `chromium-bidi`). The tree is test-only: `e2e/` is not copied into the image, every journey uses an explicit system Chrome (no browser download/unzip), and no proxy is configured, so the vulnerable paths are unreachable. Re-evaluate when a semver-major bump to `puppeteer-core` 25.18.1 can be paired with a full 8-journey re-run and a DECISIONS entry; do not run `npm audit fix --force` blindly | `e2e/package.json`, `.github/workflows/ci.yml` | new task + full e2e re-run |
+| K-50 | S4 | **Accepted waiver 2026-11-21:** 5 moderate advisories in the frontend dev chain `@vue/test-utils → js-beautify → {editorconfig, glob → minimatch}`. Test-time only, no untrusted glob input, absent from the Vite bundle; CI's `--audit-level=high` gate passes. npm's suggested "fix" is a downgrade below `js-beautify`, not a patch — do not apply it | `frontend/package-lock.json` | revisit when upstream drops the dependency |
+| K-51 | S4 | **Open, protected paths:** base images use mutable tags (`Dockerfile`, `compose.yaml`, CI, rehearsal scripts). Pin by digest with a documented refresh procedure; agent did not edit protected paths | `Dockerfile`, `compose.yaml`, `.github/workflows/` | human approval |
+| K-52 | — | **Resolved 2026-11-21:** a local pentest observed error responses on the staging stack without `Cache-Control: no-store`/`Pragma: no-cache`. Source and `web_spec.rb` already required them — the long-running web process was stale. After `docker restart ots-devrel-web`, a real 404 carried both headers and `web_spec.rb` was 16/16 green. Process lesson: restart the staged app after code changes before treating live-header evidence as authoritative | `lib/onetime/web/app.rb`, `spec/integration/web_spec.rb` | — |
 | K-32 | — | **Resolved 2026-11-11:** CI executed on GitHub across all four jobs. The first run failed in the container job: the load-test step ran a bare `docker compose down -v` with no env, and Compose interpolates `${SECRET}`/`${REDIS_PASSWORD}` on `down` too, so it aborted before restarting the stack. Fixed by hoisting the CI values to job level; the rerun (43060570677) is green and the load test reports 100/100 secrets revealed exactly once. | `.github/workflows/ci.yml` | — |
 
 ## Missing product behavior (planned, not bugs)
 
 Accounts (simple mode), the dashboard, the admin CLI, OpenAPI generation, Docker packaging,
 and CI **shipped** — see the resolved rows above; they were listed here long after they
-existed. What is still missing: organizations, custom domains, file secrets, email jobs
+existed. What is still missing: organizations, custom domains, email jobs
 (password reset, receipt notifications), MFA / WebAuthn / SSO, i18n locales, API v2, and
 `AUTH_MODE=full` (D-003).
 
@@ -81,7 +90,8 @@ existed. What is still missing: organizations, custom domains, file secrets, ema
 3. Is API v2 compatibility needed (the brief mentions it only once)?
 4. Should consumed receipts be retained for owner audit, or deleted with the secret?
 5. Should a wrong passphrase count against a per-secret attempt budget in addition to the
-   per-IP reveal limiter? v1 answer: no per-secret budget (D-012).
+   per-IP reveal limiter? Answer: yes — added 2026-11-21 as D-012b (5 guesses / 900 s, keyed by
+   the opaque secret id); a wrong guess never consumes the record.
 6. What is the maximum acceptable TTL (currently 3 days by default options)? Longer TTLs
    increase blast radius if Redis leaks.
 7. Is `AUTH_MODE=full` a launch requirement or explicitly post-v1? Current decision:

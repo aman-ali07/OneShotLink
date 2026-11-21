@@ -1,6 +1,6 @@
 # Production readiness
 
-Status as of 2026-11-12. This file is deliberately stricter than "it runs": every
+Status as of 2026-11-21. This file is deliberately stricter than "it runs": every
 item is either **verified by a command**, **implemented but untested**, or **not done**.
 
 ## Verdict
@@ -36,7 +36,7 @@ no accounts by design.
 | Container hardened | non-root UID 10001, read-only rootfs, `no-new-privileges`, only `/tmp` writable, no secrets in image |
 | Data survives restart | Redis AOF `appendfsync everysec`, named volume, and a real memory ceiling (`--maxmemory ${REDIS_MAXMEMORY:-256mb}`) so `noeviction` enforces something instead of letting the kernel OOM-kill Redis |
 | CI gate | backend specs, Vitest + typecheck/build, container build, Compose lifecycle smoke, committed browser E2E |
-| Dependency scanning | `bundler-audit` + `npm audit --audit-level=high` in the `security` CI job; both report 0 vulnerabilities. Fixed the findings: Puma 6.6.1→7.2.1 (T-74), zod 3→4.6.7 (T-74), and Puma 7.2.1→7.2.3 after four further advisories were disclosed (T-101, 2026-11-20). Re-audited with a fresh DB: 1379 advisories, 0 vulnerabilities |
+| Dependency scanning | `bundler-audit` + `npm audit --audit-level=high` in the `security` CI job; both report 0 high-severity vulnerabilities (5 moderate dev-only transitive findings from the component-test tooling are documented in D-016). Fixed the findings: Puma 6.6.1→7.2.1 (T-74), zod 3→4.6.7 (T-74), and Puma 7.2.1→7.2.3 after four further advisories were disclosed (T-101, 2026-11-20). Re-audited with a fresh DB: 1379 advisories, 0 vulnerabilities |
 | OpenAPI published | `/api/v3/openapi.json` served; spec asserts every documented path is mounted and every `$ref` resolves |
 | Session revocation | password change and `customers reset-password` revoke other/all sessions; verified live and by spec |
 | Audit trail | append-only `audit:events` stream; identifiers only, never emails/passwords/secret values |
@@ -47,7 +47,7 @@ no accounts by design.
 | Browser path | committed puppeteer journey (`e2e/journey.mjs`): create → reveal → gone and wrong/correct passphrase; zero console errors |
 | TLS rehearsal | `script/tls-rehearsal.sh`: production stack behind Caddy + throwaway CA → `PREFLIGHT PASSED` on the TLS checks (7 assertions, including cookie flags via a throwaway signup). `--with-redis` was originally the negative control (host rule unapplied); with the rule now durable the same gate passes with 0 skipped, including `PASS host cannot reach Redis at 10.77.13.2:6379` (re-run 2026-11-20) |
 | Static delivery | hashed assets `Cache-Control: immutable`; shell and deep links `no-cache`/noindex; HEAD works for `/` and `/health` |
-| Datastore outage is honest | Redis stopped under the running stack: `/health` → `503 {"status":"degraded"}`, writes → `503 service_unavailable` with `Retry-After` on both API versions (v1 keeps its `message` shape), secrets never appear in the error, and the instance recovers without a restart when Redis returns (create → reveal → second reveal `404`) |
+| Datastore outage is honest | Redis stopped under the running stack: `/health` → `503 {"status":"degraded","redis":"error","version":"0.1.0"}`, writes → `503 service_unavailable` with `Retry-After` on both API versions (v1 keeps its `message` shape), secrets never appear in the error, and the instance recovers without a restart when Redis returns (create → reveal → second reveal `404`) |
 | A full datastore is honest | At the memory ceiling every write **and** every reveal answers `503 service_unavailable` + `Retry-After` (the atomic consume is a Lua `EVAL`, which Redis refuses when full), never a generic `500`. Measured on a 6 MB stack: the crossing write got `503`, and secrets stored before the ceiling revealed intact once `maxmemory` was raised — nothing was lost, though TTLs keep running while storage is full (DEPLOYMENT.md §9) |
 | Spec isolation | the suite refuses to run when another client is attached to Redis DB 15, instead of flushing a database a live server is using |
 
@@ -64,11 +64,15 @@ docker compose exec web id          # uid=10001(ots)
 
 ## Open production items
 
-These are the only two items left. Both are **infrastructure** that depends on the
-operator's host and certificates, so they cannot be closed from the repository. They
-block a public "production ready" claim, not local use.
+These are the infrastructure gates the repository can prepare but not close: TLS on a real
+hostname (T-70) and the host-side Redis firewall (T-71). **K-46 — scheduling and verifying the
+webhook worker — is a third operator-owned item** (code ready, no scheduler on a server). The
+authoritative pre-launch checklist, ownership/status classification, zero-cost operator steps
+and the GO/NO-GO verdict live in **`GO_LIVE_REMINDER.md`**; this file keeps the detailed gate
+evidence. None of these can be closed from the repository; they block a public "production
+ready" claim, not local use.
 
-Both are checked by one command that exits non-zero on any failure:
+The TLS and Redis gates are checked by one command that exits non-zero on any failure:
 
 ```bash
 HOST=https://your.domain script/preflight.sh   # see --help
@@ -88,7 +92,7 @@ table above.
 - **D-012:** a passphrase is an access gate, not a second encryption key. The server holds
   the instance key and can decrypt. This is a deliberate parity gap; do not claim
   zero-knowledge.
-- **No file secrets in v1.** The record reserves `kind`/`filename`, but upload is not built.
+- **File secrets are v3-only.** Text files up to 512 KiB, strict base64-in-JSON; no multipart upload or image preview.
 - **No email delivery / expiration notices.** TTL expiry is Redis-only.
 - **Visual parity is unmeasured** because no reference screenshots exist (K-22/K-30).
 

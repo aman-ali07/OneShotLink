@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -15,8 +15,16 @@ export default defineConfig({
   server: {
     port: 5173,
     fs: {
-      // replica/design/tokens.css is imported from outside frontend/.
-      allow: [".."],
+      // Only the one CSS dependency outside frontend/ needs to be reachable.
+      // `allow: [".."]` exposed the whole repository root (including the
+      // git-ignored .env with SECRET) through the dev server's /@fs/ route.
+      allow: [
+        fileURLToPath(new URL(".", import.meta.url)),
+        fileURLToPath(new URL("../replica/design", import.meta.url)),
+        // Read-only marketing page for the CTA-origin regression test. Site is
+        // a static, non-secret directory; .env and the git root stay excluded.
+        fileURLToPath(new URL("../site", import.meta.url)),
+      ],
     },
     proxy: {
       "/api": {
@@ -33,5 +41,11 @@ export default defineConfig({
     outDir: "../public/app",
     emptyOutDir: true,
     sourcemap: false,
+  },
+  // Component tests mount real SFCs; the API-client tests need no DOM but are
+  // harmless under jsdom. Layout/contrast still needs the live axe gate.
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.test.ts"],
   },
 });

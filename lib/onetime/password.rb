@@ -11,6 +11,9 @@ module Onetime
   module Password
     # m_cost is a log2 exponent in this gem: 16 => 2^16 KiB = 64 MiB.
     ARGON2_OPTIONS = { t_cost: 3, m_cost: 16, p_cost: 2 }.freeze
+    # Same byte ceiling as create-side passwords/passphrases. Without this, a
+    # sign-in or account mutation could drive Argon2id with a ~1 MiB body.
+    MAX_VERIFY_BYTES = 256
 
     module_function
 
@@ -20,6 +23,7 @@ module Onetime
 
     def verify(hash, plaintext)
       return false if hash.nil? || hash.empty? || plaintext.nil?
+      return false unless plaintext.is_a?(String) && plaintext.bytesize <= MAX_VERIFY_BYTES
 
       if legacy_bcrypt?(hash)
         require "bcrypt"

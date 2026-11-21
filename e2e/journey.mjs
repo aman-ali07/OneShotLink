@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import puppeteer from "puppeteer-core";
+import assert from "node:assert/strict";
 
 const base = process.env.BASE_URL || "http://127.0.0.1:3000";
 const chrome = process.env.CHROME_PATH || "/usr/bin/google-chrome";
@@ -14,10 +15,8 @@ if (!fs.existsSync(executablePath)) {
 
 const secret = `e2e-secret-${Date.now()}`;
 const guarded = `e2e-guarded-${Date.now()}`;
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
+const multiByte = `e2e-multibyte-${Date.now()}`;
+const multiBytePassphrase = "密钥口"; // 3 code units, 9 UTF-8 bytes (D-014)
 
 let work;
 const browser = await puppeteer.launch({
@@ -28,6 +27,8 @@ const browser = await puppeteer.launch({
 
 try {
   const page = await browser.newPage();
+  const width = Number(process.env.E2E_WIDTH || 1280);
+  await page.setViewport({ width, height: width <= 480 ? 800 : 900 });
   const errors = [];
   page.on("pageerror", (error) => errors.push(`pageerror:${error.message}`));
   page.on("console", (message) => {
@@ -49,17 +50,57 @@ try {
   await page.click("button[type=submit]");
   await page.waitForSelector("#result-heading", { timeout: 10000 });
   const link = await page.$eval("p.break-all", (element) => element.textContent.trim());
-  const storageAfterCreate = await page.evaluate(() => JSON.stringify(localStorage));
+  // The primary hand-off action must work in a real browser (jsdom-only mocks
+  // cannot prove the clipboard/fallback path or its role=status feedback).
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Copy link");
+    if (!button) throw new Error("Copy link button missing");
+    button.click();
+  });
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('[role="status"]')].some((e) => /Copied/i.test(e.textContent)),
+    { timeout: 5000 },
+  );
+  const storageAfterCreate = await page.evaluate(() => ({
+    local: JSON.stringify(localStorage),
+    session: JSON.stringify(sessionStorage),
+  }));
 
   await page.goto(link, { waitUntil: "networkidle0" });
   await page.waitForSelector("#reveal-heading");
   await page.click("form button[type=submit]");
   await page.waitForSelector("#revealed-heading", { timeout: 10000 });
   const revealed = await page.$eval("pre", (element) => element.textContent);
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Copy secret");
+    if (!button) throw new Error("Copy secret button missing");
+    button.click();
+  });
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('[role="status"]')].some((e) => /Copied/i.test(e.textContent)),
+    { timeout: 5000 },
+  );
 
+  // "Hide secret" must clear the plaintext in place and move focus to the
+  // terminal heading — not merely rely on a reload to reach the gone state.
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Hide secret");
+    if (!button) throw new Error("Hide secret button missing");
+    button.click();
+  });
+  await page.waitForSelector("#gone-heading", { timeout: 10000 });
+  const hidden = await page.evaluate(() => ({
+    focus: document.activeElement?.id,
+    plaintextLeft: document.body.innerText.includes("e2e-secret-"),
+    preLeft: document.querySelectorAll("pre").length,
+  }));
+  assert(hidden.focus === "gone-heading", "focus did not move to the terminal heading");
+  assert(!hidden.plaintextLeft, "plaintext remained on screen after Hide secret");
+  assert(hidden.preLeft === 0, "secret element remained in the DOM after Hide secret");
+
+  // The non-consuming preview detects a spent link on load, so the terminal
+  // panel appears directly — there is no second reveal POST to make.
   await page.reload({ waitUntil: "networkidle0" });
-  await page.waitForSelector("#reveal-heading");
-  await page.click("form button[type=submit]");
   await page.waitForSelector("#gone-heading", { timeout: 10000 });
 
   // A wrong passphrase must not consume the secret; the correct one must.
@@ -78,10 +119,7 @@ try {
   await page.click("form button[type=submit]");
   await page.waitForSelector("[role=alert]", { timeout: 10000 });
   const wrongMessage = await page.$eval("[role=alert]", (element) => element.textContent.trim());
-  await page.$eval("#reveal-passphrase", (element) => {
-    element.value = "";
-    element.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  const clearedOnRetry = await page.$eval("#reveal-passphrase", (element) => element.value === "");
   await page.type("#reveal-passphrase", "open-sesame");
   await page.click("form button[type=submit]");
   await page.waitForSelector("#revealed-heading", { timeout: 10000 });
@@ -93,12 +131,9 @@ try {
   await page.waitForSelector("#secret");
   await page.type("#secret", "short-pass-guard");
   await page.type("#passphrase", "short");
-  const passphraseField = await page.$eval("#passphrase", (element) => ({
-    minLength: element.minLength,
-    tooShort: element.validity.tooShort,
-  }));
   await page.click("button[type=submit]");
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.waitForSelector('[role="alert"]', { timeout: 5000 });
+  const shortPassphraseAlert = await page.$eval('[role="alert"]', (element) => element.textContent.trim());
   const createdWithShortPassphrase = await page.$("#result-heading");
   const shortPassphraseResponse = await page.evaluate(async () => {
     const response = await fetch("/api/v3/guest/conceal", {
@@ -108,6 +143,33 @@ try {
     });
     return { status: response.status, body: await response.json() };
   });
+
+  // D-014 counts UTF-8 bytes, not UTF-16 code units. A native minlength would
+  // block this valid 9-byte passphrase before the app's byte rule ever ran.
+  await page.goto(`${base}/`, { waitUntil: "networkidle0" });
+  await page.waitForSelector("#secret");
+  await page.type("#secret", multiByte);
+  await page.type("#passphrase", multiBytePassphrase);
+  await page.select("#ttl", "1800");
+  await page.click("button[type=submit]");
+  await page.waitForSelector("#result-heading", { timeout: 10000 });
+  const multiByteLink = await page.$eval("p.break-all", (element) => element.textContent.trim());
+  const storageAfterMultiByteCreate = await page.evaluate(() => ({
+    local: JSON.stringify(localStorage),
+    session: JSON.stringify(sessionStorage),
+  }));
+
+  await page.goto(multiByteLink, { waitUntil: "networkidle0" });
+  await page.click("form button[type=submit]");
+  await page.waitForSelector("#reveal-passphrase", { timeout: 10000 });
+  await page.type("#reveal-passphrase", multiBytePassphrase);
+  await page.click("form button[type=submit]");
+  await page.waitForSelector("#revealed-heading", { timeout: 10000 });
+  const multiByteRevealed = await page.$eval("pre", (element) => element.textContent);
+  const storageAfterReveal = await page.evaluate(() => ({
+    local: JSON.stringify(localStorage),
+    session: JSON.stringify(sessionStorage),
+  }));
 
   // File secrets: upload a binary file, reveal once, see the download UI.
   work = fs.mkdtempSync(path.join(os.tmpdir(), "ots-e2e-"));
@@ -136,24 +198,34 @@ try {
     { timeout: 10000 },
   );
   const fileUi = await page.$eval("main", (element) => element.textContent);
+  // Spent links show the terminal panel on load via the preview GET.
   await page.reload({ waitUntil: "networkidle0" });
-  await page.click("form button[type=submit]");
   await page.waitForSelector("#gone-heading", { timeout: 10000 });
 
   assert(link.includes("/secret/"), "result link is not a /secret/ URL");
   assert(!link.includes(secret), "plaintext leaked into the link");
   assert(revealed === secret, "revealed value did not match");
-  assert(storageAfterCreate === "{}", "secret data was written to localStorage");
+  assert(storageAfterCreate.local === "{}", "secret data was written to localStorage");
+  assert(storageAfterCreate.session === "{}", "secret data was written to sessionStorage");
   assert(guardedRevealed === guarded, "guarded reveal did not match");
-  assert(passphraseField.minLength === 8, `passphrase minlength is ${passphraseField.minLength}`);
-  assert(passphraseField.tooShort, "a 5-byte passphrase was not flagged as too short");
+  assert(/8 bytes/i.test(shortPassphraseAlert), `wrong short-passphrase message: ${shortPassphraseAlert}`);
   assert(createdWithShortPassphrase === null, "a 5-byte passphrase created a secret");
+  assert(multiByteRevealed === multiByte, "a valid 9-byte passphrase did not reveal the secret");
+  assert(
+    storageAfterMultiByteCreate.local === "{}" && storageAfterMultiByteCreate.session === "{}",
+    "the multi-byte passphrase journey wrote to web storage"
+  );
+  assert(
+    storageAfterReveal.local === "{}" && storageAfterReveal.session === "{}",
+    "plaintext was written to web storage on reveal"
+  );
   assert(shortPassphraseResponse.status === 422, "the server accepted a 5-byte passphrase");
   assert(
     shortPassphraseResponse.body?.error?.code === "validation_error",
     "short passphrase was refused with the wrong code"
   );
   assert(/not correct/i.test(wrongMessage), "wrong-passphrase message missing");
+  assert(clearedOnRetry, "a wrong passphrase was not cleared for a one-type retry");
   assert(fileLink.includes("/secret/"), "file result link is not a /secret/ URL");
   assert(!fileLink.includes("e2e-file"), "file plaintext leaked into the link");
   assert(fileUi.includes("e2e-file.bin"), "file name missing from the reveal UI");

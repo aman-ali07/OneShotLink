@@ -25,6 +25,8 @@ const ReceiptSchema = z.object({
   passphrase_required: z.boolean(),
   kind: z.string().optional(),
   secret_url: z.string().optional(),
+  // Lifecycle state from D-017: new | previewed | revealed | burned.
+  status: z.enum(["new", "previewed", "revealed", "burned"]).optional(),
 });
 
 const WebhookSchema = z.object({
@@ -98,14 +100,28 @@ export type Receipt = z.infer<typeof ReceiptSchema>;
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly retryAfter: number | null;
+  // Correlation id from the X-Request-Id header (or the error envelope).
+  // Keep it on the typed error so callers can quote it in support reports.
+  readonly requestId: string | null;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    retryAfter: number | null = null,
+    requestId: string | null = null,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.retryAfter = retryAfter;
+    this.requestId = requestId;
   }
 }
+
+const DEFAULT_TIMEOUT_MS = 15_000;
 
 interface RequestOptions {
   method: "GET" | "POST" | "DELETE";
@@ -118,16 +134,22 @@ async function request<T>(
   schema: z.ZodType<T>,
   options: RequestOptions,
 ): Promise<T> {
+  // A caller-supplied signal (view teardown) wins; otherwise cap every request
+  // so a hung connection cannot leave a spinner or skeleton up forever.
+  const timeoutSignal = options.signal ? undefined : AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetch(path, {
       method: options.method,
       headers: options.body === undefined ? undefined : { "Content-Type": "application/json" },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
+      signal: options.signal ?? timeoutSignal,
       credentials: "same-origin",
     });
   } catch (cause) {
+    if (timeoutSignal?.aborted) {
+      throw new ApiError(0, "timeout", "The server took too long to respond. Try again.");
+    }
     if (cause instanceof DOMException && cause.name === "AbortError") throw cause;
     throw new ApiError(0, "network_error", "The server could not be reached. Check your connection and try again.");
   }
@@ -143,11 +165,20 @@ async function request<T>(
   }
 
   if (!response.ok) {
+    const retryAfterRaw = response.headers.get("Retry-After");
+    const retryAfter = retryAfterRaw !== null && /^\d+$/.test(retryAfterRaw) ? Number(retryAfterRaw) : null;
+    const requestId = response.headers.get("X-Request-Id");
     const parsed = ErrorEnvelope.safeParse(payload);
     if (parsed.success) {
-      throw new ApiError(response.status, parsed.data.error.code, parsed.data.error.message);
+      throw new ApiError(
+        response.status, parsed.data.error.code, parsed.data.error.message,
+        retryAfter, requestId ?? parsed.data.error.request_id ?? null,
+      );
     }
-    throw new ApiError(response.status, "request_failed", "The request failed. Please try again.");
+    throw new ApiError(
+      response.status, "request_failed", "The request failed. Please try again.",
+      retryAfter, requestId,
+    );
   }
 
   const parsed = schema.safeParse(payload);
@@ -176,6 +207,41 @@ export function concealSecret(input: {
     method: "POST",
     body,
   });
+}
+
+const PeekSchema = z.object({
+  passphrase_required: z.boolean(),
+  metadata: z.object({
+    kind: z.string().nullable(),
+    filename: z.string().nullable().optional(),
+    created_at: z.number().int().nullable().optional(),
+    ttl: z.number().int(),
+  }),
+});
+export type SecretPreview = z.infer<typeof PeekSchema>;
+
+// GET is a non-consuming preview: chat unfurlers and the SPA can inspect a
+// link without spending it. Only POST .../reveal returns plaintext.
+export function peekSecret(key: string, signal?: AbortSignal): Promise<SecretPreview> {
+  return request(`/api/v3/guest/secret/${encodeURIComponent(key)}`, PeekSchema, {
+    method: "GET",
+    signal,
+  });
+}
+
+// Owner-only destruction: the payload is deleted without being returned.
+export function burnSecret(key: string): Promise<{
+  ok: boolean;
+  metadata: { identifier: string; status: "burned" };
+}> {
+  return request(
+    `/api/v3/secret/${encodeURIComponent(key)}`,
+    z.object({
+      ok: z.boolean(),
+      metadata: z.object({ identifier: z.string(), status: z.literal("burned") }),
+    }),
+    { method: "DELETE", body: {} },
+  );
 }
 
 export function revealSecret(key: string, passphrase?: string): Promise<RevealResponse> {
@@ -242,10 +308,36 @@ export function deleteWebhook(id: string): Promise<{ ok: boolean }> {
   });
 }
 
+const DeliverySchema = z.object({
+  id: z.string(),
+  event: z.string(),
+  status: z.string(),
+  attempts: z.number().int(),
+  response_code: z.number().int().nullable(),
+  created_at: z.number().int(),
+});
+export type Delivery = z.infer<typeof DeliverySchema>;
+
+export function listWebhookDeliveries(id: string): Promise<{ deliveries: z.infer<typeof DeliverySchema>[] }> {
+  return request(`/api/v3/webhooks/${encodeURIComponent(id)}/deliveries`,
+    z.object({ deliveries: z.array(DeliverySchema) }), { method: "GET" });
+}
+
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === "rate_limited") {
-      return "Too many requests. Wait a minute and try again.";
+      return error.retryAfter
+        ? `Too many requests. Try again in ${error.retryAfter} seconds.`
+        : "Too many requests. Wait a minute and try again.";
+    }
+    if (error.code === "service_unavailable") {
+      return "Storage is temporarily unavailable. Try again shortly.";
+    }
+    if (error.code === "timeout") {
+      return error.message;
+    }
+    if (error.status === 403) {
+      return "This action is not available on this instance or account.";
     }
     return error.message;
   }

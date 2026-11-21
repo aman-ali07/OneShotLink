@@ -1,24 +1,31 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import AppAlert from "@/components/AppAlert.vue";
 import AppButton from "@/components/AppButton.vue";
 import CopyButton from "@/components/CopyButton.vue";
+import { sizeLabel, ttlLabel } from "@/lib/format";
+import { publicConfig } from "@/lib/config";
 import {
   concealSecret,
   errorMessage,
-  getConfig,
   type ConcealResponse,
 } from "@/lib/api";
 
 const secret = ref("");
 const mode = ref<"text" | "file">("text");
+// A misclick on the File tab must not destroy a pasted secret.
+const textDraft = ref("");
+const readingFile = ref(false);
 const chosenFile = ref<File | null>(null);
 const fileName = ref("");
-const maxFileBytes = ref(512 * 1024);
-const ttl = ref(86400);
+// Server values only. No hardcoded TTL/limit seeds: an operator may change
+// TTL_OPTIONS or MAX_SECRET_BYTES and the UI must follow the served config.
+const maxFileBytes = ref(0);
+const ttl = ref(0);
 const passphrase = ref("");
-const ttlOptions = ref<number[]>([1800, 43200, 86400, 259200]);
-const maxBytes = ref(1024 * 1024);
+const ttlOptions = ref<number[]>([]);
+const maxBytes = ref(0);
+const configReady = ref(false);
 const submitting = ref(false);
 const error = ref("");
 const configNote = ref("");
@@ -26,34 +33,26 @@ const result = ref<ConcealResponse | null>(null);
 const resultHeading = ref<HTMLHeadingElement | null>(null);
 const secretInput = ref<HTMLTextAreaElement | null>(null);
 
-let controller: AbortController | undefined;
-
 const bytes = computed(() => new TextEncoder().encode(secret.value).length);
 const payloadBytes = computed(() => chosenFile.value?.size ?? bytes.value);
 const limitBytes = computed(() => (mode.value === "file" ? maxFileBytes.value : maxBytes.value));
-const usage = computed(() => Math.min(100, Math.round((payloadBytes.value / limitBytes.value) * 100)));
+// Keep the true ratio for the colour decision — clamping it to 100 made the
+// over-limit branch unreachable, so an oversized paste showed amber, not red.
+const usageRaw = computed(() => Math.round((payloadBytes.value / limitBytes.value) * 100));
+const usage = computed(() => Math.min(100, usageRaw.value));
 const link = computed(() => {
   if (!result.value) return "";
   return new URL(result.value.links.secret, window.location.origin).toString();
 });
 
-function ttlLabel(seconds: number): string {
-  if (seconds < 3600) return `${Math.round(seconds / 60)} minutes`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)} hours`;
-  return `${Math.round(seconds / 86400)} day${seconds >= 172800 ? "s" : ""}`;
-}
-
-function sizeLabel(value: number): string {
-  return value >= 1024 * 1024 ? `${(value / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(value / 1024)} KB`;
-}
-
 function setMode(next: "text" | "file") {
   if (mode.value === next) return;
+  if (mode.value === "text") textDraft.value = secret.value;
   mode.value = next;
-  error.value = "";
-  secret.value = "";
+  secret.value = next === "text" ? textDraft.value : "";
   chosenFile.value = null;
   fileName.value = "";
+  error.value = "";
 }
 
 async function chooseFile(event: Event) {
@@ -71,36 +70,46 @@ async function chooseFile(event: Event) {
   }
 
   // Base64 stays ASCII, so the existing AES-GCM path (which forces UTF-8 on
-  // decrypt) cannot corrupt the original bytes.
-  const view = new Uint8Array(await chosen.arrayBuffer());
-  let binary = "";
-  const CHUNK = 0x8000;
-  for (let i = 0; i < view.length; i += CHUNK) {
-    binary += String.fromCharCode(...view.subarray(i, i + CHUNK));
+  // decrypt) cannot corrupt the original bytes. Encoding a 512 KiB file is
+  // visible work, so show a live status while it runs.
+  readingFile.value = true;
+  try {
+    const view = new Uint8Array(await chosen.arrayBuffer());
+    let binary = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < view.length; i += CHUNK) {
+      binary += String.fromCharCode(...view.subarray(i, i + CHUNK));
+    }
+    secret.value = btoa(binary);
+    chosenFile.value = chosen;
+    fileName.value = chosen.name;
+  } catch {
+    error.value = "Could not read that file. Try again.";
+  } finally {
+    readingFile.value = false;
   }
-  secret.value = btoa(binary);
-  chosenFile.value = chosen;
-  fileName.value = chosen.name;
 }
 
 onMounted(async () => {
-  controller = new AbortController();
   try {
-    const config = await getConfig(controller.signal);
+    const config = await publicConfig();
     ttlOptions.value = config.ttl_options;
     maxBytes.value = config.max_secret_bytes;
-    maxFileBytes.value = config.max_file_bytes ?? maxFileBytes.value;
+    maxFileBytes.value = config.max_file_bytes ?? 0;
     ttl.value = config.ttl_options.includes(config.default_ttl)
       ? config.default_ttl
-      : (config.ttl_options[0] ?? 86400);
+      : (config.ttl_options[0] ?? 0);
+    configReady.value = true;
   } catch {
-    configNote.value = "Could not load server settings. Default expiry options are shown.";
+    // Fail closed: without the server allowlist there is no valid TTL to send.
+    configNote.value = "Could not load server settings. Refresh the page to try again.";
   }
 });
 
-onBeforeUnmount(() => controller?.abort());
-
 async function submit() {
+  // Synchronous reentry guard: a disabled button is patched asynchronously,
+  // so a double-click or Enter-repeat could otherwise create two secrets.
+  if (submitting.value) return;
   error.value = "";
   if (mode.value === "file" && !chosenFile.value) {
     error.value = "Choose a file to share.";
@@ -115,8 +124,19 @@ async function submit() {
     return;
   }
   if (passphrase.value !== "" && new TextEncoder().encode(passphrase.value).length < 8) {
-    error.value = "Use at least 8 characters for the passphrase, or leave it empty.";
+    error.value = "Use at least 8 bytes for the passphrase, or leave it empty.";
     return;
+  }
+  if (new TextEncoder().encode(passphrase.value).length > 256) {
+    error.value = "The passphrase is too long (256 bytes maximum).";
+    return;
+  }
+  if (mode.value === "file") {
+    const nameBytes = new TextEncoder().encode(fileName.value).length;
+    if (nameBytes < 1 || nameBytes > 255) {
+      error.value = "Use a filename between 1 and 255 bytes.";
+      return;
+    }
   }
 
   submitting.value = true;
@@ -130,6 +150,8 @@ async function submit() {
     });
     // Do not keep plaintext in component state after the request succeeds.
     secret.value = "";
+    textDraft.value = "";
+    fileName.value = "";
     passphrase.value = "";
     chosenFile.value = null;
     await nextTick();
@@ -146,7 +168,9 @@ function reset() {
   error.value = "";
   chosenFile.value = null;
   fileName.value = "";
+  textDraft.value = "";
   secret.value = "";
+  passphrase.value = "";
   nextTick(() => secretInput.value?.focus());
 }
 </script>
@@ -163,7 +187,7 @@ function reset() {
 
         <div class="space-y-7 px-6 py-7 sm:px-8 sm:py-9">
           <div class="space-y-3">
-            <h1 id="compose-heading" class="text-3xl font-bold tracking-tight sm:text-4xl">
+            <h1 id="compose-heading" class="ots-title">
               Share a secret once
             </h1>
             <p class="max-w-xl leading-relaxed text-muted">
@@ -181,7 +205,7 @@ function reset() {
                   type="button"
                   :aria-pressed="mode === 'text'"
                   :class="[
-                    'rounded-md px-4 py-2 text-sm font-semibold transition-colors',
+                    'inline-flex min-h-11 items-center rounded-md px-4 py-2 text-sm font-semibold transition-colors',
                     mode === 'text' ? 'bg-accent text-on-accent' : 'ots-inset text-muted hover:text-text',
                   ]"
                   @click="setMode('text')"
@@ -192,7 +216,7 @@ function reset() {
                   type="button"
                   :aria-pressed="mode === 'file'"
                   :class="[
-                    'rounded-md px-4 py-2 text-sm font-semibold transition-colors',
+                    'inline-flex min-h-11 items-center rounded-md px-4 py-2 text-sm font-semibold transition-colors',
                     mode === 'file' ? 'bg-accent text-on-accent' : 'ots-inset text-muted hover:text-text',
                   ]"
                   @click="setMode('file')"
@@ -211,7 +235,7 @@ function reset() {
                   spellcheck="false"
                   autocomplete="off"
                   aria-describedby="secret-help"
-                  class="ots-inset w-full resize-y p-3 font-mono text-sm text-text placeholder:text-muted/70"
+                  class="ots-inset w-full resize-y p-3 font-mono text-sm text-text placeholder:text-muted"
                   placeholder="Paste the value you want to share…"
                 />
               </template>
@@ -224,6 +248,7 @@ function reset() {
                   aria-describedby="secret-help"
                   @change="chooseFile"
                 />
+                <p v-if="readingFile" class="text-xs text-muted" role="status">Reading file…</p>
                 <p v-if="chosenFile" class="text-xs text-muted">
                   {{ fileName }} · {{ sizeLabel(chosenFile.size) }} — encrypted before it is stored.
                 </p>
@@ -236,7 +261,7 @@ function reset() {
               <div class="h-1 overflow-hidden rounded-full bg-border" aria-hidden="true">
                 <div
                   class="h-full rounded-full transition-[width] duration-200"
-                  :class="usage > 90 ? 'bg-danger' : 'bg-accent'"
+                  :class="usageRaw > 100 ? 'bg-danger' : usageRaw > 90 ? 'bg-warning' : 'bg-accent'"
                   :style="{ width: `${usage}%` }"
                 />
               </div>
@@ -266,14 +291,13 @@ function reset() {
                   v-model="passphrase"
                   type="password"
                   autocomplete="new-password"
-                  minlength="8"
                   maxlength="256"
                   class="ots-inset w-full px-3 py-2.5 text-sm"
                   aria-describedby="passphrase-help"
                   placeholder="Leave empty for none"
                 />
                 <p id="passphrase-help" class="text-xs text-muted">
-                  8 characters minimum. Share it through a different channel.
+                  8 bytes minimum. Share it through a different channel.
                 </p>
               </div>
             </div>
@@ -281,7 +305,7 @@ function reset() {
             <AppAlert v-if="error" tone="danger">{{ error }}</AppAlert>
 
             <div class="flex flex-wrap items-center gap-4 pt-1">
-              <AppButton type="submit" :loading="submitting">
+              <AppButton type="submit" :loading="submitting" :disabled="!configReady">
                 {{ submitting ? "Creating link…" : "Create the link" }}
               </AppButton>
               <span class="text-xs text-muted">No account needed on either end.</span>
@@ -331,7 +355,7 @@ function reset() {
       </div>
       <div class="space-y-7 px-6 py-8 sm:px-8 sm:py-10">
         <div class="space-y-3">
-          <h1 id="result-heading" ref="resultHeading" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h1 id="result-heading" ref="resultHeading" tabindex="-1" class="ots-title-compact">
             Your link, ready to send
           </h1>
           <p class="text-muted">

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>OneShotLink — frontend design system</title>
+<style>
+  :root {
+    --bg:#fafaf9; --surface:#ffffff; --border:#e7e5e4; --border-input:#78716c;
+    --text:#1c1917; --muted:#57534e; --accent:#0f766e; --on-accent:#ffffff;
+    --grid:#efeeec; --radius:16px; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:var(--bg);color:var(--text);
+    background-image:linear-gradient(to right,var(--grid) 1px,transparent 1px),
+                     linear-gradient(to bottom,var(--grid) 1px,transparent 1px);
+    background-size:48px 48px;
+  }
+  .stage{position:relative;width:1030px;height:560px;overflow:hidden}
+  /* The product window fills the stage and runs off the right and bottom edges. */
+  .window{
+    position:absolute;left:64px;top:48px;width:1180px;
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;
+  }
+  /* Run the window well past the crop instead of leaving a few-pixel sliver. */
+  .chrome{height:44px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 40px}
+  .nav-fill{display:block;width:46px;height:7px;border-radius:4px;background:#d6d3d1}
+  .mark{width:22px;height:22px;display:grid;place-items:center;background:var(--accent);border-radius:6px}
+  .mark svg{width:14px;height:14px}
+  .wordmark{font-size:13px;font-weight:700;letter-spacing:-.01em}
+  .spacer{flex:1}
+  .navitem{font-size:11px;color:var(--muted)}
+  .body{display:block;min-height:620px}
+  .main{max-width:640px;padding:34px 40px 40px}
+  .eyebrow{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+  h1{font-size:30px;line-height:1.15;letter-spacing:-.02em;margin:12px 0 8px}
+  .lede{font-size:13px;line-height:1.6;color:var(--muted);max-width:460px;margin:0 0 24px}
+  .field{border:1px solid var(--border-input);border-radius:10px;background:color-mix(in srgb,var(--bg) 70%,var(--surface));padding:14px 16px}
+  .field .line{height:7px;border-radius:4px;background:#d6d3d1}
+  .field .line.short{width:38%;margin-bottom:10px}
+  .field .line.wide{width:88%}
+  .opts{display:flex;gap:10px;margin:14px 0 20px}
+  .opt{border:1px solid var(--border-input);border-radius:8px;padding:9px 12px;font-size:11px;color:var(--muted);min-width:112px}
+  .cta{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--on-accent);
+       border-radius:8px;padding:11px 16px;font-size:12px;font-weight:600}
+  /* Result satellite straddles the main panel edge — the payoff is left visible. */
+  .satellite{
+    position:absolute;right:36px;bottom:34px;width:288px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);padding:18px;
+  }
+  .satellite .tag{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+  .satellite p{font-size:12px;line-height:1.5;margin:10px 0 14px;color:var(--muted)}
+  .link{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--text);
+        background:color-mix(in srgb,var(--accent) 8%,var(--surface));border-radius:6px;padding:9px 10px;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .aside{border-left:1px solid var(--border);padding:34px 26px;background:color-mix(in srgb,var(--bg) 40%,var(--surface))}
+  .aside h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 18px}
+  .row{display:flex;gap:10px;margin-bottom:16px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:4px;flex:none}
+  .row p{margin:0;font-size:11px;line-height:1.6;color:var(--muted)}
+  .row strong{color:var(--text);font-weight:600}
+  .foot{position:absolute;left:64px;top:16px;font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="stage ss-stage ss-fit">
+  <div class="window">
+    <div class="chrome">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9h-1a7 7 0 0 0-7 7 7 7 0 0 0 7 7h1"/><path d="M18 9h1a7 7 0 0 1 7 7 7 7 0 0 1-7 7h-1"/></svg>
+      </span>
+      <span class="wordmark">OneShotLink</span>
+      <span class="spacer"></span>
+      <span class="navitem">New secret</span>
+      <span class="navitem" aria-hidden="true"><span class="nav-fill"></span></span>
+    </div>
+    <div class="body">
+      <div class="main">
+        <p class="eyebrow">New secret</p>
+        <h1>Share a secret once</h1>
+        <p class="lede">One-time links for passwords and keys. The recipient never needs an account.</p>
+        <div class="field" aria-hidden="true">
+          <div class="line short"></div><div class="line wide"></div>
+        </div>
+        <div class="opts" aria-hidden="true">
+          <span class="opt">Expires in 1 day</span><span class="opt">Passphrase</span>
+        </div>
+        <span class="cta">Create secret link <span aria-hidden="true">→</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="satellite">
+    <span class="tag">Link ready</span>
+    <p>Copy this link and send it through a different channel than the passphrase.</p>
+    <div class="link">app.your-domain.example/s/8fK2…</div>
+  </div>
+  <span class="foot">Design system · tokens.css · prefers-color-scheme · WCAG 2.2 AA</span>
+</div>
+</body>
+</html>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppAlert from "@/components/AppAlert.vue";
 import AppButton from "@/components/AppButton.vue";
 import { errorMessage, signIn } from "@/lib/api";
+import { accountsEnabled } from "@/lib/authMode";
 
 const email = ref("");
 const password = ref("");
@@ -11,6 +12,11 @@ const submitting = ref(false);
 const error = ref("");
 const route = useRoute();
 const router = useRouter();
+const available = ref(true);
+
+onMounted(async () => {
+  available.value = await accountsEnabled();
+});
 
 function redirectTarget(): string {
   const target = typeof route.query.redirect === "string" ? route.query.redirect : "/dashboard";
@@ -36,11 +42,16 @@ async function submit() {
   <section class="ots-panel ots-enter mx-auto max-w-lg space-y-6 p-7 sm:p-9">
     <p class="ots-eyebrow">Account / Sign in</p>
     <div class="space-y-2">
-      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Sign in</h1>
+      <h1 class="ots-title">Sign in</h1>
       <p class="text-muted">See the secret links you have created.</p>
     </div>
 
-    <form class="space-y-4" @submit.prevent="submit">
+    <AppAlert v-if="!available">
+      Accounts are off on this instance. You can still create and open secret links without one.
+      <RouterLink to="/" class="font-semibold underline underline-offset-2">Create a secret</RouterLink>
+    </AppAlert>
+
+    <form v-if="available" class="space-y-4" @submit.prevent="submit">
       <div class="space-y-2">
         <label for="email" class="block text-sm font-semibold">Email</label>
         <input
@@ -62,17 +73,18 @@ async function submit() {
           autocomplete="current-password"
           required
           class="w-full rounded-md border border-border-input bg-surface px-3 py-2 text-sm"
+          :aria-describedby="error ? 'signin-error' : undefined"
         />
       </div>
 
-      <AppAlert v-if="error" tone="danger">{{ error }}</AppAlert>
+      <AppAlert v-if="error" id="signin-error" tone="danger">{{ error }}</AppAlert>
 
       <AppButton type="submit" :loading="submitting">
         {{ submitting ? "Signing in…" : "Sign in" }}
       </AppButton>
     </form>
 
-    <p class="text-sm text-muted">
+    <p v-if="available" class="text-sm text-muted">
       No account?
       <RouterLink to="/signup" class="font-medium text-accent underline underline-offset-2">
         Create one

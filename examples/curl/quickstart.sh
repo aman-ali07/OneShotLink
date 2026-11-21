@@ -4,13 +4,16 @@
 set -euo pipefail
 
 BASE="${BASE_URL:-http://127.0.0.1:3000}"
+BASE="${BASE%/}"
 SECRET_VALUE="curl-example-$(date +%s)"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# Discover the operator's TTL allowlist instead of hard-coding a duration.
+TTL=$(curl -fsS "$BASE/api/v3/config" | python3 -c 'import json,sys; print(json.load(sys.stdin)["default_ttl"])')
 create=$(curl -fsS -X POST "$BASE/api/v3/guest/conceal" \
   -H 'content-type: application/json' \
-  -d "{\"secret\":\"$SECRET_VALUE\",\"ttl\":1800}")
+  -d "{\"secret\":\"$SECRET_VALUE\",\"ttl\":$TTL}")
 key=$(printf '%s' "$create" | python3 -c 'import json,sys; print(json.load(sys.stdin)["secret_key"])')
 test -n "$key"
 

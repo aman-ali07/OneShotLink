@@ -12,14 +12,14 @@ jobs:
     name: Dependency scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: ruby/setup-ruby@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1 branch head
         with:
           ruby-version: "3.3"
           bundler-cache: true
       - name: Ruby dependency audit
         run: bundle exec bundler-audit check --update
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
       - name: Frontend dependency audit (high and above fails)
@@ -53,8 +53,8 @@ jobs:
       REDIS_URL: redis://127.0.0.1:6379/15
       RACK_ENV: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: ruby/setup-ruby@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1 branch head
         with:
           ruby-version: "3.3"
           bundler-cache: true
@@ -64,8 +64,8 @@ jobs:
     name: Frontend typecheck and build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
@@ -87,8 +87,8 @@ jobs:
       APP_PORT: "3000"
       AUTH_MODE: simple
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
@@ -118,7 +118,20 @@ jobs:
           npm --prefix e2e ci --no-audit --no-fund
           BASE_URL=http://127.0.0.1:3000 npm --prefix e2e test
           BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:accounts
+          BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:file
+          BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:requests
+          BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:webhooks
+          BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:states
+          BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:mobile
+          BASE_URL=http://127.0.0.1:3000 npm --prefix e2e run test:mobile
+          # WCAG 2.2 AA gate: axe runs in the same browser against static routes
+          # and the live reveal phases. A violation fails the build (D-016).
+          BASE_URL=http://127.0.0.1:3000 CHROME_PATH=/usr/bin/google-chrome npm --prefix e2e run test:a11y
           docker compose down -v
+      - name: SDK examples — run every quickstart against a throwaway stack
+        env:
+          OTS_APP_IMAGE: oneshotlink-web
+        run: bash script/test-examples.sh
       - name: Load test — single-use invariant under concurrency
         env:
           RATE_LIMIT_CONCEAL: "100000"

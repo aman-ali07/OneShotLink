@@ -30,6 +30,51 @@ RSpec.describe "Secret lifecycle API" do
   end
 
   describe "v3 guest conceal/reveal" do
+    it "fails closed with 501 for every API route in full mode" do
+      with_env("AUTH_MODE" => "full") do
+        post "/api/v3/guest/conceal", JSON.generate(secret: "full-mode", ttl: 1800), JSON_HEADERS
+        expect(last_response.status).to eq(501)
+        expect(JSON.parse(last_response.body).dig("error", "code")).to eq("not_configured")
+
+        get "/api/v3/config"
+        expect(last_response.status).to eq(501)
+
+        post "/api/v1/share", secret: "full-mode", ttl: 1800
+        expect(last_response.status).to eq(501)
+        # v1 is a frozen contract: its errors use `message`, never the v3 envelope.
+        expect(JSON.parse(last_response.body)).to include("message")
+        expect(JSON.parse(last_response.body)).not_to have_key("error")
+      end
+    end
+
+    it "limits passphrase guesses per secret without consuming the record (D-012b)" do
+      with_env("RATE_LIMIT_PASSPHRASE" => "2", "RATE_LIMIT_PASSPHRASE_WINDOW" => "7") do
+        key = create_v3(secret: "budget-secret", ttl: 1800, passphrase: "correct-horse")["secret_key"]
+        object_key = Onetime::Models::Secret.object_key(key)
+
+        2.times do
+          reveal_v3(key, passphrase: "wrong-one")
+          expect(last_response.status).to eq(401)
+        end
+
+        reveal_v3(key, passphrase: "wrong-two")
+        expect(last_response.status).to eq(429)
+        # Literal 7 (not the ambient default) proves the budget carries its own
+        # window to the error handler instead of falling back to 60 (K-47).
+        expect(last_response.headers["Retry-After"]).to eq("7")
+        expect(last_response.headers["X-RateLimit-Limit"]).to eq("2")
+        expect(last_response.headers["X-RateLimit-Remaining"]).to eq("0")
+        expect(Onetime::Store.redis.exists?(object_key)).to be(true)
+
+        # The budget is a window, not a lockout: after it expires the right
+        # passphrase still reveals the untouched record.
+        Onetime::Store.redis.del("limiter:#{key}:passphrase", "limiter:#{key}:passphrase:counter")
+        reveal_v3(key, passphrase: "correct-horse")
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["secret_value"]).to eq("budget-secret")
+      end
+    end
+
     it "never consumes a secret on GET, so a link preview cannot burn it" do
       key = create_v3(secret: "preview-safe", ttl: 1800)["secret_key"]
 
@@ -91,7 +136,11 @@ RSpec.describe "Secret lifecycle API" do
       expect(JSON.parse(last_response.body).dig("error", "code")).to eq("not_found")
 
       expect(Onetime::Store.redis.exists?("secret:object:#{key}")).to be(false)
-      expect(Onetime::Store.redis.exists?("secret:receipt:#{key}")).to be(false)
+      # D-receipt: only non-sensitive metadata survives, for 30 days.
+      receipt = Onetime::Store.redis.hgetall("secret:receipt:#{key}")
+      expect(receipt["status"]).to eq("revealed")
+      expect(receipt.values.join).not_to include("s3cr3t-value")
+      expect(Onetime::Store.redis.ttl("secret:receipt:#{key}")).to be_within(5).of(30 * 86_400)
     end
 
     it "stores only ciphertext at rest with a TTL" do
@@ -366,7 +415,9 @@ RSpec.describe "Secret lifecycle API" do
       post "/api/v3/guest/conceal", JSON.generate(secret: "p1", ttl: 1800, passphrase: "1234567"), JSON_HEADERS
       expect(last_response.status).to eq(422)
       expect(JSON.parse(last_response.body).dig("error", "code")).to eq("validation_error")
-      expect(Onetime::Store.redis.keys("secret:*")).to be_empty
+      # The rejected conceal wrote nothing; the revealed one left only metadata.
+      expect(Onetime::Store.redis.keys("secret:object:*")).to be_empty
+      expect(Onetime::Store.redis.keys("secret:receipt:*").length).to eq(1)
 
       # Exactly 8 bytes is a real passphrase and must be enforced on reveal.
       post "/api/v3/guest/conceal", JSON.generate(secret: "p1", ttl: 1800, passphrase: "12345678"), JSON_HEADERS
@@ -415,6 +466,7 @@ RSpec.describe "Secret lifecycle API" do
         post "/api/v1/share", secret: "two", ttl: 1800
         expect(last_response.status).to eq(429)
         expect(last_response.headers["Retry-After"]).to eq("60")
+        expect(JSON.parse(last_response.body).keys).to eq(["message"])
       end
     end
 

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "openssl"
 require "securerandom"
 
 module Onetime
@@ -23,6 +24,7 @@ module Onetime
       customer.delete_failed
       customer.sessions_revoked
       secret.revealed
+      secret.burned
       secret.passphrase_failed
       request.created
       request.responded
@@ -30,6 +32,11 @@ module Onetime
       webhook.created
       webhook.deleted
       admin.role_changed
+      admin.migrated
+      admin.backup_exported
+      admin.restored
+      admin.key_rotated
+      webhook.worker_run
     ].freeze
 
     module_function
@@ -43,17 +50,39 @@ module Onetime
       }
       entry["actor_id"] = actor_id.to_s if actor_id
       entry["request_id"] = request_id.to_s if request_id
-      entry["ip"] = ip.to_s if ip
+      # D-retention: raw IPs are personal data. Store a truncated HMAC with a
+      # key that rotates daily, so events from the same source can still be
+      # correlated within a day without building a long-term identifier.
+      reference = ip_reference(ip)
+      entry["ip_day"] = reference if reference
       entry["detail"] = detail.to_s if detail
 
       # Approximate trimming keeps memory bounded without blocking writers.
       Store.redis.xadd(STREAM, entry, maxlen: MAXLEN, approximate: true)
       true
     rescue Redis::BaseError => e
-      # Auditing must never break a request path; surface the failure in logs.
-      Onetime.logger.error("audit_write_failed event=#{event} class=#{e.class}")
+      # Auditing must never break a request path. Keep the correlation fields
+      # so an operator can find the affected request, and count the drop so it
+      # can be alerted on rather than disappearing into a log line.
+      Metrics.best_effort_failure("audit")
+      Onetime.logger.error(
+        "audit_write_failed event=#{event} class=#{e.class} " \
+        "request_id=#{request_id} actor_id=#{actor_id}"
+      )
       false
     end
+
+    # Privacy-conscious, short-lived IP correlation. The daily salt means the
+    # same IP produces a different reference tomorrow; short-lived Redis
+    # limiter keys remain the actual abuse-prevention control.
+    def ip_reference(ip)
+      return nil if ip.to_s.empty?
+
+      day = Time.now.to_i / 86_400
+      key = Crypto.derive(Config.secret!, "ots-audit-ip/v1:#{day}")
+      OpenSSL::HMAC.hexdigest("SHA256", key, ip.to_s)[0, 12]
+    end
+    private_class_method :ip_reference
 
     # Newest-first slice for an operator-facing listing.
     def recent(limit: 50)

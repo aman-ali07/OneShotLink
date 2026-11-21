@@ -10,17 +10,17 @@ Guest use without an account,onboarding,must,yes,yes,anonymous create/reveal ver
 Encryption of secret content at rest,security,must,yes,yes,AES-256-GCM; ciphertext-only Redis spec
 Rate limiting on create and reveal,security,must,yes,yes,429 + Retry-After verified
 Accessible responsive create/reveal UI,ux,must,yes,yes,Vue SPA; headless journey + 375/768/1280 overflow checks
-Email/password accounts (simple mode),accounts,should,yes,no,Redis sessions + Argon2id; original offers accounts + SSO
-Owner dashboard of active receipts,accounts,should,yes,no,inferred screen S09; no UI yet
+Email/password accounts (simple mode),accounts,should,yes,yes,Redis sessions + Argon2id; e2e/accounts.mjs; original adds SSO
+Owner dashboard of active receipts,accounts,should,yes,yes,DashboardView.vue + receipts/burn/request/webhook panels; e2e/accounts.mjs
 Email verification and password reset,accounts,should,yes,no,requires email delivery; deferred
 Custom domains for branded links,branding,should,yes,no,paid-plan feature; deferred (T-61)
 Incoming secret request links,collaboration,should,yes,yes,v3 owner-created links accept one encrypted text answer; owner reveals once (T-117). No passphrase on submissions
-Localized UI (16+ locales advertised),i18n,should,yes,no,English only in v1; i18n gem declared
-Light / dark / auto theme,ux,should,yes,no,follow prefers-color-scheme in design system
+Localized UI (16+ locales advertised),i18n,should,no,no,English only in v1; no i18n dependency (adding one needs a decision)
+Light / dark / auto theme,ux,should,yes,partial,follows prefers-color-scheme (auto dark); no manual toggle
 Organizations / RBAC / SSO,teams,could,yes,no,Team Plus feature; deferred (T-60/T-61)
 MFA and WebAuthn,security,could,yes,no,full auth mode; deferred (T-60)
 Security audit trail,security,could,yes,no,paid-plan feature; deferred
-OpenAPI document and rate-limit headers,integrations,could,yes,no,planned T-44/T-26
+OpenAPI document and rate-limit headers,integrations,could,yes,yes,/api/v3/openapi.json served and contract-checked; X-RateLimit-* headers
 QR code for the one-time link,sharing,could,yes,no,nice-to-have; not evidenced as required
 Original name / logo / copy / visual identity,brand,skip,yes,skip,clean-room rule: never copy; rebrand before launch
 Regional hosting and data-residency operations,infrastructure,skip,yes,skip,their infrastructure and legal footprint - not a feature to code
@@ -28,7 +28,7 @@ Subscription billing and plan management,billing,skip,yes,skip,only needed if th
 Their customer base and network effects,network,skip,yes,skip,cannot be cloned; must be earned
 Preview-safe one-time links (survive link previewers/scanners),security,should,no,no,Evidence R-08: 2 reviews; passphrase today raises the bar but nothing warns the sender (replica/fixes.md 1.5)
 Client-side (zero-knowledge) encryption option,security,should,no,no,"Evidence R-08: 3 reviews; deliberate gap D-012 -- server-side AES only, passphrase is an access gate"
-File and image secrets,core,could,no,yes,Text files up to 512 KiB via v3 JSON/base64; encrypted at rest and single-use download (T-116). Image preview and multipart upload are not implemented
+File and image secrets,core,could,no,partial,"Text and binary file secrets up to 512 KiB via v3 JSON/base64; encrypted and single-use download (T-116). Image preview and multipart upload are not implemented"
 Read counts greater than one,core,could,no,no,Evidence R-08: 1 review (thin); 'view limits greater than 1'
-Published crypto spec and a 'verify it yourself' page,docs,should,partial,partial,"Evidence R-08: 6 reviews on trust/crypto; SECURITY.md exists, no standalone verifiable spec page yet"
+Published crypto spec and a 'verify it yourself' page,docs,should,partial,partial,"Evidence R-08: docs/CRYPTO_SPEC.md documents the shipped crypto; a separate self-verification page is still deferred"
 Signed webhook event delivery,developer,could,no,yes,Metadata-only HMAC-signed events with a Redis queue and bin/ots webhooks:work worker; operator schedules the worker (T-118)

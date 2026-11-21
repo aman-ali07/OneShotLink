@@ -5,6 +5,10 @@ import {
   deleteAccount,
   errorMessage,
   getConfig,
+  burnSecret,
+  listReceipts,
+  listWebhookDeliveries,
+  peekSecret,
   revealSecret,
 } from "./api";
 
@@ -170,5 +174,76 @@ describe("errorMessage", () => {
 
   it("falls back for unknown errors", () => {
     expect(errorMessage(new Error("boom"))).toMatch(/Something went wrong/);
+  });
+});
+
+describe("new API surface", () => {
+  it("burns an owner secret with DELETE without returning a value", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ ok: true, metadata: { identifier: "k", status: "burned" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await burnSecret("k");
+
+    expect(result.metadata.status).toBe("burned");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v3/secret/k",
+      expect.objectContaining({ method: "DELETE", credentials: "same-origin" }),
+    );
+  });
+
+  it("previews a secret via GET without consuming it", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        passphrase_required: true,
+        metadata: { kind: "text", filename: null, created_at: 100, ttl: 1800 },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await peekSecret("a/b");
+
+    expect(result.passphrase_required).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v3/guest/secret/a%2Fb",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("lists scoped webhook deliveries", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ deliveries: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listWebhookDeliveries("hook-1");
+
+    expect(fetchMock.mock.calls[0]![0]).toBe("/api/v3/webhooks/hook-1/deliveries");
+  });
+
+  it("preserves receipt lifecycle status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      jsonResponse({ receipts: [{ ...receipt, status: "burned" }] }),
+    ));
+
+    const result = await listReceipts();
+
+    expect(result.receipts[0]!.status).toBe("burned");
+  });
+
+  it("surfaces Retry-After and unavailable/timeout errors", async () => {
+    const response = jsonResponse(
+      { error: { code: "rate_limited", message: "slow down" } },
+      429,
+    );
+    Object.defineProperty(response, "ok", { value: false });
+    Object.defineProperty(response.headers, "get", {
+      value: (name: string) => (name === "Retry-After" ? "7" : null),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+
+    await expect(peekSecret("k")).rejects.toMatchObject({ code: "rate_limited", retryAfter: 7 });
+    expect(errorMessage(new ApiError(429, "rate_limited", "slow down", 7))).toContain("7 seconds");
+    expect(errorMessage(new ApiError(503, "service_unavailable", "x"))).toMatch(/temporarily unavailable/i);
+    expect(errorMessage(new ApiError(0, "timeout", "took too long"))).toContain("took too long");
   });
 });

@@ -46,7 +46,14 @@ module Onetime
     def decrypt(payload, secret: Config.secret!)
       salt = Base64.strict_decode64(payload.fetch("salt"))
       key = derive(secret, salt)
-      cipher = OpenSSL::Cipher.new(payload.fetch("cipher", CIPHER))
+      # `cipher` sits outside the AEAD ciphertext and outside the record MAC, so
+      # a Redis writer must not get to choose the algorithm. Only the algorithm
+      # this service writes is valid; anything else is a typed integrity failure,
+      # never a raw OpenSSL error surfaced as an untyped 500.
+      name = payload.fetch("cipher", CIPHER)
+      raise Onetime::Error, "Stored secret failed integrity verification" unless name == CIPHER
+
+      cipher = OpenSSL::Cipher.new(name)
       cipher.decrypt
       cipher.key = key
       cipher.iv = Base64.strict_decode64(payload.fetch("iv"))

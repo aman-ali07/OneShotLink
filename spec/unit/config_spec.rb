@@ -38,6 +38,19 @@ RSpec.describe Onetime::Config do
     expect { validate("SECRET" => "short") }.to raise_error(described_class::Error, /at least 32 bytes/)
   end
 
+  it "ships loopback-only proxy trust so per-IP limits work behind the local TLS proxy" do
+    example = File.read(File.expand_path("../../.env.example", __dir__))
+    expect(example[/^TRUST_PROXY=(.*)$/, 1]).to eq("true")
+    proxies = example[/^TRUSTED_PROXIES=(.*)$/, 1].to_s.split(",").map(&:strip)
+    expect(proxies).to contain_exactly("127.0.0.1/32", "::1/128")
+  end
+
+  it "refuses a short metrics token when metrics are enabled" do
+    expect { validate("METRICS_ENABLED" => "true", "METRICS_TOKEN" => "prometheus") }
+      .to raise_error(described_class::Error, /METRICS_TOKEN must be at least 32 bytes/)
+    expect(validate("METRICS_ENABLED" => "true", "METRICS_TOKEN" => "t" * 40)).to be(true)
+  end
+
   it "ships an example SECRET that cannot boot by accident" do
     example = File.read(File.expand_path("../../.env.example", __dir__))
     placeholder = example[/^SECRET=(.*)$/, 1]
@@ -62,6 +75,10 @@ RSpec.describe Onetime::Config do
     expect { validate("TTL_OPTIONS" => ",") }.to raise_error(described_class::Error, /TTL_OPTIONS/)
     expect { validate("RATE_LIMIT_CONCEAL" => "0") }.to raise_error(described_class::Error, /RATE_LIMIT_CONCEAL/)
     expect { validate("RATE_LIMIT_WINDOW" => "0") }.to raise_error(described_class::Error, /RATE_LIMIT_WINDOW/)
+    %w[SIGNUP REQUEST WEBHOOK PASSWORD DELETE SIGNOUT].each do |scope|
+      expect { validate("RATE_LIMIT_#{scope}" => "0") }
+        .to raise_error(described_class::Error, /RATE_LIMIT_#{scope}/)
+    end
     expect { validate("MAX_SECRET_BYTES" => (11 * 1024 * 1024).to_s) }.to raise_error(described_class::Error, /10 MiB/)
   end
 
@@ -92,6 +109,34 @@ RSpec.describe Onetime::Config do
       expect(url).to include("s3cret")
       expect(url).to include("redis:6379")
     end
+  end
+
+  it "keeps .env.example defaults in sync with compose.yaml" do
+    root = File.expand_path("../..", __dir__)
+    env_defaults = File.read(File.join(root, ".env.example")).scan(/^([A-Z0-9_]+)=([^\s#]*)/).to_h
+    compose = File.read(File.join(root, "compose.yaml"))
+    checked = 0
+
+    compose.each_line do |line|
+      match = line.match(/^\s+([A-Z0-9_]+): \$\{[A-Z0-9_]+:-([^}]*)\}/)
+      next unless match
+
+      key, default = match[1], match[2]
+      next unless env_defaults.key?(key)
+
+      checked += 1
+      expect(env_defaults[key]).to eq(default), "#{key}: .env.example=#{env_defaults[key]} compose=#{default}"
+    end
+
+    expect(checked).to be > 10
+  end
+
+  it "documents every Config variable in the deployment env table" do
+    root = File.expand_path("../..", __dir__)
+    deployment = File.read(File.join(root, "DEPLOYMENT.md"))
+    documented = deployment.scan(/^\| `([A-Z0-9_]+)` \|/).flatten
+    missing = described_class::DEFAULTS.keys.reject { |key| documented.include?(key) }
+    expect(missing).to be_empty, "undocumented in DEPLOYMENT.md: #{missing.join(', ')}"
   end
 
   it "rejects a Redis URL with an unsupported scheme" do

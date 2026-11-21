@@ -15,9 +15,12 @@ async function api(path, { method = "GET", body } = {}) {
   return { status: response.status, data };
 }
 
+// The operator may narrow TTL_OPTIONS; use the advertised default.
+const config = await api("/api/v3/config");
+assert.equal(config.status, 200);
 const created = await api("/api/v3/guest/conceal", {
   method: "POST",
-  body: { secret: secretValue, ttl: 1800 },
+  body: { secret: secretValue, ttl: config.data.default_ttl },
 });
 assert.equal(created.status, 201);
 const key = created.data.secret_key;

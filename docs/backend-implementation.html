@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OneShotLink — backend implementation</title>
+<style>
+  :root{--ink:#1d2430;--ink-2:#4a5566;--ink-3:#8a94a4;--line:#e3e7ee;--line-faint:#eef1f5;--surface:#fff;--canvas:#f7f8fa;--accent:#2563eb;--accent-soft:#eaf0ff;--ok:#1f7a4d;--ok-soft:#e7f5ec;--amber:#a8620a;--amber-soft:#fdf1e2}
+  *{box-sizing:border-box}html,body{margin:0;background:#fff}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .stage{position:relative;width:1030px;height:560px;overflow:hidden;margin:0 auto}
+  .window{position:absolute;left:92px;top:30px;width:1120px;height:700px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(25,35,55,.16);overflow:hidden}
+  .chrome{height:38px;display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);background:#fcfcfd}
+  .dots{display:flex;gap:6px}.dot{width:9px;height:9px;border-radius:50%;background:#d8dde5}
+  .brand{font-size:12px;font-weight:650;letter-spacing:-.01em}.crumb{font-size:12px;color:var(--ink-3)}
+  .chrome-pill{width:86px;height:20px;border-radius:6px;background:#eef1f5;margin-left:auto}
+  .body{display:flex;height:calc(100% - 38px)}
+  .sidebar{width:160px;flex:none;border-right:1px solid var(--line);padding:18px 10px;background:var(--canvas)}
+  .nav{display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:7px;font-size:12px;color:var(--ink-2)}
+  .nav.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .nav i{width:12px;height:12px;border-radius:4px;background:#cdd5e0;flex:none}.nav.on i{background:var(--accent)}
+  .side-label{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);padding:18px 10px 8px}
+  .main{flex:1;min-width:0;padding:22px 22px}
+  .head{display:flex;align-items:baseline;margin-bottom:16px}
+  .title{font-size:17px;font-weight:650;letter-spacing:-.02em}.sub{font-size:12px;color:var(--ink-3);margin-left:10px}
+  .count{font-size:12px;color:var(--ink-2);margin-left:16px}
+  .tablehead,.row{display:grid;grid-template-columns:150px 1fr 80px 92px;align-items:center;gap:12px;max-width:700px}
+  .tablehead{height:28px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--line)}
+  .row{height:54px;border-bottom:1px solid var(--line-faint)}.row.sel{background:#f7f9fd;border-radius:8px}
+  .name{font-size:13px;font-weight:550}.dep{font-size:12px;color:var(--ink-2)}
+  .badge{font-size:10px;font-weight:700;height:20px;line-height:20px;text-align:center;border-radius:5px;width:60px}
+  .b-core{color:var(--accent);background:var(--accent-soft)}.b-sec{color:var(--amber);background:var(--amber-soft)}
+  .status{font-size:12px;color:var(--ok);font-weight:600}
+  .bar{height:7px;border-radius:4px;background:#e7ebf1}.bar.w70{width:70%}.bar.w52{width:52%}
+  .satellite{position:absolute;left:28px;bottom:28px;width:244px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(25,35,55,.16);padding:16px 18px 12px}
+  .sat-title{font-size:12px;font-weight:650;margin-bottom:10px}
+  .sat-line{display:flex;gap:9px;align-items:center;height:28px;font-size:12px;color:var(--ink-2)}
+  .sat-line .mark{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+  .sat-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-faint);margin-top:8px;padding-top:10px;font-size:11px;color:var(--ink-3)}
+  .sat-foot b{color:var(--ink);font-size:11px}
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="window">
+      <div class="chrome">
+        <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span class="brand">OneShotLink</span><span class="crumb">/ backend / next increment</span>
+        <span class="chrome-pill"></span>
+      </div>
+      <div class="body">
+        <aside class="sidebar">
+          <div class="nav on"><i></i>Overview</div>
+          <div class="nav"><i></i>Lifecycle</div>
+          <div class="nav"><i></i>Data</div>
+          <div class="nav"><i></i>API</div>
+          <div class="nav"><i></i>CLI</div>
+          <div class="side-label">Proof</div>
+          <div class="nav"><i></i>Specs</div>
+          <div class="nav"><i></i>Live run</div>
+          <div class="nav"><i></i>Migrations</div>
+        </aside>
+        <div class="main">
+          <div class="head">
+            <div><span class="title">Backend gaps closed</span><span class="sub">Five parallel reviews · 2026-11-21</span></div>
+            <div class="count">6 features · 0 mocks</div>
+          </div>
+          <div class="tablehead"><span>Capability</span><span>Evidence</span><span>Area</span><span>State</span></div>
+          <div class="row sel">
+            <span class="name">Backup v2</span>
+            <span class="dep">Requests + webhooks round-trip</span>
+            <span><span class="badge b-core">DATA</span></span>
+            <span class="status">Landed</span>
+          </div>
+          <div class="row">
+            <span class="name">Request integrity</span>
+            <span class="dep">MAC, TTL bound, index cleanup</span>
+            <span><span class="badge b-sec">SEC</span></span>
+            <span class="status">Landed</span>
+          </div>
+          <div class="row">
+            <span class="name">OpenAPI truth</span>
+            <span class="dep">Health, webhook id, rate limits</span>
+            <span><span class="badge b-core">API</span></span>
+            <span class="status">Landed</span>
+          </div>
+          <div class="row">
+            <span class="name">CLI create/reveal</span>
+            <span class="dep">Live Puma: once, then 404</span>
+            <span><span class="badge b-core">API</span></span>
+            <span class="status">Landed</span>
+          </div>
+          <div class="row">
+            <span class="name">Migrations</span>
+            <span class="dep">schema:version, dry-run, idempotent</span>
+            <span><span class="badge b-core">DATA</span></span>
+            <span class="status">Landed</span>
+          </div>
+          <div class="row">
+            <span class="bar w70"></span>
+            <span class="bar w52"></span>
+            <span><span class="badge b-core">API</span></span>
+            <span class="status">Landed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="satellite">
+      <div class="sat-title">Evidence gate</div>
+      <div class="sat-line"><span class="mark"></span>Red → green on every fix</div>
+      <div class="sat-line"><span class="mark"></span>Live CLI, no mock API</div>
+      <div class="sat-line"><span class="mark"></span>Redis-only, JSON-string records</div>
+      <div class="sat-foot"><span>Plan&nbsp; </span><b>IMPLEMENTATION_PLAN.md</b></div>
+    </div>
+  </div>
+</body>
+</html>

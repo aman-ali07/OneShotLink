@@ -1,0 +1,50 @@
+name: Bug report
+description: Report incorrect behaviour in OneShotLink
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Please search existing issues first. **Do not report security
+        vulnerabilities here** — follow [SECURITY.md](https://github.com/aman-ali07/OneShotLink/blob/main/SECURITY.md)
+        for private reporting. Never paste secrets, passphrases, tokens, ciphertext or `.env` contents.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Expected versus observed behaviour.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: >
+        curl commands or UI steps. Include the request method/path, `AUTH_MODE`,
+        and TTL/passphrase flags used. Use synthetic values only.
+    validations:
+      required: true
+  - type: input
+    id: request-id
+    attributes:
+      label: X-Request-Id
+      description: From the failing response header, if any.
+  - type: textarea
+    id: verify-output
+    attributes:
+      label: verify-deployment.sh output
+      description: Redacted output of `BASE_URL=... script/verify-deployment.sh`, if relevant.
+  - type: input
+    id: versions
+    attributes:
+      label: Environment
+      description: Commit SHA, OS, Ruby 3.3 / Node 24 / Docker Compose v2, Redis 7+, browser version.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      options:
+        - label: "I confirmed this is NOT a security vulnerability (those go to SECURITY.md private reporting)."
+          required: true
+        - label: "I included no real secrets, tokens, passphrases or ciphertext."
+          required: true

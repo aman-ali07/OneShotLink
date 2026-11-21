@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OneShotLink — independent security &amp; performance posture</title>
+<style>
+  :root { --ink:#1d2430; --ink-2:#4a5566; --ink-3:#8a94a4; --line:#e3e7ee; --line-faint:#eef1f5;
+          --surface:#fff; --ok:#1f7a4d; --warn:#9a6700; }
+  * { box-sizing:border-box; } html, body { margin:0; background:#fff; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
+  .stage { position:relative; width:1030px; height:560px; overflow:hidden; }
+  .window { position:absolute; left:54px; top:32px; width:726px; height:520px; background:var(--surface);
+            border:1px solid var(--line); border-radius:12px; box-shadow:0 18px 50px rgba(25,35,55,.14); overflow:hidden; }
+  .chrome { height:38px; display:flex; align-items:center; gap:12px; padding:0 14px; border-bottom:1px solid var(--line); background:#fcfcfd; }
+  .dots { display:flex; gap:6px; } .dot { width:9px; height:9px; border-radius:50%; background:#d8dde5; }
+  .crumb { font-size:12px; color:var(--ink-3); }
+  .main { padding:26px 28px; }
+  .eyebrow { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); }
+  h1 { font-size:22px; letter-spacing:-.02em; margin:12px 0 8px; }
+  .lead { font-size:12px; color:var(--ink-2); line-height:1.6; max-width:530px; margin:0 0 16px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .card { border:1px solid var(--line); border-radius:9px; padding:12px 14px; }
+  .card .n { font-size:16px; font-weight:650; }
+  .card .l { font-size:10.5px; color:var(--ink-3); margin-top:3px; }
+  .bar { height:6px; background:var(--line-faint); border-radius:4px; margin-top:7px; }
+  .bar > i { display:block; width:100%; height:100%; background:var(--ok); border-radius:4px; }
+  .sat { position:absolute; left:752px; top:88px; width:250px; background:var(--surface);
+         border:1px solid var(--line); border-radius:10px; box-shadow:0 14px 38px rgba(25,35,55,.13); padding:16px; }
+  .sat h2 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin:0 0 11px; }
+  .fix { font-size:10.8px; padding:6px 0; border-bottom:1px solid var(--line-faint); }
+  .fix:last-child { border-bottom:0; }
+  .fix b { display:block; } .fix span { color:var(--ink-3); }
+  .foot { position:absolute; left:54px; top:514px; width:726px; font-size:10.8px; color:var(--ink-3); line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="window">
+    <div class="chrome">
+      <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <span class="crumb">OneShotLink / Independent pre-release audit</span>
+    </div>
+    <div class="main">
+      <p class="eyebrow">Security / Performance gates</p>
+      <h1>No critical or high defect in shipped code</h1>
+      <p class="lead">Six parallel <b>.claude/</b> specialists plus independent scans, authorized local probes and a concurrency soak. Every finding was re-read against code; fixes were reproduced red before going green.</p>
+      <div class="grid">
+        <div class="card"><div class="n">0</div><div class="l">gem + production npm advisories</div><div class="bar"><i></i></div></div>
+        <div class="card"><div class="n">400 / 400</div><div class="l">secrets revealed exactly once at load</div><div class="bar"><i></i></div></div>
+        <div class="card"><div class="n">305</div><div class="l">backend specs · 0 failures</div><div class="bar"><i></i></div></div>
+        <div class="card"><div class="n">35</div><div class="l">Vitest tests · 0 failures</div><div class="bar"><i></i></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="sat">
+    <h2>Fixed / disposition</h2>
+    <div class="fix"><b>Worker lock</b><span>predictable /tmp → private 0700</span></div>
+    <div class="fix"><b>Backup TTL</b><span>request:object gap closed</span></div>
+    <div class="fix"><b>Password ceiling</b><span>256 B before Argon2</span></div>
+    <div class="fix"><b>Hot-path pipelines</b><span>emit / list round trips cut</span></div>
+    <div class="fix"><b>Protected paths</b><span>4 S3/S4 proposals await approval</span></div>
+    <div class="fix"><b>Argon2 capacity</b><span>~2 req/s — documented, not tuned</span></div>
+  </div>
+  <p class="foot">Verdict: code-level <b>GO</b>; public launch remains <b>NO-GO</b> until T-70/T-71 have target-host evidence and protected-path fixes are approved. Passphrase is an access gate, not end-to-end encryption.</p>
+</div>
+</body>
+</html>

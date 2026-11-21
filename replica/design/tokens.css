@@ -35,6 +35,69 @@
   --ots-motion-base: 200ms;
   --ots-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ots-content-max: 42rem;
+
+  /* Type scale — names the sizes the shipped UI actually renders. */
+  --ots-text-2xs: 0.6875rem;
+  --ots-text-xs: 0.8125rem;
+  --ots-text-sm: 0.875rem;
+  --ots-text-base: 1rem;
+  --ots-text-lg: 1.125rem;
+  --ots-text-xl: 1.25rem;
+  --ots-text-2xl: 1.5rem;
+  --ots-text-3xl: 1.875rem;
+  --ots-text-4xl: 2.25rem;
+  --ots-text-display: 2.5rem;
+  --ots-text-help: var(--ots-text-sm);
+
+  /* Semantic colours for states that already exist in the UI. */
+  --ots-on-danger: #ffffff;
+  --ots-accent-hover: #0b5d56;
+  --ots-danger-hover: #991b1b;
+  --ots-success-tint: color-mix(in srgb, var(--ots-success) 8%, var(--ots-surface));
+  --ots-warning-tint: color-mix(in srgb, var(--ots-warning) 8%, var(--ots-surface));
+  --ots-danger-tint: color-mix(in srgb, var(--ots-danger) 8%, var(--ots-surface));
+
+  /* Rhythm steps used across views, named so they can converge later. */
+  --ots-space-5: 20px;
+  --ots-space-7: 28px;
+  --ots-space-9: 36px;
+  --ots-space-10: 40px;
+  --ots-space-14: 56px;
+  --ots-panel-pad: var(--ots-space-6);
+  --ots-target-min: 44px;
+
+  /* Shared brand ground and chrome. */
+  --ots-grid-size: 48px;
+  --ots-grid-line: color-mix(in srgb, var(--ots-border) 55%, transparent);
+  --ots-bloom: color-mix(in srgb, var(--ots-accent) 9%, transparent);
+  --ots-eyebrow-size: 0.75rem;
+  --ots-eyebrow-tracking: 0.12em;
+  --ots-mark-size: 36px;
+}
+
+/* Dark palette documented in DESIGN_SYSTEM.md §3. Follows the OS; there is no
+   manual toggle in v1. Derived tokens (grid, bloom, tints) are color-mix values
+   and therefore adapt automatically. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ots-bg: #0c0a09;
+    --ots-surface: #1c1917;
+    --ots-border: #44403c;
+    --ots-border-input: #a8a29e;
+    --ots-text: #f5f5f4;
+    /* #a8a29e on --ots-border (#44403c) measured 4.07:1 (below AA); #b9b4ae passes. */
+    --ots-text-muted: #b9b4ae;
+    --ots-accent: #2dd4bf;
+    --ots-on-accent: #042f2e;
+    --ots-danger: #f87171;
+    --ots-success: #4ade80;
+    --ots-warning: #fbbf24;
+
+    --ots-on-danger: #1c1917;
+    --ots-accent-hover: #5eead4;
+    --ots-danger-hover: #fca5a5;
+    --ots-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
 }
 
 /* Tailwind 4: generates bg-bg, text-muted, border-border, etc. */
@@ -56,6 +119,24 @@
   --radius-sm: var(--ots-radius-sm);
   --radius-md: var(--ots-radius-md);
   --radius-lg: var(--ots-radius-lg);
+  --text-2xs: var(--ots-text-2xs);
+  --text-xs: var(--ots-text-xs);
+  --text-sm: var(--ots-text-sm);
+  --text-base: var(--ots-text-base);
+  --text-lg: var(--ots-text-lg);
+  --text-xl: var(--ots-text-xl);
+  --text-2xl: var(--ots-text-2xl);
+  --text-3xl: var(--ots-text-3xl);
+  --text-4xl: var(--ots-text-4xl);
+  --color-on-danger: var(--ots-on-danger);
+  --color-accent-hover: var(--ots-accent-hover);
+  --color-danger-hover: var(--ots-danger-hover);
+  --spacing-5: var(--ots-space-5);
+  --spacing-7: var(--ots-space-7);
+  --spacing-9: var(--ots-space-9);
+  --spacing-10: var(--ots-space-10);
+  --spacing-14: var(--ots-space-14);
+  --shadow-card: var(--ots-shadow-card);
 }
 
 @media (prefers-reduced-motion: reduce) {

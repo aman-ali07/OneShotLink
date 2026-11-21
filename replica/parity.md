@@ -77,7 +77,8 @@ Feedback mining (`replica/reviews.csv`, `replica/fixes.md`) added five rows for 
 original's users actually complain about: preview-safe links, client-side encryption,
 file secrets, read counts > 1, and a published crypto spec.
 
-- **63.0 / 100 overall** (+2.4)
+- **80.8 / 100 overall** on the current working tree (theme row corrected to `partial`);
+  **63.0 / 100** is the historical R-08 baseline recorded below
 - **11 / 11 must-haves**
 - 24 features counted (the five new rows are `could`/`should` and are scored against
   the original independently).

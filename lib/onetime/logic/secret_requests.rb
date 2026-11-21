@@ -39,14 +39,7 @@ module Onetime
       end
 
       def validate_ttl
-        ttl = begin
-          Integer(@ttl.nil? ? Config.default_ttl : @ttl)
-        rescue ArgumentError, TypeError
-          raise ValidationError, "ttl must be an integer number of seconds"
-        end
-        raise ValidationError, "ttl must be one of: #{Config.ttl_options.join(', ')}" unless Config.ttl_options.include?(ttl)
-
-        ttl
+        Config.valid_ttl!(@ttl)
       end
     end
 
@@ -59,7 +52,7 @@ module Onetime
       end
 
       def call
-        raise ValidationError, "request key is required" if @key.empty? || @key.bytesize > 128
+        raise ValidationError, "request key is required" if @key.empty? || @key.bytesize > Ids::MAX_KEY_BYTES
         raise ValidationError, "secret must be a string" unless @secret.is_a?(String)
         raise ValidationError, "secret cannot be empty" if @secret.empty?
         raise PayloadTooLarge if @secret.bytesize > Config.max_secret_bytes
@@ -68,8 +61,21 @@ module Onetime
         raise NotFound unless pair
 
         record, = pair
+        Models::SecretRequest.verify_meta!(record, key: @key)
+
+        # An answer must never outlive the request it answers. Use the remaining
+        # TTL of the request object, not its original full lifetime.
+        remaining = Store.redis.ttl(Models::SecretRequest.object_key(@key))
+        raise NotFound if remaining == -2
+        # Redis reports 0 in the final sub-second of a key's life; accepting an
+        # answer then would need the full-TTL fallback below and would leave an
+        # orphan after the request expired. The fallback now only covers -1 (a
+        # TTL-less key, e.g. from a legacy restore).
+        raise NotFound if remaining.zero?
+
         raw = JSON.generate(Crypto.encrypt(@secret))
-        written = Models::SecretRequest.submit(@key, raw, ttl: record["ttl"].to_i)
+        ttl = remaining == -1 ? record["ttl"].to_i : remaining
+        written = Models::SecretRequest.submit(@key, raw, ttl: ttl)
         raise Conflict, "This request has already been answered." unless written
 
         Webhook.emit("request.responded", owner_id: record["owner_id"],
@@ -87,18 +93,26 @@ module Onetime
       end
 
       def call
+        raise ValidationError, "request key is invalid" if @key.empty? || @key.bytesize > Ids::MAX_KEY_BYTES
+
         pair = Models::SecretRequest.fetch(@key)
         raise NotFound unless pair
 
         record, = pair
+        # Authenticate the record before trusting owner_id for authorization.
+        Models::SecretRequest.verify_meta!(record, key: @key)
         raise NotFound unless record["owner_id"] == @owner_id
 
         raw = Store.redis.get(Models::SecretRequest.submission_key(@key))
         raise NotFound, "No secret has been submitted to this request yet." if raw.nil?
 
         plaintext = Crypto.decrypt(JSON.parse(raw))
-        raise NotFound unless Models::SecretRequest.consume_submission(@key, raw)
+        # One atomic step: delete the submission AND retire the bearer object.
+        # Doing them separately left a window for a second answer to be written
+        # to the now-free submission key while the link was still live.
+        raise NotFound unless Models::SecretRequest.consume_and_retire(@key, raw)
 
+        cleanup_owner_index(record["owner_id"])
         Webhook.emit("request.revealed", owner_id: @owner_id,
                      data: { request_key: @key, label: record["label"].to_s })
         {
@@ -111,6 +125,18 @@ module Onetime
             ttl: record["ttl"].to_i
           }
         }
+      end
+
+      private
+
+      # Housekeeping after the irreversible consume: a failure must not turn an
+      # already-delivered secret into an error. Count and log the class only —
+      # the key is a bearer credential and must never be logged (AGENTS rule 7).
+      def cleanup_owner_index(owner_id)
+        Models::SecretRequest.cleanup(@key, owner_id: owner_id)
+      rescue Redis::BaseError => e
+        Onetime.logger.warn("request_cleanup_failed class=#{e.class}")
+        Metrics.best_effort_failure("cleanup")
       end
     end
   end
