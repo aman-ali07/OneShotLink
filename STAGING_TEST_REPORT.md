@@ -93,7 +93,7 @@ tracked in T-146.
 | Gate | Status | Why |
 |---|---|---|
 | K-46 scheduled, signed webhook worker | **CLOSED for staging** | Workflow applied and merged (PR #2), `staging` environment with all four secrets, `SECRET` verified by decrypt test. Run `44945858274`: `claimed=3 delivered=1 retrying=0 failed=2 skipped=0` (two failures were deliveries encrypted under the earlier rotated key). Receiver captured one POST with `X-OneShotLink-Event: secret.created`, delivery id, and `X-OneShotLink-Signature` matching the independently computed HMAC-SHA256 exactly. Replay run `claimed=0 delivered=0`; receiver still has 2 requests (one local probe + one delivery); delivery record `status: delivered`, `attempts: 1`, `response_code: 200` |
-| Cold-start measurement | **NOT RUN** | Requires leaving the service idle >15 min, then timestamped `/health` probes; the service was continuously exercised during verification. Procedure is in the integration plan; run before final sign-off |
+| Cold-start measurement | **RUN — no wake observed** | 16-minute idle window (20:24:42Z→20:40:42Z) with no requests from this environment, then 20 timestamped `/health` probes every 5s: first probe `200 0.634635s`, all 20 probes `200` (0.298–0.635s); create→reveal `200 0.572171s`. No 503 or multi-second wake was observed. This does **not** disprove Render's documented 15-min idle spin-down (platform-internal health probes or the CDN may keep the service warm); it records what was measured. Full log: `/tmp/opencode/stage17-coldstart.log` |
 | Provider quota over-limit | **UNVERIFIED** | Upstash Free behavior above 500k commands/month is not documented; `CONFIG GET maxmemory-policy` returned no value on managed Redis |
 | Redis network isolation (T-71) | **NOT ACHIEVED** | Upstash Free has no IP allowlist/ACL/Private Link; TLS + token only |
 | Production TLS chain / real hostname | **OPEN** | Staging `*.onrender.com` is not a production hostname; no production-host preflight recorded |
@@ -108,6 +108,8 @@ backup/restore, and K-46 signed delivery + HMAC + replay. CI was also fixed duri
 `307 examples, 0 failures` and CI run `44944157486` passed Backend, Frontend, Dependency scanning
 and Container smoke test.
 
-Remaining gaps: cold-start measurement, Upstash quota over-limit behaviour, and the operator-owned
-T-70/T-71 production gates. **Staging is functionally usable for beta testing; public launch stays
+Remaining gaps: Upstash quota over-limit behaviour, live encrypted backup export inspection, and
+the operator-owned T-70/T-71 production gates. The cold-start probe was executed but observed no
+spin-down, so the platform's documented cold-start behaviour remains an unverified caveat rather
+than a measured failure. **Staging is functionally usable for beta testing; public launch stays
 NO-GO.**

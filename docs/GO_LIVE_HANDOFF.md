@@ -9,13 +9,15 @@ sentinel guard (both pushed). Companion artifact:
 > (285 backend specs, 28 Vitest tests) and `README.md` (parity 66.7). Do not treat the numbers
 > in this memo as current; it is kept for the operator sequence and approval line only.
 
-## Production audit: 84/100 — launchable with caveats
+## Production audit: 84/100 — code-level only, NOT launchable
 
 Every in-repo gap found by the four-role production audit is closed and verified below. The
 remaining risks are operator-owned: TLS on a real hostname, a domain serving the legal
 pages, trademark/handle screening, and a green preflight on the real host. The repo's binding
 rule (`AGENTS.md`, `PRODUCTION_READINESS.md` §Verdict) still forbids calling this
-"production ready" while T-70/T-71 are open. **No deploy was performed.**
+"production ready" while T-70/T-71 are open. A **free-tier staging deployment now exists** at
+`https://oneshotlink.onrender.com` with synthetic data (see `STAGING_TEST_REPORT.md`); no
+production deploy or public release has been authorized.
 
 ## Gates re-run at `dd14fa7` (command → result)
 
@@ -78,7 +80,7 @@ The three-pillar pass added `PROJECT_AUDIT.md`, `FEATURE_MATRIX.md` and
   Screenshots at 375 px and 1280 px were reviewed with zero horizontal overflow.
 
 Phase 4 (deployment readiness) is unchanged: the items below still need an operator and a
-real host. No deploy was performed.
+real host. Staging verification is recorded in `STAGING_TEST_REPORT.md`; no production deploy was performed.
 
 ## Phase 4 verification (full gate battery, re-run)
 
@@ -151,8 +153,9 @@ Payloads never contain secret material; this is not end-to-end encrypted deliver
 ### Stage 17 staging preparation
 
 Phase 0 decisions, the staging-isolation waiver awaiting operator acceptance, and the outstanding
-human gates are recorded in [`STAGING_PHASE0.md`](STAGING_PHASE0.md). No staging resource exists
-yet; `STAGING_TEST_REPORT.md` will be written only after real target-host evidence is collected.
+human gates are recorded in [`STAGING_PHASE0.md`](STAGING_PHASE0.md). The staging resource now
+exists; real target-host evidence is recorded in [`STAGING_TEST_REPORT.md`](../STAGING_TEST_REPORT.md).
+K-46 is closed for staging only; T-70/T-71 remain operator-owned.
 
 ### Free-tier (₹0) alternative sequence
 
