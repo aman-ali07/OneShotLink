@@ -115,11 +115,15 @@ try {
   await page.goto(guardedLink, { waitUntil: "networkidle0" });
   await page.click("form button[type=submit]");
   await page.waitForSelector("#reveal-passphrase", { timeout: 10000 });
+  // On a remote host the first reveal request may still be settling here; the
+  // submit button is disabled while loading, so a click now would be ignored.
+  await page.waitForSelector("form button[type=submit]:not([disabled])", { timeout: 10000 });
   await page.type("#reveal-passphrase", "wrong");
   await page.click("form button[type=submit]");
   await page.waitForSelector("[role=alert]", { timeout: 10000 });
   const wrongMessage = await page.$eval("[role=alert]", (element) => element.textContent.trim());
   const clearedOnRetry = await page.$eval("#reveal-passphrase", (element) => element.value === "");
+  await page.waitForSelector("form button[type=submit]:not([disabled])", { timeout: 10000 });
   await page.type("#reveal-passphrase", "open-sesame");
   await page.click("form button[type=submit]");
   await page.waitForSelector("#revealed-heading", { timeout: 10000 });
@@ -162,6 +166,7 @@ try {
   await page.goto(multiByteLink, { waitUntil: "networkidle0" });
   await page.click("form button[type=submit]");
   await page.waitForSelector("#reveal-passphrase", { timeout: 10000 });
+  await page.waitForSelector("form button[type=submit]:not([disabled])", { timeout: 10000 });
   await page.type("#reveal-passphrase", multiBytePassphrase);
   await page.click("form button[type=submit]");
   await page.waitForSelector("#revealed-heading", { timeout: 10000 });
