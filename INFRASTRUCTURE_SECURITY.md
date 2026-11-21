@@ -61,6 +61,19 @@ through `gh`). The staging token was pasted into an operator chat earlier and mu
 disclosed — rotate it, update Render + GitHub secrets, redeploy, re-verify `/health`, and purge
 transcripts (operator action).
 
+## 1b. Production-readiness fixes executed (2026-11-22)
+
+| Fix | Command / evidence | Status |
+|---|---|---|
+| `staging` environment required reviewer | `gh api -X PUT repos/aman-ali07/OneShotLink/environments/staging -F 'reviewers[][id]=132501232'` → `protection_rules: 1`, reviewer `aman-ali07` | **DONE** (operator action no longer needed) |
+| Worker liveness monitor | `.github/workflows/ci.yml` now has a `worker-liveness` job on CI's long-registered schedule; manual dispatch run `44948498621` logged `last successful ops run: 2026-11-21T20:22:41Z (29m ago)` / `worker healthy; no action` | **DONE in branch**, needs merge to `main` for the schedule to register |
+| Live staging backup export | `bin/ots backup --out /out/stage18-staging-dump.json` → `Wrote 1 secret record(s) and 23 customer(s)`; `stat` → `600 24378`; parsed JSON `format=2`, `schema_version=1`, all nine namespaces present, 1 encrypted `secret:object` (`cipher=aes-256-gcm`, `v=3`, `meta_mac` present, no `secret_value`/`plaintext`), 24 receipts, 23 customers. The only synthetic string in the dump is a customer email | **VERIFIED** on staging data, file kept outside the repo at `/tmp/opencode/` |
+| Cold start | 16-min idle probe: first `/health` 200 in 0.635s, 20/20 probes 200, reveal 200 in 0.572s — no spin-down observed | **PROBED**, documented caveat remains |
+
+Still human-owned: rotate the disclosed token, choose the CDN posture, record Upstash console
+settings, and give the final go/no-go signature. `ops-free-tier.yml` still shows **0 scheduled
+runs**; the new CI-based monitor is the mitigation pending merge.
+
 ## 2. T-71 substitute controls — network isolation NOT achieved
 
 The app's original T-71 assumption was a host-level `nft`/`ufw` rule against a Docker bridge.

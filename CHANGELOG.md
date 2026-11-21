@@ -12,6 +12,19 @@ older entries are point-in-time snapshots; the current total is recorded in `TES
 No user-visible *application* changes since `0.2.0`; the sections below record deployment
 and documentation preparation.
 
+### Production-readiness fixes (2026-11-22) — partially executed
+
+- Added a required reviewer to the GitHub `staging` environment and a CI-based webhook worker
+  liveness monitor that dispatches a replacement and opens a de-duplicated issue when no successful
+  worker run is recent. Manually verified via workflow_dispatch run `44948498621`.
+- Verified a live staging backup export: mode `0600`, format 2, `schema_version=1`, all nine
+  namespaces, and a ciphertext-only secret record (no plaintext).
+- Cold-start probe recorded: first `/health` after 16 minutes idle was 200 in 0.635s; no wake
+  observed, so the documented spin-down remains an unmeasured caveat.
+- Remaining operator gates: merge the liveness change to `main`, rotate the disclosed token,
+  decide the CDN posture, record provider console settings, and sign the go/no-go. Public launch
+  remains NO-GO.
+
 ### Stage 18 infrastructure security verification (2026-11-22) — evidence recorded
 
 - `INFRASTRUCTURE_SECURITY.md` now distinguishes staging evidence from production gates: T-70
