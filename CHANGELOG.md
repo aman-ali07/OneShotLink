@@ -12,6 +12,18 @@ older entries are point-in-time snapshots; the current total is recorded in `TES
 No user-visible *application* changes since `0.2.0`; the sections below record deployment
 and documentation preparation.
 
+### Stage 18 infrastructure security verification (2026-11-22) — evidence recorded
+
+- `INFRASTRUCTURE_SECURITY.md` now distinguishes staging evidence from production gates: T-70
+  staging-host TLS passed but production remains OPEN; T-71 is NOT ACHIEVED on Upstash Free
+  (TLS + token substitutes only); K-46's manual signed delivery is evidenced but its schedule
+  and monitoring are absent (0 scheduled runs, 0 environment protection rules).
+- `GO_LIVE_REMINDER.md` and `docs/GO_LIVE_HANDOFF.md` no longer claim that nothing was deployed;
+  they state that only a synthetic-data staging deployment exists and public launch is NO-GO.
+- Recorded the required operator action to rotate the Upstash token after it was exposed in chat,
+  the Cloudflare-in-path finding, and the still-pending live backup export, cold-start and
+  provider-quota checks. `/metrics` hiding and the isolated restore drill were re-verified.
+
 ### Stage 17 staging verification (2026-11-22) — executed, not public
 
 - Deployed the merged free-tier config to a Render Free staging service and an Upstash Redis Free
