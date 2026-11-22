@@ -66,18 +66,18 @@ try {
     await page.waitForSelector("#gone-heading", { timeout: 10000 });
 
     // Invalid key is a distinct state from a consumed one.
-    await page.goto(`${base}/secret/${"x".repeat(180)}`, { waitUntil: "networkidle0" });
+    await page.goto(`${base}/#/secret/${"x".repeat(180)}`, { waitUntil: "networkidle0" });
     await page.waitForSelector("#invalid-heading", { timeout: 10000 });
 
     // Owner burn: create a signed-in secret, then destroy it from the dashboard.
     const email = `states-${stamp}@example.com`;
     const password = "e2e correct horse battery";
-    await page.goto(`${base}/signup`, { waitUntil: "networkidle0" });
+    await page.goto(`${base}/#/signup`, { waitUntil: "networkidle0" });
     await page.type("#email", email);
     await page.type("#password", password);
     await page.type("#confirmation", password);
     await page.click("button[type=submit]");
-    await page.waitForFunction(() => location.pathname === "/dashboard", { timeout: 10000 });
+    await page.waitForFunction(() => location.hash === "#/dashboard", { timeout: 10000 });
 
     const guarded = `burn-${stamp}`;
     await page.goto(`${base}/`, { waitUntil: "networkidle0" });
@@ -87,7 +87,7 @@ try {
     await page.waitForSelector("#result-heading", { timeout: 10000 });
     const burnLink = await page.$eval("p.break-all", (el) => el.textContent.trim());
 
-    await page.goto(`${base}/dashboard`, { waitUntil: "networkidle0" });
+    await page.goto(`${base}/#/dashboard`, { waitUntil: "networkidle0" });
     await page.waitForFunction(() => document.body.innerText.includes("Destroy now"), { timeout: 10000 });
     const destroyButtons = await page.$$("button");
     for (const button of destroyButtons) {
@@ -116,7 +116,7 @@ try {
     await page.goto(viewedLink, { waitUntil: "networkidle0" });
     await page.click('form button[type="submit"]');
     await page.waitForSelector("#revealed-heading", { timeout: 10000 });
-    await page.goto(`${base}/dashboard`, { waitUntil: "networkidle0" });
+    await page.goto(`${base}/#/dashboard`, { waitUntil: "networkidle0" });
     await page.waitForFunction(() => document.body.innerText.includes("Already viewed — destroyed"), { timeout: 10000 });
     const dashboardText = await page.evaluate(() => document.body.innerText);
     assert(!dashboardText.includes(viewed), `${viewport.name}: dashboard retained revealed plaintext`);

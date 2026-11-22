@@ -36,12 +36,12 @@ try {
     }
   });
 
-  await page.goto(`${base}/signup`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/signup`, { waitUntil: "networkidle0" });
   await page.type("#email", email);
   await page.type("#password", password);
   await page.type("#confirmation", password);
   await page.click("button[type=submit]");
-  await page.waitForFunction(() => location.pathname === "/dashboard", { timeout: 10000 });
+  await page.waitForFunction(() => location.hash === "#/dashboard", { timeout: 10000 });
   await page.waitForSelector("h1");
   assert((await page.$eval("h1", (el) => el.textContent)).includes("Your account"), "dashboard did not load after signup");
 
@@ -52,7 +52,7 @@ try {
   await page.click("button[type=submit]");
   await page.waitForSelector("#result-heading", { timeout: 10000 });
 
-  await page.goto(`${base}/dashboard`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/dashboard`, { waitUntil: "networkidle0" });
   await page.waitForSelector("#receipts-heading");
   const dashboardText = await page.$eval("main", (el) => el.textContent);
   assert(/Expires in/.test(dashboardText), "receipt did not appear on the dashboard");
@@ -67,17 +67,17 @@ try {
   ).then((items) => items.find((item) => item.text === "Sign out")?.button);
   assert(signOutButton, "sign out button not found");
   await signOutButton.click();
-  await page.waitForFunction(() => location.pathname === "/", { timeout: 10000 });
+  await page.waitForFunction(() => location.hash === "#/" || location.hash === "", { timeout: 10000 });
 
-  await page.goto(`${base}/dashboard`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/dashboard`, { waitUntil: "networkidle0" });
   await page.waitForSelector("h1");
   assert((await page.$eval("main", (el) => el.textContent)).includes("Sign in"), "signed-out dashboard did not prompt");
 
-  await page.goto(`${base}/signin`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/signin`, { waitUntil: "networkidle0" });
   await page.type("#email", email);
   await page.type("#password", password);
   await page.click("button[type=submit]");
-  await page.waitForFunction(() => location.pathname === "/dashboard", { timeout: 10000 });
+  await page.waitForFunction(() => location.hash === "#/dashboard", { timeout: 10000 });
   await page.waitForSelector("#receipts-heading");
 
   const storage = await page.evaluate(() => ({
@@ -106,12 +106,12 @@ try {
     { timeout: 10000 },
   );
   await deleteButton.click();
-  await page.waitForFunction(() => location.pathname === "/", { timeout: 10000 });
+  await page.waitForFunction(() => location.hash === "#/" || location.hash === "", { timeout: 10000 });
 
   const meStatus = await page.evaluate(async () => (await fetch("/api/v3/account/me")).status);
   assert(meStatus === 401, `deleted account still resolves, me returned ${meStatus}`);
 
-  await page.goto(`${base}/signin`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/signin`, { waitUntil: "networkidle0" });
   await page.type("#email", email);
   await page.type("#password", password);
   await page.click("button[type=submit]");
@@ -119,7 +119,7 @@ try {
   // async sign-in finishes. Wait for the rejected-credentials alert instead.
   await page.waitForSelector("#signin-error", { timeout: 10000 });
   assert(
-    (await page.evaluate(() => location.pathname)) === "/signin",
+    (await page.evaluate(() => location.hash)) === "#/signin",
     "signed in after the account was deleted",
   );
 
@@ -127,12 +127,12 @@ try {
   // must be accepted, even though a native minlength would count only 6.
   const cjkEmail = `e2e-cjk-${Date.now()}@example.com`;
   const cjkPassword = "密码口令测试";
-  await page.goto(`${base}/signup`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/signup`, { waitUntil: "networkidle0" });
   await page.type("#email", cjkEmail);
   await page.type("#password", cjkPassword);
   await page.type("#confirmation", cjkPassword);
   await page.click("button[type=submit]");
-  await page.waitForFunction(() => location.pathname === "/dashboard", { timeout: 10000 });
+  await page.waitForFunction(() => location.hash === "#/dashboard", { timeout: 10000 });
 
   assert(errors.length === 0, `browser errors: ${errors.join("; ")}`);
   console.log("accounts journey ok");

@@ -9,6 +9,18 @@ older entries are point-in-time snapshots; the current total is recorded in `TES
 
 ## [Unreleased]
 
+### CDN-log mitigation: hash links + body-key API (2026-11-22) — verified locally
+
+- Share links now use hash routes (`/#/secret/<key>`, `/#/request/<key>`); fragments are never
+  sent to the server, so Render's CDN no longer sees the bearer capability in a request path.
+- Added additive static-path body-key API aliases for preview/reveal/burn/respond so the SPA
+  never places a key in a URL path; original routes remain for compatibility.
+- Fixed the skip link for hash routing and updated all e2e journeys/unit tests. Verification:
+  RSpec 307/0, Vitest 35/0, typecheck/build clean, eight browser journeys + a11y green, and a
+  CDP proof showing no request path contains the secret key.
+- This mitigates CDN log exposure; it is not E2EE/zero-knowledge and does not close T-71.
+  Deploy-host verification is still required before the gate can be closed.
+
 ### Frontend alignment fixes (2026-11-22) — verified
 
 - Programmatic focus no longer draws an accent box around terminal-state headings; real controls

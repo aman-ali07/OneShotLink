@@ -32,12 +32,12 @@ try {
     if (m.type() === "error" && !/status of (401|403|404|409|422)/.test(m.text())) errors.push(`console:${m.text()}`);
   });
 
-  await page.goto(`${base}/signup`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/signup`, { waitUntil: "networkidle0" });
   await page.type("#email", email);
   await page.type("#password", password);
   await page.type("#confirmation", password);
   await page.click("button[type=submit]");
-  await page.waitForFunction(() => location.pathname === "/dashboard", { timeout: 10000 });
+  await page.waitForFunction(() => location.hash === "#/dashboard", { timeout: 10000 });
 
   await page.waitForSelector("#request-label");
   await page.type("#request-label", "API key please");
@@ -54,7 +54,7 @@ try {
   });
   assert(key, "request key missing from API");
 
-  await page.goto(`${base}/request/${key}`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/request/${key}`, { waitUntil: "networkidle0" });
   await page.waitForSelector("#request-secret");
   const previewText = await page.$eval("main", (el) => el.textContent);
   assert(previewText.includes("API key please"), "label missing from responder view");
@@ -63,19 +63,20 @@ try {
   await page.waitForSelector("#request-sent-heading", { timeout: 10000 });
 
   // A fulfilled-but-unrevealed link is "taken", and a second answer gets 409.
-  await page.goto(`${base}/request/${key}`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/request/${key}`, { waitUntil: "networkidle0" });
+  await page.reload({ waitUntil: "networkidle0" });
   await page.waitForSelector("#request-taken-heading", { timeout: 10000 });
   const secondAnswer = await page.evaluate(async (requestKey) => {
-    const res = await fetch(`/api/v3/requests/${encodeURIComponent(requestKey)}/respond`, {
+    const res = await fetch("/api/v3/requests/respond", {
       method: "POST", credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ secret: "a second answer" }),
+      body: JSON.stringify({ key: requestKey, secret: "a second answer" }),
     });
     return res.status;
   }, key);
   assert.equal(secondAnswer, 409, "second answer was not rejected with 409");
 
-  await page.goto(`${base}/dashboard`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/dashboard`, { waitUntil: "networkidle0" });
   await page.waitForFunction(() => document.body.textContent.includes("Answer received"), { timeout: 10000 });
   await clickButton(page, "Reveal answer");
   // Do not dump the DOM here: it contains the submitted secret and CI logs

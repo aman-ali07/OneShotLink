@@ -41,7 +41,7 @@ try {
   await page.click("button[type=submit]");
   await page.waitForSelector("#result-heading", { timeout: 10000 });
   const link = await page.$eval("p.break-all", (el) => el.textContent.trim());
-  assert(link.includes("/secret/"), "no one-time link for the file");
+  assert(link.includes("/#/secret/"), "no hash-based one-time link for the file");
 
   const recipientContext = await browser.createBrowserContext();
   const recipient = await recipientContext.newPage();
@@ -73,13 +73,18 @@ try {
   assert(downloaded, "the file was never downloaded");
   assert.deepEqual(fs.readFileSync(downloaded), bytes, "downloaded bytes differ from the fixture");
 
-  // Spent links show the terminal panel on load via the preview GET. Measure
-  // that preview's status instead of logging a hard-coded "404".
+  // Spent links show the terminal panel on load via the body-key preview POST.
+  // Hash routing needs a full reload to re-run the route's load().
   await recipient.goto(link, { waitUntil: "networkidle0" });
+  await recipient.reload({ waitUntil: "networkidle0" });
   await recipient.waitForSelector("#gone-heading", { timeout: 10000 });
   const replayStatus = await recipient.evaluate(async (url) => {
     const key = url.split("/secret/")[1].split(/[?#]/)[0];
-    const response = await fetch(`/api/v3/guest/secret/${encodeURIComponent(key)}`);
+    const response = await fetch("/api/v3/guest/secret/preview", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
     return response.status;
   }, link);
   assert.equal(replayStatus, 404, `replay preview returned ${replayStatus}`);

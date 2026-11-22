@@ -132,7 +132,8 @@ async function load() {
 }
 
 function requestLink(key: string): string {
-  return new URL(`/request/${key}`, window.location.origin).toString();
+  // Hash fragment keeps the request capability out of CDN access logs.
+  return `${window.location.origin}/#/request/${encodeURIComponent(key)}`;
 }
 
 async function copyRequestLink(key: string): Promise<boolean> {

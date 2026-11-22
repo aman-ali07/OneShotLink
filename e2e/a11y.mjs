@@ -90,8 +90,8 @@ try {
     ["signup", "/signup"],
     ["dashboard-signed-out", "/dashboard"],
     ["not-found", "/no-such-page"],
-    ["secret-preview", "/secret/definitely-not-a-real-key-1234"],
-    ["request-gone", "/request/definitely-not-a-real-key-1234"],
+    ["secret-preview", "/#/secret/definitely-not-a-real-key-1234"],
+    ["request-gone", "/#/request/definitely-not-a-real-key-1234"],
   ]) {
     for (const viewport of VIEWPORTS) {
       await audit(`${name}`, `${base}${route}`, undefined, viewport);
@@ -119,7 +119,7 @@ try {
   });
   if (!response.ok) throw new Error(`create for a11y gate failed: ${response.status}`);
   const { secret_key: key } = await response.json();
-  const revealUrl = `${base}/secret/${key}`;
+  const revealUrl = `${base}/#/secret/${key}`;
 
   await audit("reveal-idle", revealUrl);
   await audit("reveal-idle", revealUrl, undefined, VIEWPORTS[0], true);
@@ -129,7 +129,7 @@ try {
   });
   // A never-valid key is detected by the non-consuming preview, so no POST is
   // needed; the terminal panel renders on load.
-  await audit("reveal-gone", `${base}/secret/a-key-that-was-never-valid-1234`, async (page) => {
+  await audit("reveal-gone", `${base}/#/secret/a-key-that-was-never-valid-1234`, async (page) => {
     await page.waitForSelector("#gone-heading");
   });
 
@@ -141,13 +141,13 @@ try {
   });
   if (!protectedResponse.ok) throw new Error(`protected create failed: ${protectedResponse.status}`);
   const protectedKey = (await protectedResponse.json()).secret_key;
-  await audit("reveal-passphrase", `${base}/secret/${protectedKey}`, async (page) => {
+  await audit("reveal-passphrase", `${base}/#/secret/${protectedKey}`, async (page) => {
     await page.click('button[type="submit"]');
     await page.waitForSelector("#reveal-passphrase");
   });
   // The wrong-passphrase error is a distinct accessibility state (live region,
   // focus, alert role) and must be audited too.
-  await audit("reveal-passphrase-error", `${base}/secret/${protectedKey}`, async (page) => {
+  await audit("reveal-passphrase-error", `${base}/#/secret/${protectedKey}`, async (page) => {
     await page.waitForSelector("#reveal-passphrase");
     await page.type("#reveal-passphrase", "definitely-wrong");
     await page.click('button[type="submit"]');

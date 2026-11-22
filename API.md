@@ -312,6 +312,22 @@ Errors (on the `reveal` POST):
 The record is consumed **before** the response is sent, and only after the passphrase
 check and the decryption have succeeded — a wrong passphrase, a rotated `SECRET` or a
 corrupt record leaves it intact (D-013). The response is `no-store`.
+
+**Body-key aliases (added for CDN-log safety):** the SPA uses static-path routes so the
+opaque capability never appears in a URL path that a CDN logs:
+
+| Route | Body | Equivalent |
+|---|---|---|
+| `POST /api/v3/guest/secret/preview` | `{"key":"..."}` | `GET /api/v3/guest/secret/:key` |
+| `POST /api/v3/guest/secret/reveal` | `{"key":"...","passphrase":"..."}` | `POST /api/v3/guest/secret/:key/reveal` |
+| `POST /api/v3/secret/burn` | `{"key":"..."}` | `DELETE /api/v3/secret/:key` |
+| `POST /api/v3/requests/preview` | `{"key":"..."}` | `GET /api/v3/requests/:key` |
+| `POST /api/v3/requests/respond` | `{"key":"...","secret":"..."}` | `POST /api/v3/requests/:key/respond` |
+| `POST /api/v3/requests/reveal` | `{"key":"..."}` | `POST /api/v3/requests/:key/reveal` |
+
+These are additive aliases with identical validation, rate limits and responses; the original
+path-based routes remain for compatibility. Generated share links use hash fragments
+(`/#/secret/<key>`, `/#/request/<key>`), which browsers never transmit to the server.
 If the request carries a valid session, the owner receipt is created on either conceal
 route. Reveal permanently deletes the payload with the atomic consume; the receipt stays as
 `revealed` with non-sensitive metadata for 30 days (D-017). A public `GET` preview marks it

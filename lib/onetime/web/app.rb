@@ -852,6 +852,27 @@ module Onetime
                 list_requests_payload(customer)
               end
 
+              # Body-key aliases so request capabilities never enter a logged
+              # path either. Declared before the dynamic /requests/:key routes.
+              r.post "preview" do
+                body = parse_json_body
+                request_preview_payload(body["key"])
+              end
+
+              r.post "respond" do
+                body = parse_json_body
+                verify_csrf!
+                respond_to_request_payload(body["key"])
+              end
+
+              r.post "reveal" do
+                require_accounts!
+                verify_csrf!
+                customer = require_session!
+                body = parse_json_body
+                reveal_request_payload(body["key"], customer)
+              end
+
               r.on String do |key|
                 # C2: recipient-facing routes are public capabilities. The
                 # owner-only create/list/reveal routes above stay session-scoped.
@@ -931,6 +952,21 @@ module Onetime
                 create_v3(owner_id: owner && owner[:id])
               end
 
+              # Body-key aliases: the opaque capability stays in the POST body,
+              # never in a request path that Render's CDN logs. Static routes are
+              # declared before the dynamic /secret/:key routes below.
+              r.post "secret", "preview" do
+                enforce_rate_limit!(:reveal)
+                body = parse_json_body
+                peek_payload(body["key"])
+              end
+
+              r.post "secret", "reveal" do
+                enforce_rate_limit!(:reveal)
+                body = parse_json_body
+                reveal_payload(body["key"], passphrase: body["passphrase"])
+              end
+
               r.on "secret", String do |key|
                 r.post "reveal" do
                   enforce_rate_limit!(:reveal)
@@ -957,6 +993,24 @@ module Onetime
                 owner = require_session!
                 verify_csrf!
                 create_v3(owner_id: owner && owner[:id])
+              end
+
+              # Body-key aliases for owner surfaces (see guest block above).
+              r.post "reveal" do
+                require_session!
+                verify_csrf!
+                enforce_rate_limit!(:reveal)
+                body = parse_json_body
+                reveal_payload(body["key"], passphrase: body["passphrase"])
+              end
+
+              r.post "burn" do
+                require_accounts!
+                enforce_rate_limit!(:burn)
+                verify_csrf!
+                customer = require_session!
+                body = parse_json_body
+                burn_secret_payload(body["key"], customer[:id])
               end
 
               r.on String do |key|

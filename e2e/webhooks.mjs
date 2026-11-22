@@ -20,12 +20,12 @@ try {
     if (m.type() === "error" && !/status of (401|403|404|409|422)/.test(m.text())) errors.push(`console:${m.text()}`);
   });
 
-  await page.goto(`${base}/signup`, { waitUntil: "networkidle0" });
+  await page.goto(`${base}/#/signup`, { waitUntil: "networkidle0" });
   await page.type("#email", email);
   await page.type("#password", password);
   await page.type("#confirmation", password);
   await page.click("button[type=submit]");
-  await page.waitForFunction(() => location.pathname === "/dashboard", { timeout: 10000 });
+  await page.waitForFunction(() => location.hash === "#/dashboard", { timeout: 10000 });
 
   await page.waitForSelector("#hook-url");
   await page.type("#hook-url", url);

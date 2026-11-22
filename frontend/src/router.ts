@@ -1,5 +1,5 @@
 import { nextTick } from "vue";
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHashHistory } from "vue-router";
 import ConcealView from "@/views/ConcealView.vue";
 import NotFoundView from "@/views/NotFoundView.vue";
 import RevealView from "@/views/RevealView.vue";
@@ -9,7 +9,9 @@ import DashboardView from "@/views/DashboardView.vue";
 import RequestView from "@/views/RequestView.vue";
 
 export const router = createRouter({
-  history: createWebHistory(),
+  // Secret ids live in the fragment, which browsers never send to the server.
+  // Render's CDN therefore logs only "/" instead of the bearer capability.
+  history: createWebHashHistory(),
   routes: [
     { path: "/", name: "conceal", component: ConcealView, meta: { title: "New secret" } },
     { path: "/secret/:key", name: "reveal", component: RevealView, meta: { title: "Open a secret" } },

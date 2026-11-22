@@ -42,7 +42,9 @@ const usageRaw = computed(() => Math.round((payloadBytes.value / limitBytes.valu
 const usage = computed(() => Math.min(100, usageRaw.value));
 const link = computed(() => {
   if (!result.value) return "";
-  return new URL(result.value.links.secret, window.location.origin).toString();
+  // Hash route: the opaque id is in the fragment, which is never sent to the
+  // server or its CDN. Only "/" reaches Render's access log.
+  return `${window.location.origin}/#/secret/${encodeURIComponent(result.value.secret_key)}`;
 });
 
 function setMode(next: "text" | "file") {

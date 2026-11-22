@@ -220,11 +220,12 @@ const PeekSchema = z.object({
 });
 export type SecretPreview = z.infer<typeof PeekSchema>;
 
-// GET is a non-consuming preview: chat unfurlers and the SPA can inspect a
-// link without spending it. Only POST .../reveal returns plaintext.
+// Non-consuming preview. The key travels in the body so Render's CDN logs only
+// the static path "/api/v3/guest/secret/preview", never the bearer capability.
 export function peekSecret(key: string, signal?: AbortSignal): Promise<SecretPreview> {
-  return request(`/api/v3/guest/secret/${encodeURIComponent(key)}`, PeekSchema, {
-    method: "GET",
+  return request("/api/v3/guest/secret/preview", PeekSchema, {
+    method: "POST",
+    body: { key },
     signal,
   });
 }
@@ -235,36 +236,37 @@ export function burnSecret(key: string): Promise<{
   metadata: { identifier: string; status: "burned" };
 }> {
   return request(
-    `/api/v3/secret/${encodeURIComponent(key)}`,
+    "/api/v3/secret/burn",
     z.object({
       ok: z.boolean(),
       metadata: z.object({ identifier: z.string(), status: z.literal("burned") }),
     }),
-    { method: "DELETE", body: {} },
+    { method: "POST", body: { key } },
   );
 }
 
 export function revealSecret(key: string, passphrase?: string): Promise<RevealResponse> {
-  const body = passphrase ? { passphrase } : {};
+  const body = passphrase ? { key, passphrase } : { key };
   return request(
-    `/api/v3/guest/secret/${encodeURIComponent(key)}/reveal`,
+    "/api/v3/guest/secret/reveal",
     RevealResponseSchema,
     { method: "POST", body },
   );
 }
 
 export function getRequest(key: string, signal?: AbortSignal): Promise<RequestPreview> {
-  return request(`/api/v3/requests/${encodeURIComponent(key)}`, RequestPreviewSchema, {
-    method: "GET",
+  return request("/api/v3/requests/preview", RequestPreviewSchema, {
+    method: "POST",
+    body: { key },
     signal,
   });
 }
 
 export function respondToRequest(key: string, secret: string): Promise<{ ok: boolean; label: string }> {
   return request(
-    `/api/v3/requests/${encodeURIComponent(key)}/respond`,
+    "/api/v3/requests/respond",
     z.object({ ok: z.boolean(), label: z.string() }),
-    { method: "POST", body: { secret } },
+    { method: "POST", body: { key, secret } },
   );
 }
 
@@ -283,9 +285,9 @@ export function createRequest(label: string, ttl: number): Promise<z.infer<typeo
 
 export function revealRequest(key: string): Promise<RevealResponse> {
   return request(
-    `/api/v3/requests/${encodeURIComponent(key)}/reveal`,
+    "/api/v3/requests/reveal",
     RevealResponseSchema,
-    { method: "POST", body: {} },
+    { method: "POST", body: { key } },
   );
 }
 

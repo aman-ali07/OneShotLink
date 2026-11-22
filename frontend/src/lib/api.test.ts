@@ -94,7 +94,8 @@ describe("revealSecret", () => {
     const result = await revealSecret("a/b");
 
     expect(result.secret_value).toBe("hello");
-    expect(fetchMock.mock.calls[0]![0]).toBe("/api/v3/guest/secret/a%2Fb/reveal");
+    expect(fetchMock.mock.calls[0]![0]).toBe("/api/v3/guest/secret/reveal");
+    expect(fetchMock.mock.calls[0]![1]?.body).toContain("a/b");
   });
 
   it("maps a wrong passphrase to a typed ApiError without losing the message", async () => {
@@ -178,7 +179,7 @@ describe("errorMessage", () => {
 });
 
 describe("new API surface", () => {
-  it("burns an owner secret with DELETE without returning a value", async () => {
+  it("burns an owner secret with a static body-key route without returning a value", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({ ok: true, metadata: { identifier: "k", status: "burned" } }),
     );
@@ -188,12 +189,12 @@ describe("new API surface", () => {
 
     expect(result.metadata.status).toBe("burned");
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v3/secret/k",
-      expect.objectContaining({ method: "DELETE", credentials: "same-origin" }),
+      "/api/v3/secret/burn",
+      expect.objectContaining({ method: "POST", credentials: "same-origin" }),
     );
   });
 
-  it("previews a secret via GET without consuming it", async () => {
+  it("previews a secret via a static body-key route without consuming it", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
         passphrase_required: true,
@@ -206,8 +207,8 @@ describe("new API surface", () => {
 
     expect(result.passphrase_required).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v3/guest/secret/a%2Fb",
-      expect.objectContaining({ method: "GET" }),
+      "/api/v3/guest/secret/preview",
+      expect.objectContaining({ method: "POST" }),
     );
   });
 

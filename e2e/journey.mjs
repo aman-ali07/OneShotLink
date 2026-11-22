@@ -207,7 +207,7 @@ try {
   await page.reload({ waitUntil: "networkidle0" });
   await page.waitForSelector("#gone-heading", { timeout: 10000 });
 
-  assert(link.includes("/secret/"), "result link is not a /secret/ URL");
+  assert(link.includes("/#/secret/"), "result link is not a hash-based /secret/ URL");
   assert(!link.includes(secret), "plaintext leaked into the link");
   assert(revealed === secret, "revealed value did not match");
   assert(storageAfterCreate.local === "{}", "secret data was written to localStorage");
@@ -231,7 +231,7 @@ try {
   );
   assert(/not correct/i.test(wrongMessage), "wrong-passphrase message missing");
   assert(clearedOnRetry, "a wrong passphrase was not cleared for a one-type retry");
-  assert(fileLink.includes("/secret/"), "file result link is not a /secret/ URL");
+  assert(fileLink.includes("/#/secret/"), "file result link is not a hash-based /secret/ URL");
   assert(!fileLink.includes("e2e-file"), "file plaintext leaked into the link");
   assert(fileUi.includes("e2e-file.bin"), "file name missing from the reveal UI");
   assert(fileUi.includes("binary file"), "file size/type line missing");

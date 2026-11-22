@@ -70,8 +70,10 @@ try {
     await noOverflow(page, `revealed-${width}`);
     await targetsAtLeast44(page, `revealed-${width}`, "main button");
 
-    // Spent links show the terminal panel on load via the non-consuming GET.
+    // Spent links show the terminal panel on load via the non-consuming POST
+    // preview. Hash routing needs a full reload to re-run the route's load().
     await page.goto(link, { waitUntil: "networkidle0" });
+    await page.reload({ waitUntil: "networkidle0" });
     await page.waitForSelector("#gone-heading", { timeout: 10000 });
     await noOverflow(page, `gone-${width}`);
     await page.close();
@@ -110,13 +112,13 @@ try {
     const stamp = Date.now();
     const email = `mobile-${stamp}@example.test`;
     const password = "mobile-passphrase-123";
-    await page.goto(`${base}/signup`, { waitUntil: "networkidle0" });
+    await page.goto(`${base}/#/signup`, { waitUntil: "networkidle0" });
     await noOverflow(page, "signup-375");
     await page.type("#email", email);
     await page.type("#password", password);
     await page.type("#confirmation", password);
     await page.click("button[type=submit]");
-    await page.waitForFunction(() => location.pathname === "/dashboard", { timeout: 15000 });
+    await page.waitForFunction(() => location.hash === "#/dashboard", { timeout: 15000 });
     await page.waitForSelector("#receipts-heading", { timeout: 10000 });
     await noOverflow(page, "dashboard-375");
 
@@ -133,7 +135,7 @@ try {
     });
     assert(key, "request key missing from API");
 
-    await page.goto(`${base}/request/${key}`, { waitUntil: "networkidle0" });
+    await page.goto(`${base}/#/request/${key}`, { waitUntil: "networkidle0" });
     await page.waitForSelector("#request-secret", { timeout: 10000 });
     await noOverflow(page, "responder-ready-375");
     await page.type("#request-secret", `mobile-answer-${stamp}`);
@@ -172,7 +174,7 @@ try {
       scroll: document.documentElement.scrollWidth,
       client: document.documentElement.clientWidth,
     }));
-    assert.equal(after.hash, "#main", "skip link did not set #main");
+    assert.equal(after.id, "main", "skip link did not focus <main>");
     assert.equal(after.id, "main", "skip link did not focus <main>");
     assert(after.scroll <= after.client + 1, "static site overflows at 320px");
     await page.close();
