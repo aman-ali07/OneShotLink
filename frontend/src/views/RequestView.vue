@@ -154,7 +154,7 @@ async function submit() {
 
     <section v-else class="ots-panel overflow-hidden" aria-labelledby="request-heading">
       <div class="flex items-center gap-3 border-b border-border px-6 py-4">
-        <span class="ots-eyebrow">Incoming request</span>
+        <span class="ots-eyebrow shrink-0 whitespace-nowrap">Incoming request</span>
         <span class="ots-rule flex-1" aria-hidden="true" />
         <span class="text-xs text-muted">One answer allowed</span>
       </div>

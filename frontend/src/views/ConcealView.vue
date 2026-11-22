@@ -180,7 +180,7 @@ function reset() {
     <div v-if="!result" class="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-12">
       <section class="ots-panel overflow-hidden" aria-labelledby="compose-heading">
         <div class="flex items-center gap-3 border-b border-border px-6 py-4 sm:px-8">
-          <span class="ots-eyebrow">01 / Compose</span>
+          <span class="ots-eyebrow shrink-0 whitespace-nowrap">01 / Compose</span>
           <span class="ots-rule flex-1" aria-hidden="true" />
           <span class="text-xs text-muted">Nothing is sent until you create the link</span>
         </div>
@@ -341,7 +341,7 @@ function reset() {
           </p>
         </div>
 
-        <p class="px-1 text-xs text-muted">
+        <p class="text-xs text-muted">
           Limits on this instance: {{ sizeLabel(maxBytes) }} of text, {{ sizeLabel(maxFileBytes) }} per file.
         </p>
       </aside>

@@ -9,6 +9,16 @@ older entries are point-in-time snapshots; the current total is recorded in `TES
 
 ## [Unreleased]
 
+### Frontend alignment fixes (2026-11-22) — verified
+
+- Programmatic focus no longer draws an accent box around terminal-state headings; real controls
+  and the skip link keep their focus ring.
+- Panel eyebrows no longer wrap mid-label at 390px, and the sidebar limit note now shares its
+  card's left edge at desktop widths.
+- Theme, palette, typography and spacing scale are unchanged. Verified with Vitest, typecheck,
+  build and headless measurements at four viewport widths. Stageshow still added at
+  `docs/frontend-alignment-fix.html` / `.png`.
+
 No user-visible *application* changes since `0.2.0`; the sections below record deployment
 and documentation preparation.
 

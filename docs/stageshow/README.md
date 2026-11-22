@@ -27,6 +27,21 @@ To reproduce, copy `index.tsx` and `card.css` into
 commands above. The kit is a design toolchain, not an app dependency; nothing here is
 imported by the Vue SPA or the static site.
 
+## Frontend alignment-fix still (2026-11-22)
+
+`frontend-alignment-fix.html` / `frontend-alignment-fix.png` is the `@stageshow` still coordinating
+the layout-only frontend fixes: the eyebrow holds one line at 390px, the sidebar note shares the
+card's left edge at 1440px, and terminal-state headings no longer draw a focus box while real
+controls keep their focus ring. It reuses the exact tokens from `frontend-design.html`; **theme,
+palette, type and spacing scale are unchanged**. Rendered 1030×560 with zero page errors, no
+document overflow (`docWidth=1030`, `docHeight=560`). Verified in a local Vite dev server with
+mocked API responses: eyebrow height 18px at 390px, `noteLeft === cardLeft === 968` at 1440px,
+terminal heading `outlineStyle: none` while focused, and a keyboard-focused link still shows
+`outlineStyle: solid`.
+
+Code changes: `frontend/src/assets/styles.css`, `views/ConcealView.vue`, `views/RevealView.vue`,
+`views/RequestView.vue`. Verification: Vitest, `vue-tsc --noEmit` and Vite build all exit 0.
+
 ## Developer-readiness still (2026-11-21)
 
 `../developer-readiness.html` and `../developer-readiness.png` are the `@stageshow` still for

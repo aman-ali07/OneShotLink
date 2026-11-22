@@ -20,6 +20,13 @@
     outline-offset: 2px;
   }
 
+  /* Programmatically focused status headings are announcements, not controls.
+     Keep the focus ring on links/buttons/inputs and the skip link, but do not
+     draw a stray accent box around a terminal-state title. Layout only. */
+  :is(h1, h2, h3)[tabindex="-1"]:focus {
+    outline: none;
+  }
+
   /* Every text control gets a 44px hit area without inflating checkboxes or
      radios (WCAG 2.5.8). Tailwind's preflight halves placeholder opacity, so
      restore the full muted token for contrast (WCAG 1.4.3). */

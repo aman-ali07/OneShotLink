@@ -262,7 +262,7 @@ function downloadFile() {
 
     <section v-else class="ots-panel overflow-hidden" aria-labelledby="reveal-heading" :aria-busy="loading">
       <div class="flex items-center gap-3 border-b border-border px-6 py-4 sm:px-8">
-        <span class="ots-eyebrow">03 / Open</span>
+        <span class="ots-eyebrow shrink-0 whitespace-nowrap">03 / Open</span>
         <span class="ots-rule flex-1" aria-hidden="true" />
         <span class="text-xs text-muted">One-time link</span>
       </div>

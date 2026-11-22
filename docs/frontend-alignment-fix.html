@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>OneShotLink — frontend alignment fix</title>
+<style>
+  /* Same tokens as docs/frontend-design.html. Position/alignment only. */
+  :root {
+    --bg:#fafaf9; --surface:#ffffff; --border:#e7e5e4; --border-input:#78716c;
+    --text:#1c1917; --muted:#57534e; --accent:#0f766e; --on-accent:#ffffff;
+    --grid:#efeeec; --radius:16px; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:var(--bg);color:var(--text);
+    background-image:linear-gradient(to right,var(--grid) 1px,transparent 1px),
+                     linear-gradient(to bottom,var(--grid) 1px,transparent 1px);
+    background-size:48px 48px;
+  }
+  .stage{position:relative;width:1030px;height:560px;overflow:hidden}
+  .foot{position:absolute;left:64px;top:16px;font-size:10px;color:var(--muted)}
+  .window{
+    position:absolute;left:64px;top:48px;width:1180px;
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;
+  }
+  .chrome{height:44px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 40px}
+  .mark{width:22px;height:22px;display:grid;place-items:center;background:var(--accent);border-radius:6px}
+  .mark svg{width:14px;height:14px}
+  .wordmark{font-size:13px;font-weight:700;letter-spacing:-.01em}
+  .spacer{flex:1}
+  .navitem{font-size:11px;color:var(--muted)}
+  .body{display:block;min-height:620px}
+  .panel{margin:34px 40px 40px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .panel-head{display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--border);padding:16px 28px}
+  .eyebrow{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);white-space:nowrap}
+  .rule{height:1px;flex:1;background:var(--border)}
+  .note{font-size:11px;color:var(--muted)}
+  .content{padding:28px}
+  h1{font-size:30px;line-height:1.15;letter-spacing:-.02em;margin:0 0 10px}
+  .lede{font-size:13px;line-height:1.6;color:var(--muted);max-width:440px;margin:0 0 24px}
+  .field{border:1px solid var(--border-input);border-radius:10px;background:color-mix(in srgb,var(--bg) 70%,var(--surface));padding:14px 16px}
+  .field .line{height:7px;border-radius:4px;background:#d6d3d1}
+  .field .line.short{width:32%;margin-bottom:10px}
+  .field .line.wide{width:86%}
+  .opts{display:flex;gap:10px;margin:14px 0 20px}
+  .opt{border:1px solid var(--border-input);border-radius:8px;padding:9px 12px;font-size:11px;color:var(--muted);min-width:112px}
+  .cta{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--on-accent);
+       border-radius:8px;padding:11px 16px;font-size:12px;font-weight:600}
+  .satellite{
+    position:absolute;right:36px;bottom:34px;width:292px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);padding:18px;
+  }
+  .satellite .tag{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+  .sat-row{display:flex;gap:10px;margin-top:13px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:4px;flex:none}
+  .sat-row p{margin:0;font-size:11px;line-height:1.5;color:var(--muted)}
+  .sat-row strong{color:var(--text);font-weight:600}
+  .sat-foot{border-top:1px solid var(--border);margin-top:14px;padding-top:10px;font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="foot">Frontend alignment — layout only · theme and colour unchanged</div>
+  <div class="window">
+    <div class="chrome">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 9h-1a7 7 0 0 0-7 7 7 7 0 0 0 7 7h1" />
+          <path d="M18 9h1a7 7 0 0 1 7 7 7 7 0 0 1-7 7h-1" />
+        </svg>
+      </span>
+      <span class="wordmark">OneShotLink</span>
+      <span class="spacer"></span>
+      <span class="navitem">New secret</span>
+      <span class="navitem">Account</span>
+    </div>
+    <div class="body">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="eyebrow">01 / Compose</span>
+          <span class="rule" aria-hidden="true"></span>
+          <span class="note">Nothing is sent until you create the link</span>
+        </div>
+        <div class="content">
+          <h1>Share a secret once</h1>
+          <p class="lede">Paste a password, key or private note. The recipient gets a link that works exactly once.</p>
+          <div class="field">
+            <div class="line short"></div>
+            <div class="line wide"></div>
+          </div>
+          <div class="opts">
+            <span class="opt">Expires in 1 day</span>
+            <span class="opt">Passphrase</span>
+          </div>
+          <span class="cta">Create the link</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="satellite">
+    <div class="tag">Alignment gates</div>
+    <div class="sat-row"><span class="dot"></span><p><strong>390px:</strong> eyebrow stays on one line (18px high)</p></div>
+    <div class="sat-row"><span class="dot"></span><p><strong>1440px:</strong> sidebar note shares the card's left edge</p></div>
+    <div class="sat-row"><span class="dot"></span><p><strong>Terminal state:</strong> no focus box on headings; controls keep their ring</p></div>
+    <div class="sat-foot">Verified: typecheck, tests, build, headless measurements</div>
+  </div>
+</div>
+</body>
+</html>
